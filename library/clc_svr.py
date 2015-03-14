@@ -8,18 +8,11 @@ import json
 sys.path.append(os.path.expanduser('./common'))
 from clc_util import *
 
-try:
-    import clc
-except ImportError:
-    print "failed=True msg='clc-python-sdk required for this module'"
-    sys.exit(1)
-
-def create_instances(module):
+def create_instances(module, clc):
     """
     Creates new instances
 
     module : AnsibleModule object
-    ec2: authenticated ec2 connection object
 
     Returns:
         A list of dictionaries with instance information
@@ -62,6 +55,7 @@ def main():
             name = dict(),
             template = dict(),
             group_id = dict(),
+            group_name = dict(),
             network_id = dict(),
             cpu = dict(default=None),
             memory = dict(default=None),
@@ -95,10 +89,14 @@ def main():
         mutually_exclusive = [
                                 ['exact_count', 'count'],
                                 ['exact_count', 'state'],
+                                ['group_id', 'group_name'],
                              ],
     )
 
-    print json.dumps(module.params)
+    clc = clc_set_credentials(module)
+
+    result = json.dumps(module.params)
+    print result
 
 from ansible.module_utils.basic import *
 main()
