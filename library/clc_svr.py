@@ -8,7 +8,28 @@ import json
 sys.path.append(os.path.expanduser('./common'))
 from clc_util import *
 
-def create_instances(module, clc):
+def find_running_instances_by_group_name(module, clc, count_tag, zone=None):
+    return
+
+def _set_none_to_blank(dictionary):
+    return
+
+def get_reservations(module, clc, tags=None, state=None, zone=None):
+    return
+
+def get_instance_info(inst):
+    return
+
+def enforce_count(module, clc, vpc):
+
+    all_instances = []
+    instance_dict_array = []
+    changed_instance_ids = []
+    changed = False
+
+    return (all_instances, instance_dict_array, changed_instance_ids, changed)
+
+def create_instances(module, clc, vpc):
     """
     Creates new instances
 
@@ -41,11 +62,33 @@ def create_instances(module, clc):
     anti_affinity_policy_id = module.params.get('anti_affinity_policy_id')
     packages = module.params.get('packages')
 
-    clc.v2.Server.Create(name, template, group_id, network_id, cpu=None, memory=None, alias=None,
-                     password=None, ip_address=None, storage_type="standard", type="standard",
-                     primary_dns=None, secondary_dns=None, additional_disks=[], custom_fields=[],
-                     ttl=None, managed_os=False, description=None, source_server_password=None,
-                     cpu_autoscale_policy_id=None, anti_affinity_policy_id=None, packages=[])
+    # clc.v2.Server.Create(name, template, group_id, network_id, cpu=None, memory=None, alias=None,
+    #                  password=None, ip_address=None, storage_type="standard", type="standard",
+    #                  primary_dns=None, secondary_dns=None, additional_disks=[], custom_fields=[],
+    #                  ttl=None, managed_os=False, description=None, source_server_password=None,
+    #                  cpu_autoscale_policy_id=None, anti_affinity_policy_id=None, packages=[])
+
+    instance_dict_array = []
+    created_instance_ids = []
+    changed = False
+
+    return (instance_dict_array, created_instance_ids, changed)
+
+def terminate_instances(module, clc, instance_ids):
+
+    changed = False
+    instance_dict_array = []
+    new_instance_ids = []
+
+    return (changed, instance_dict_array, new_instance_ids)
+
+def startstop_instances(module, clc, instance_ids, state):
+
+    changed = False
+    instance_dict_array = []
+    new_instance_ids = []
+
+    return (changed, instance_dict_array, new_instance_ids)
 
 def main():
 
@@ -94,6 +137,34 @@ def main():
     )
 
     clc = clc_set_credentials(module)
+
+    vpc = None
+
+    state = module.params.get('state')
+
+    if state == 'absent':
+        instance_ids = module.params.get('instance_ids')
+        if not isinstance(instance_ids, list):
+            module.fail_json(msg='termination_list needs to be a list of instances to terminate')
+
+        (changed, instance_dict_array, new_instance_ids) = terminate_instances(module, clc, instance_ids)
+
+    elif state in ('running', 'stopped'):
+        instance_ids = module.params.get('instance_ids')
+        if not isinstance(instance_ids, list):
+            module.fail_json(msg='running list needs to be a list of instances to run: %s' % instance_ids)
+
+        (changed, instance_dict_array, new_instance_ids) = startstop_instances(module, clc, instance_ids, state)
+
+    elif state == 'present':
+        # Changed is always set to true when provisioning new instances
+        if not module.params.get('template'):
+            module.fail_json(msg='template parameter is required for new instance')
+
+        if module.params.get('exact_count') is None:
+            (instance_dict_array, new_instance_ids, changed) = create_instances(module, clc, vpc)
+        else:
+            (tagged_instances, instance_dict_array, new_instance_ids, changed) = enforce_count(module, clc, vpc)
 
     result = json.dumps(module.params)
     print result
