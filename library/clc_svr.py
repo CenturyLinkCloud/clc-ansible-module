@@ -1,7 +1,12 @@
 #!/usr/bin/python
 
+import sys
+import os
 import datetime
 import json
+
+sys.path.append(os.path.expanduser('./common'))
+from clc_util import *
 
 try:
     import clc
@@ -51,36 +56,40 @@ def create_instances(module):
 
 def main():
 
-    argument_spec = dict(
-        name = dict(),
-        template = dict(),
-        group_id = dict(),
-        network_id = dict(),
-        cpu = dict(default=None),
-        memory = dict(default=None),
-        alias = dict(default=None),
-        password = dict(default=None),
-        ip_address = dict(default=None),
-        storage_type = dict(default='standard'),
-        type = dict(default='standard'),
-        primary_dns = dict(default=None),
-        secondary_dns = dict(default=None),
-        additional_disks = dict(type='list', default=[]),
-        custom_fields = dict(type='list', default=[]),
-        ttl = dict(default=None),
-        managed_os = dict(default=False),
-        description = dict(default=None),
-        source_server_password = dict(default=None),
-        cpu_autoscale_policy_id = dict(default=None),
-        anti_affinity_policy_id = dict(default=None),
-        packages = dict(type='list', default=[]),
-        state = dict(default='present', choices=['present', 'absent']),
-        count = dict(type='int', default='1'),
-        exact_count = dict(type='int', default=None),
-        wait = dict(type='bool', default=False),
-        wait_timeout = dict(default=300)
+    argument_spec = clc_common_argument_spec()
+    argument_spec.update(
+        dict(
+            name = dict(),
+            template = dict(),
+            group_id = dict(),
+            network_id = dict(),
+            cpu = dict(default=None),
+            memory = dict(default=None),
+            alias = dict(default=None),
+            password = dict(default=None),
+            ip_address = dict(default=None),
+            storage_type = dict(default='standard'),
+            type = dict(default='standard'),
+            primary_dns = dict(default=None),
+            secondary_dns = dict(default=None),
+            additional_disks = dict(type='list', default=[]),
+            custom_fields = dict(type='list', default=[]),
+            ttl = dict(default=None),
+            managed_os = dict(default=False),
+            description = dict(default=None),
+            source_server_password = dict(default=None),
+            cpu_autoscale_policy_id = dict(default=None),
+            anti_affinity_policy_id = dict(default=None),
+            packages = dict(type='list', default=[]),
+            state = dict(default='present', choices=['present', 'absent']),
+            count = dict(type='int', default='1'),
+            exact_count = dict(type='int', default=None),
+            wait = dict(type='bool', default=False),
+            wait_timeout = dict(default=300)
+            )
 
     )
+
     module = AnsibleModule(
         argument_spec=argument_spec,
         mutually_exclusive = [
