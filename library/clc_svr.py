@@ -4,12 +4,55 @@ import sys
 import os
 import datetime
 import json
+#import pudb; pu.db
 
-sys.path.append(os.path.expanduser('./common'))
+sys.path.append(os.path.expanduser('~/Development/workspace/clc-ansible-module/library/common'))
 from clc_util import *
 
 def find_running_instances_by_group_name(module, clc, count_tag, zone=None):
     return
+
+def _find_datacenter(module, clc):
+    location = module.params.get('location')
+    try:
+        datacenter = clc.v2.Datacenter(location)
+    except:
+        module.fail_json(msg = str("Unable to find location: " + location))
+        sys.exit(1)
+    return datacenter
+
+def _find_group(module, clc, datacenter):
+    lookup_group = module.params.get('group')
+    try:
+        group = datacenter.Groups().Get(lookup_group)
+    except:
+        module.fail_json(msg = str("Unable to find group: " + lookup_group + " in location: " + datacenter.id))
+        sys.exit(1)
+    return group
+
+def _find_template(module,clc,datacenter):
+    lookup_template = module.params.get('template')
+    try:
+        template = datacenter.Templates().Search(lookup_template)[0]
+    except:
+        module.fail_json(msg = str("Unable to find a template: "+ lookup_template +" in location: " + datacenter.id))
+        sys.exit(1)
+    return template
+
+def _find_default_network(module, clc, datacenter):
+    try:
+        network = datacenter.Networks().networks[0]
+    except:
+        module.fail_json(msg = str("Unable to find a network in location: " + datacenter.id))
+        sys.exit(1)
+    return network
+
+def _validate_name(module):
+    name = module.params.get('name')
+    if (len(name)<1 or len(name) > 6):
+        module.fail_json(msg = str("name must be a string with a minimum length of 1 and a maximum length of 6"))
+        sys.exit(1)
+    return name
 
 def _set_none_to_blank(dictionary):
     return
@@ -20,7 +63,10 @@ def get_reservations(module, clc, tags=None, state=None, zone=None):
 def get_instance_info(inst):
     return
 
-def enforce_count(module, clc, vpc):
+def enforce_count(module, clc):
+
+    exact_count = module.params.get('exact_count')
+    count_group = module.params.get('count_group')
 
     all_instances = []
     instance_dict_array = []
@@ -29,7 +75,7 @@ def enforce_count(module, clc, vpc):
 
     return (all_instances, instance_dict_array, changed_instance_ids, changed)
 
-def create_instances(module, clc, vpc):
+def create_instances(module, clc, override_count=None):
     """
     Creates new instances
 
@@ -39,9 +85,8 @@ def create_instances(module, clc, vpc):
         A list of dictionaries with instance information
         about the instances that were launched
     """
-    name = module.params.get('name')
-    template = module.params.get('template')
-    group_id = module.params.get('group_id')
+    name = _validate_name(module)
+
     network_id = module.params.get('network_id')
     cpu = module.params.get('cpu')
     memory = module.params.get('memory')
@@ -61,16 +106,65 @@ def create_instances(module, clc, vpc):
     cpu_autoscale_policy_id = module.params.get('cpu_autoscale_policy_id')
     anti_affinity_policy_id = module.params.get('anti_affinity_policy_id')
     packages = module.params.get('packages')
+    wait = module.params.get('wait')
 
-    # clc.v2.Server.Create(name, template, group_id, network_id, cpu=None, memory=None, alias=None,
-    #                  password=None, ip_address=None, storage_type="standard", type="standard",
-    #                  primary_dns=None, secondary_dns=None, additional_disks=[], custom_fields=[],
-    #                  ttl=None, managed_os=False, description=None, source_server_password=None,
-    #                  cpu_autoscale_policy_id=None, anti_affinity_policy_id=None, packages=[])
+    if override_count:
+        count = override_count
+    else:
+        count = module.params.get('count')
 
-    instance_dict_array = []
-    created_instance_ids = []
-    changed = False
+    datacenter = _find_datacenter(module, clc)
+    group = _find_group(module, clc, datacenter)
+    template = _find_template(module, clc, datacenter)
+
+    if not network_id:
+        network_id = _find_default_network(module, clc, datacenter).id
+
+    params = {
+        'clc': clc,
+        'name': name,
+        'template': template.id,
+        'group_id': group.id,
+        'network_id': network_id,
+        'cpu': cpu,
+        'memory': memory,
+        'alias': alias,
+        'password': password,
+        'ip_address': ip_address,
+        'storage_type': storage_type,
+        'type': svr_type,
+        'primary_dns': primary_dns,
+        'secondary_dns': secondary_dns,
+        'additional_disks': additional_disks,
+        'custom_fields': custom_fields,
+        'ttl': ttl,
+        'managed_os': managed_os,
+        'description': description,
+        'source_server_password': source_server_password,
+        'cpu_autoscale_policy_id': cpu_autoscale_policy_id,
+        'anti_affinity_policy_id': anti_affinity_policy_id,
+        'packages': packages
+    }
+
+    if count == 0:
+        changed = False
+    else:
+        changed = True
+
+        requests = []
+        instance_dict_array = []
+        created_instance_ids = []
+
+        for i in range(0,count):
+            req=create_clc_server(**params)
+            server = req.requests[0].Server()
+
+            requests.append(req)
+            instance_dict_array.append(server.data)
+            created_instance_ids.append(server.id)
+
+        if wait:
+            sum(requests).WaitUntilComplete()
 
     return (instance_dict_array, created_instance_ids, changed)
 
@@ -90,18 +184,29 @@ def startstop_instances(module, clc, instance_ids, state):
 
     return (changed, instance_dict_array, new_instance_ids)
 
-def main():
+def create_ansible_module():
+    argument_spec = define_argument_spec()
 
+    module = AnsibleModule(
+        argument_spec=argument_spec,
+        mutually_exclusive = [
+                                ['exact_count', 'count'],
+                                ['exact_count', 'state']
+                             ],
+    )
+    return module
+
+def define_argument_spec():
     argument_spec = clc_common_argument_spec()
     argument_spec.update(
         dict(
             name = dict(),
             template = dict(),
-            group_id = dict(),
-            group_name = dict(),
+            group = dict(default='Default Group'),
             network_id = dict(),
-            cpu = dict(default=None),
-            memory = dict(default=None),
+            location = dict(default=None),
+            cpu = dict(default=1),
+            memory = dict(default='1'),
             alias = dict(default=None),
             password = dict(default=None),
             ip_address = dict(default=None),
@@ -121,26 +226,20 @@ def main():
             state = dict(default='present', choices=['present', 'absent']),
             count = dict(type='int', default='1'),
             exact_count = dict(type='int', default=None),
-            wait = dict(type='bool', default=False),
-            wait_timeout = dict(default=300)
+            count_group = dict(),
+            wait = dict(type='bool', default=True),
             )
 
     )
+    return argument_spec
 
-    module = AnsibleModule(
-        argument_spec=argument_spec,
-        mutually_exclusive = [
-                                ['exact_count', 'count'],
-                                ['exact_count', 'state'],
-                                ['group_id', 'group_name'],
-                             ],
-    )
+def main():
 
+    module = create_ansible_module()
     clc = clc_set_credentials(module)
-
-    vpc = None
-
     state = module.params.get('state')
+
+    tagged_instances = []
 
     if state == 'absent':
         instance_ids = module.params.get('instance_ids')
@@ -162,12 +261,11 @@ def main():
             module.fail_json(msg='template parameter is required for new instance')
 
         if module.params.get('exact_count') is None:
-            (instance_dict_array, new_instance_ids, changed) = create_instances(module, clc, vpc)
+            (instance_dict_array, new_instance_ids, changed) = create_instances(module, clc)
         else:
-            (tagged_instances, instance_dict_array, new_instance_ids, changed) = enforce_count(module, clc, vpc)
+            (tagged_instances, instance_dict_array, new_instance_ids, changed) = enforce_count(module, clc)
 
-    result = json.dumps(module.params)
-    print result
+    module.exit_json(changed=changed, instance_ids=new_instance_ids, instances=instance_dict_array, tagged_instances=tagged_instances)
 
 from ansible.module_utils.basic import *
 main()
