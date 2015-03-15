@@ -1,0 +1,16 @@
+---
+- name: deploy ubuntu hosts at CLC (Yay!)
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: clc module
+      clc-server:
+        name: test
+        template: ubuntu-14-64
+        exact_count: 2
+        group: 'DBServers'
+        count_group: 'DBServers'
+      register: clc
+    - name: debug
+      debug: var=clc.server_ids

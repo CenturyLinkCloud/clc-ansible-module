@@ -1,0 +1,11 @@
+---
+- name: deploy ubuntu hosts at CLC (Yay!)
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: test deploying keys
+      clc-auth-key:
+        server_ids: ['VA1DTADTEST345', 'VA1DTADTEST345']
+    - name: debug
+      debug: var=clc.server_ids
