@@ -64,15 +64,6 @@ def _validate_name(module):
         sys.exit(1)
     return name
 
-def _set_none_to_blank(dictionary):
-    return
-
-def get_reservations(module, clc, tags=None, state=None, zone=None):
-    return
-
-def get_instance_info(inst):
-    return
-
 def enforce_count(module, clc):
 
     exact_count = module.params.get('exact_count')
@@ -235,7 +226,6 @@ def terminate_servers(module, clc, server_ids):
     """
     # Whether to wait for termination to complete before returning
     wait = module.params.get('wait')
-    servers = clc.v2.Servers(server_ids).Servers()
     terminated_server_ids = []
     server_dict_array = []
     requests = []
@@ -244,6 +234,7 @@ def terminate_servers(module, clc, server_ids):
     if not isinstance(server_ids, list) or len(server_ids) < 1:
         module.fail_json(msg='server_ids should be a list of servers, aborting')
 
+    servers = clc.v2.Servers(server_ids).Servers()
     changed = True
 
     for server in servers:
@@ -258,13 +249,56 @@ def terminate_servers(module, clc, server_ids):
 
     return (changed, server_dict_array, terminated_server_ids)
 
-def startstop_instances(module, clc, instance_ids, state):
+def startstop_servers(module, clc, server_ids, state):
+    """
+    Starts or stops a list of existing servers
 
+    module: Ansible module object
+    clc: authenticated ec2 connection object
+    server_ids: The list of instances to start in the form of
+      [ {id: <server-id>}, ..]
+    state: Intended state ("started" or "stopped")
+
+    Returns a dictionary of instance information
+    about the instances started/stopped.
+
+    If the instance was not able to change state,
+    "changed" will be set to False.
+
+    """
+
+    wait = module.params.get('wait')
     changed = False
+    changed_servers = []
     server_dict_array = []
-    new_server_ids = []
+    result_server_ids = []
+    requests = []
 
-    return (changed, server_dict_array, new_server_ids)
+    if not isinstance(server_ids, list) or len(server_ids) < 1:
+        module.fail_json(msg='server_ids should be a list of servers, aborting')
+
+    servers = clc.v2.Servers(server_ids).Servers()
+    for server in servers:
+        if server.powerState != state:
+            changed_servers.append(server)
+            try:
+                if state=='started':
+                    requests.append(server.PowerOn())
+                else:
+                    requests.append(server.PowerOff())
+            except e:
+                module.fail_json(msg='Unable to change state for server {0}, error: {1}'.format(server.id, e))
+            changed = True
+
+    if wait:
+        sum(requests).WaitUntilComplete()
+        for server in changed_servers: server.Refresh()
+
+    for server in changed_servers:
+        server_dict_array.append(server.data)
+        result_server_ids.append(server.id)
+
+    return (changed, server_dict_array, result_server_ids)
 
 def create_ansible_module():
     argument_spec = define_argument_spec()
@@ -305,7 +339,7 @@ def define_argument_spec():
             cpu_autoscale_policy_id = dict(default=None),
             anti_affinity_policy_id = dict(default=None),
             packages = dict(type='list', default=[]),
-            state = dict(default='present', choices=['present', 'absent']),
+            state = dict(default='present', choices=['present', 'absent', 'started', 'stopped']),
             count = dict(type='int', default='1'),
             exact_count = dict(type='int', default=None),
             count_group = dict(),
@@ -331,12 +365,12 @@ def main():
 
         (changed, server_dict_array, new_server_ids) = terminate_servers(module, clc, server_ids)
 
-    elif state in ('running', 'stopped'):
-        instance_ids = module.params.get('instance_ids')
-        if not isinstance(instance_ids, list):
-            module.fail_json(msg='running list needs to be a list of instances to run: %s' % instance_ids)
+    elif state in ('started', 'stopped'):
+        server_ids = module.params.get('server_ids')
+        if not isinstance(server_ids, list):
+            module.fail_json(msg='running list needs to be a list of servers to run: %s' % server_ids)
 
-        (changed, server_dict_array, new_server_ids) = startstop_instances(module, clc, instance_ids, state)
+        (changed, server_dict_array, new_server_ids) = startstop_servers(module, clc, server_ids, state)
 
     elif state == 'present':
         # Changed is always set to true when provisioning new instances
