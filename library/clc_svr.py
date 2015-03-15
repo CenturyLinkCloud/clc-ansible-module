@@ -185,37 +185,41 @@ def create_instances(module, clc, override_count=None):
         changed = True
 
         requests = []
-        instance_dict_array = []
-        created_instance_ids = []
+        servers = []
+        server_dict_array = []
+        created_server_ids = []
 
         for i in range(0,count):
             req=create_clc_server(**params)
             server = req.requests[0].Server()
-
             requests.append(req)
-            instance_dict_array.append(server.data)
-            created_instance_ids.append(server.id)
+            servers.append(server)
 
         if wait:
             sum(requests).WaitUntilComplete()
+            for server in servers: server.Refresh()
 
-    return (instance_dict_array, created_instance_ids, changed)
+        for server in servers:
+            server_dict_array.append(server.data)
+            created_server_ids.append(server.id)
+
+    return (server_dict_array, created_server_ids, changed)
 
 def terminate_instances(module, clc, instance_ids):
 
     changed = False
-    instance_dict_array = []
-    new_instance_ids = []
+    server_dict_array = []
+    new_server_ids = []
 
-    return (changed, instance_dict_array, new_instance_ids)
+    return (changed, server_dict_array, new_server_ids)
 
 def startstop_instances(module, clc, instance_ids, state):
 
     changed = False
-    instance_dict_array = []
-    new_instance_ids = []
+    server_dict_array = []
+    new_server_ids = []
 
-    return (changed, instance_dict_array, new_instance_ids)
+    return (changed, server_dict_array, new_server_ids)
 
 def create_ansible_module():
     argument_spec = define_argument_spec()
@@ -279,14 +283,14 @@ def main():
         if not isinstance(instance_ids, list):
             module.fail_json(msg='termination_list needs to be a list of instances to terminate')
 
-        (changed, instance_dict_array, new_instance_ids) = terminate_instances(module, clc, instance_ids)
+        (changed, server_dict_array, new_server_ids) = terminate_instances(module, clc, instance_ids)
 
     elif state in ('running', 'stopped'):
         instance_ids = module.params.get('instance_ids')
         if not isinstance(instance_ids, list):
             module.fail_json(msg='running list needs to be a list of instances to run: %s' % instance_ids)
 
-        (changed, instance_dict_array, new_instance_ids) = startstop_instances(module, clc, instance_ids, state)
+        (changed, server_dict_array, new_server_ids) = startstop_instances(module, clc, instance_ids, state)
 
     elif state == 'present':
         # Changed is always set to true when provisioning new instances
@@ -294,11 +298,11 @@ def main():
             module.fail_json(msg='template parameter is required for new instance')
 
         if module.params.get('exact_count') is None:
-            (instance_dict_array, new_instance_ids, changed) = create_instances(module, clc)
+            (server_dict_array, new_server_ids, changed) = create_instances(module, clc)
         else:
-            (instance_dict_array, new_instance_ids, changed) = enforce_count(module, clc)
+            (server_dict_array, new_server_ids, changed) = enforce_count(module, clc)
 
-    module.exit_json(changed=changed, instance_ids=new_instance_ids, instances=instance_dict_array, tagged_instances=tagged_instances)
+    module.exit_json(changed=changed, server_ids=new_server_ids, servers=server_dict_array)
 
 from ansible.module_utils.basic import *
 main()
