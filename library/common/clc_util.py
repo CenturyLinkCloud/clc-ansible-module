@@ -1,5 +1,6 @@
 
 import json
+import os
 
 try:
     import clc
@@ -17,16 +18,22 @@ def clc_common_argument_spec():
     )
 
 def clc_set_credentials(module):
-        v1_api_key = module.params.get('v1_api_key')
-        v1_api_passwd = module.params.get('v1_api_passwd')
-        v2_api_username = module.params.get('v2_api_username')
-        v2_api_passwd = module.params.get('v2_api_passwd')
+        p = module.params
+        e = os.environ
+
+        v1_api_key = p['v1_api_key'] if p['v1_api_key'] else e['CLC_V1_API_KEY']
+        v1_api_passwd = p['v1_api_passwd'] if p['v1_api_passwd'] else e['CLC_V1_API_PASSWD']
+        v2_api_username = p['v2_api_username'] if p['v2_api_username'] else e['CLC_V2_API_USERNAME']
+        v2_api_passwd = p['v2_api_passwd'] if p['v2_api_passwd'] else e['CLC_V2_API_PASSWD']
+
+        if (not v2_api_username or not v2_api_passwd):
+            module.fail_json(msg = "you must set the clc v2 api username and password on the task or using environment variables")
+            sys.exit(1)
 
         clc.v1.SetCredentials(v1_api_key,v1_api_passwd)
         clc.v2.SetCredentials(v2_api_username,v2_api_passwd)
 
         return clc
-
 
 def create_clc_server(clc, name,template,group_id,network_id,cpu=None,memory=None,alias=None,password=None,ip_address=None,
            storage_type="standard",type="standard",primary_dns=None,secondary_dns=None,
