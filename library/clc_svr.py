@@ -106,6 +106,18 @@ def enforce_count(module, clc):
             for server in server_dict_array:
                 running_servers.append(server)
 
+    elif len(running_servers) > exact_count:
+        changed = True
+        to_remove = len(running_servers) - exact_count
+        if not checkmode:
+            all_server_ids = sorted([ x.id for x in running_servers ])
+            remove_ids = all_server_ids[0:to_remove]
+
+            servers = [ x for x in servers if x.id not in remove_ids]
+
+            (changed, server_dict_array, changed_server_ids) \
+                = terminate_servers(module, clc, remove_ids)
+
     return (server_dict_array, changed_server_ids, changed)
 
 def create_instances(module, clc, override_count=None):
