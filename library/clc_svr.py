@@ -205,13 +205,46 @@ def create_instances(module, clc, override_count=None):
 
     return (server_dict_array, created_server_ids, changed)
 
-def terminate_instances(module, clc, instance_ids):
+def terminate_servers(module, clc, server_ids):
+    """
+    Terminates a list of servers
+
+    module: Ansible module object
+    clc: authenticated clc connection object
+    termination_list: a list of instances to terminate in the form of
+      [ {id: <inst-id>}, ..]
+
+    Returns a dictionary of server information
+    about the instances terminated.
+
+    If the server to be terminated is running
+    "changed" will be set to False.
+
+    """
+    # Whether to wait for termination to complete before returning
+    wait = module.params.get('wait')
+    servers = clc.v2.Servers(server_ids).Servers()
+    terminated_server_ids = []
+    server_dict_array = []
+    requests = []
 
     changed = False
-    server_dict_array = []
-    new_server_ids = []
+    if not isinstance(server_ids, list) or len(server_ids) < 1:
+        module.fail_json(msg='server_ids should be a list of servers, aborting')
 
-    return (changed, server_dict_array, new_server_ids)
+    changed = True
+
+    for server in servers:
+        requests.append(server.Delete())
+
+    if wait:
+        sum(requests).WaitUntilComplete()
+
+    for server in servers:
+        server_dict_array.append(server.data)
+        terminated_server_ids.append(server.id)
+
+    return (changed, server_dict_array, terminated_server_ids)
 
 def startstop_instances(module, clc, instance_ids, state):
 
@@ -264,6 +297,7 @@ def define_argument_spec():
             count = dict(type='int', default='1'),
             exact_count = dict(type='int', default=None),
             count_group = dict(),
+            server_ids = dict(type='list'),
             wait = dict(type='bool', default=True),
             )
 
@@ -279,11 +313,11 @@ def main():
     tagged_instances = []
 
     if state == 'absent':
-        instance_ids = module.params.get('instance_ids')
-        if not isinstance(instance_ids, list):
+        server_ids = module.params.get('server_ids')
+        if not isinstance(server_ids, list):
             module.fail_json(msg='termination_list needs to be a list of instances to terminate')
 
-        (changed, server_dict_array, new_server_ids) = terminate_instances(module, clc, instance_ids)
+        (changed, server_dict_array, new_server_ids) = terminate_servers(module, clc, server_ids)
 
     elif state in ('running', 'stopped'):
         instance_ids = module.params.get('instance_ids')
