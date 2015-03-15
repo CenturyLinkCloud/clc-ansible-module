@@ -20,3 +20,5 @@ You can also set them as parameters on the tasks themselves, though I wouldn't r
 
 
 ## clc-auth-key Module
+
+## Dynamic Inventory Module
