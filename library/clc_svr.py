@@ -9,8 +9,17 @@ import json
 sys.path.append(os.path.expanduser('~/Development/workspace/clc-ansible-module/library/common'))
 from clc_util import *
 
-def find_running_instances_by_group_name(module, clc, count_tag, zone=None):
-    return
+def find_running_servers_by_group_name(module, clc, datacenter, count_group):
+    group = _find_group(module, clc, datacenter, count_group)
+
+    servers = group.Servers().Servers()
+    running_servers = []
+
+    for server in servers:
+        if (server.status == 'active' and server.powerState == 'started'):
+            running_servers.append(server)
+
+    return servers, running_servers
 
 def _find_datacenter(module, clc):
     location = module.params.get('location')
@@ -21,8 +30,9 @@ def _find_datacenter(module, clc):
         sys.exit(1)
     return datacenter
 
-def _find_group(module, clc, datacenter):
-    lookup_group = module.params.get('group')
+def _find_group(module, clc, datacenter, lookup_group=None):
+    if not lookup_group:
+        lookup_group = module.params.get('group')
     try:
         group = datacenter.Groups().Get(lookup_group)
     except:
@@ -67,13 +77,36 @@ def enforce_count(module, clc):
 
     exact_count = module.params.get('exact_count')
     count_group = module.params.get('count_group')
+    datacenter = _find_datacenter(module, clc)
 
-    all_instances = []
-    instance_dict_array = []
-    changed_instance_ids = []
+    # fail here if the exact count was specified without filtering
+    # on a group, as this may lead to a undesired removal of instances
+    if exact_count and count_group is None:
+        module.fail_json(msg="you must use the 'count_group' option with exact_count")
+
+    servers, running_servers = find_running_servers_by_group_name(module, clc, datacenter, count_group)
+
+    changed = None
+    checkmode = False
+    server_dict_array = []
+    changed_server_ids = None
+
+    all_servers = []
     changed = False
 
-    return (all_instances, instance_dict_array, changed_instance_ids, changed)
+    if len(running_servers) == exact_count:
+        changed = False
+    elif len(running_servers) < exact_count:
+        changed = True
+        to_create = exact_count - len(running_servers)
+        if not checkmode:
+            (server_dict_array, changed_server_ids, changed) \
+                = create_instances(module, clc, override_count=to_create)
+
+            for server in server_dict_array:
+                running_servers.append(server)
+
+    return (server_dict_array, changed_server_ids, changed)
 
 def create_instances(module, clc, override_count=None):
     """
@@ -263,7 +296,7 @@ def main():
         if module.params.get('exact_count') is None:
             (instance_dict_array, new_instance_ids, changed) = create_instances(module, clc)
         else:
-            (tagged_instances, instance_dict_array, new_instance_ids, changed) = enforce_count(module, clc)
+            (instance_dict_array, new_instance_ids, changed) = enforce_count(module, clc)
 
     module.exit_json(changed=changed, instance_ids=new_instance_ids, instances=instance_dict_array, tagged_instances=tagged_instances)
 
