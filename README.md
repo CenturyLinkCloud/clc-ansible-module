@@ -54,4 +54,33 @@ If you just specify *count* instead of *exact_count*, it is in non-idempotent mo
 
 ## clc-auth-key Module
 
+Push a SSH key to a user's authorized keys file on a list of servers.  Uses the CLC Server.Credentials API to login.
+
+### Example Playbook
+```yaml
+---
+- name: deploy ubuntu hosts at CLC (Yay!)
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Insure that exactly 3 Ubuntu servers are running in Default Group
+      clc-server:
+        name: test
+        template: ubuntu-14-64
+        exact_count: 3
+        group: 'Default Group'
+        count_group: 'Default Group'
+      register: clc
+
+    - name: Deploy ssh key to servers
+      clc-auth-key:
+        server_ids: "{{ clc.server_ids }}"
+        path_to_keyfile: ~/.ssh/id_rsa.pub
+
+    - name: debug
+      debug: var=clc.server_ids
+```
+
+
 ## Dynamic Inventory Module
