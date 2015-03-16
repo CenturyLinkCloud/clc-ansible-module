@@ -545,7 +545,6 @@ def find_server_by_uuid(clc, svr_uuid, alias=None):
     server = clc.v2.Server(id=server_id,alias=alias,server_obj=server_obj)
     return server
 
-
 #
 #  Run the program
 #
