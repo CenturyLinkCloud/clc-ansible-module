@@ -81,7 +81,7 @@ def create_ansible_module():
         mutually_exclusive = [
                                 ['exact_count', 'count'],
                                 ['exact_count', 'state']
-                             ],
+                             ]
     )
     return module
 
@@ -132,7 +132,7 @@ def clc_common_argument_spec():
     )
 
 #
-#  Functions to execute the different behaviors
+#  Functions to execute the module's behaviors
 #  (called from main())
 #
 
@@ -183,8 +183,6 @@ def enforce_count(module, clc):
         if not checkmode:
             all_server_ids = sorted([ x.id for x in running_servers ])
             remove_ids = all_server_ids[0:to_remove]
-
-            servers = [ x for x in servers if x.id not in remove_ids]
 
             (changed, server_dict_array, changed_server_ids) \
                 = delete_servers(module, clc, remove_ids)

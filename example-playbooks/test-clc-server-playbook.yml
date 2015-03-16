@@ -12,5 +12,9 @@
         group: 'Default Group'
         count_group: 'Default Group'
       register: clc
+    - name: Deploy ssh key to servers
+      clc-auth-key:
+
+
     - name: debug
       debug: var=clc.server_ids

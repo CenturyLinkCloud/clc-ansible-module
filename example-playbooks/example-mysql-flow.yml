@@ -17,6 +17,6 @@
       clc-auth-key:
         server_ids: "{{ clc.server_ids }}"
         path_to_keyfile: ~/.ssh/id_rsa.pub
-
+        
     - name: debug
       debug: var=clc.server_ids
