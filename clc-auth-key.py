@@ -19,6 +19,7 @@ except ImportError:
 
 #
 #  An Ansible module to push SSH keys to a list of servers on CenturyLink Cloud.
+#
 #  Include this file (or symlink to it) in the ./library directory under any playbook that uses it.
 #  This is loosely based on the ansible-core-modules EC2 module, and offers similar behavior.
 #
