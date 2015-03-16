@@ -4,13 +4,13 @@
   gather_facts: False
   connection: local
   tasks:
-    - name: clc module
+    - name: Insure that exactly 3 Ubuntu servers are running in Default Group
       clc-server:
         name: test
         template: ubuntu-14-64
-        exact_count: 2
-        group: 'DBServers'
-        count_group: 'DBServers'
+        exact_count: 3
+        group: 'Default Group'
+        count_group: 'Default Group'
       register: clc
     - name: debug
       debug: var=clc.server_ids
