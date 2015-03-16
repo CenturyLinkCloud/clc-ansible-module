@@ -463,7 +463,7 @@ def _validate_name(module):
 #  This is a hack.  The clc-python-sdk has a defect in its Server.Create function.  It submits a server create request
 #  and returns a Request object, but that Request is broken and unable to reference the server that is being created.
 #
-#  To work around it, we copied the Server.Create function here from the sdk, and then monkey patched the Request object
+#  To work around it, we copied the Server.Create function here from the sdk, and then monkey patch the Request object
 #  with a working Server() function before it's returned.  We'll submit a PR to the
 #  clc-sdk team then remove this code.
 #
