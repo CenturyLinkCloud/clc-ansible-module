@@ -18,7 +18,7 @@ You can also set them as parameters on the tasks themselves, though I wouldn't r
 
 ## clc-server Module
 
-Create, delete, start, or stop a server at CLC.  This module can be run in two modes: **idempotent** and **non-idempotent**. The module is idempotent if you specify the *exact_count* and *count_group* parameters.  In that case, it will create or delete the right number of servers to make sure that the *count_group* server group match the specified *exact_count* param.  
+Create, delete, start, or stop a server at CLC.  This module can be run in two modes: **idempotent** and **non-idempotent**. The module is idempotent if you specify the *exact_count* and *count_group* parameters.  In that case, it will create or delete the right number of servers to make sure that the *count_group* Server Group matches the number specified in the *exact_count* param.  
 
 If you just specify *count* instead of *exact_count*, it is in non-idempotent mode and will create *count* number of servers every time it's run.
 
