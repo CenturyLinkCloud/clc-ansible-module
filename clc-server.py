@@ -464,8 +464,8 @@ def _validate_name(module):
 #  and returns a Request object, but that Request is broken and unable to reference the server that is being created.
 #
 #  To work around it, we copied the Server.Create function here from the sdk, and then monkey patched the Request object
-#  with a working Server() function object, before it's returned, so that it would work.  We'll submit a PR to the
-#  clc-sdk project shortly, and then remove this code.
+#  with a working Server() function before it's returned.  We'll submit a PR to the
+#  clc-sdk team then remove this code.
 #
 
 def create_clc_server(clc, name,template,group_id,network_id,cpu=None,memory=None,alias=None,password=None,ip_address=None,
