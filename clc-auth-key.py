@@ -34,6 +34,7 @@ except ImportError:
 #  main() defines the program flow and behaviors
 #
 
+
 def main():
     module = create_ansible_module()
     clc = _clc_set_credentials(module)
@@ -57,12 +58,6 @@ def main():
 #  Functions to define the Ansible module and its arguments
 #
 
-def load_ssh_key(module, path_to_keyfile):
-    try:
-        key = open(os.path.expanduser(path_to_keyfile)).read()
-    except IOError as e:
-        module.fail_json(msg='unable to load ssh key: %s' % e)
-    return key
 
 def create_ansible_module():
     argument_spec = define_argument_spec()
@@ -75,31 +70,41 @@ def create_ansible_module():
     )
     return module
 
+
 def define_argument_spec():
     argument_spec = clc_common_argument_spec()
     argument_spec.update(
         dict(
-            server_ids = dict(type='list'),
-            ssh_port = dict(default=22),
-            user_to_update = dict(),
-            path_to_keyfile = dict(default='~/.ssh/id_rsa.pub'),
+            server_ids=dict(type='list'),
+            ssh_port=dict(default=22),
+            user_to_update=dict(),
+            path_to_keyfile=dict(default='~/.ssh/id_rsa.pub'),
             )
 
     )
     return argument_spec
 
+
 def clc_common_argument_spec():
     return dict(
         v1_api_key=dict(),
         v1_api_passwd=dict(no_log=True),
-        v2_api_username = dict(),
-        v2_api_passwd = dict(no_log=True)
+        v2_api_username=dict(),
+        v2_api_passwd=dict(no_log=True)
     )
 
 #
 #  Functions to execute the module's behaviors
 #  (called from main())
 #
+
+
+def load_ssh_key(module, path_to_keyfile):
+    try:
+        key = open(os.path.expanduser(path_to_keyfile)).read()
+    except IOError as e:
+        module.fail_json(msg='unable to load ssh key: %s' % e)
+    return key
 
 def find_servers(clc, server_ids):
     return clc.v2.Servers(server_ids).Servers()
@@ -114,18 +119,20 @@ def update_servers(clc, servers, ssh_port, key):
 
         deploy_key(key ,ipaddress, ssh_port, username, password)
 
+
 def deploy_key(key, server, ssh_port, username, password):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(server, port=ssh_port, username=username, password=password)
     client.exec_command('mkdir -p ~/.ssh/')
-    client.exec_command('grep -q -F "%s" foo.bar || echo "%s" >> ~/.ssh/authorized_keys' % (key,key))
+    client.exec_command('grep -q -F "%s" foo.bar || echo "%s" >> ~/.ssh/authorized_keys' % (key, key))
     client.exec_command('chmod 644 ~/.ssh/authorized_keys')
     client.exec_command('chmod 700 ~/.ssh/')
 
 #
 #  Utility Functions
 #
+
 
 def _clc_set_credentials(module):
         p = module.params
