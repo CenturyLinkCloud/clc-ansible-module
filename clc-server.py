@@ -17,8 +17,6 @@ except ImportError:
     sys.exit(1)
 
 #
-#  Author:  Brian Albrecht
-#
 #  An Ansible module to Create, Delete, Start and Stop servers in CenturyLink Cloud.
 #  Include this file (or symlink to it) in the ./library directory under any playbook that uses it.
 #  This is loosely based on the ansible-core-modules EC2 module, and offers similar behavior.
