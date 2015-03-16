@@ -18,9 +18,9 @@ You can also set them as parameters on the tasks themselves, though I wouldn't r
 
 ## clc-server Module
 
-Create, delete, start, or stop a server at CLC.  This module can be run in two modes: **idempotent** and **non-idempotent**. The module is idempotent if you specify the *exact_count* and *count_group* parameters.  In that case, it will create or delete the right number of servers to make sure that the *count_group* Server Group matches the number specified in the *exact_count* param.  
+Create, delete, start, or stop a server at CLC.  This module can be run in two modes: **idempotent** and **non-idempotent**. The module is idempotent if you specify the *exact_count* and *count_group* parameters.  In that case, it will create or delete the right number of servers to make sure that the number of running VMs in the *count_group* Server Group matches the number specified by the *exact_count* param.  
 
-If you just specify *count* instead of *exact_count*, it is in non-idempotent mode and will create *count* number of servers every time it's run.
+If you just specify *count* instead of *exact_count*, the module runs in non-idempotent mode.  It will create *count* number of VMs every time it's run.
 
 ###Example Playbook```yaml
 ---
@@ -37,6 +37,24 @@ If you just specify *count* instead of *exact_count*, it is in non-idempotent mo
         group: 'Default Group'
         count_group: 'Default Group'
       register: clc
+    - name: debug
+      debug: var=clc.server_ids
+```
+
+```yaml
+---
+- name: deploy ubuntu hosts at CLC (Yay!)
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Deploy 3 new Ubuntu VMs to Default Group
+      clc-server:
+        name: test
+        template: ubuntu-14-64
+        count: 3
+        group: 'Default Group'
+       register: clc
     - name: debug
       debug: var=clc.server_ids
 ```

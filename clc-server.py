@@ -11,10 +11,12 @@ from ansible.module_utils.basic import *
 #  sudo pip install clc-sdk
 #
 try:
-    import clc
+    import clc as clc_sdk
 except ImportError:
-    print "failed=True msg='clc-python-sdk required for this module'"
-    sys.exit(1)
+    clc_found = False
+    clc_sdk = None
+else:
+    clc_found = True
 
 #
 #  An Ansible module to Create, Delete, Start and Stop servers in CenturyLink Cloud.
@@ -30,6 +32,8 @@ except ImportError:
 #
 #  main() defines the program flow and what behaviors happen for each state
 #
+
+
 def main():
 
     #
@@ -37,8 +41,13 @@ def main():
     #
     module = create_ansible_module()
     p = module.params
-    clc = _clc_set_credentials(module)
     state = p['state']
+
+    if not clc_found:
+        module.fail_json(msg='clc-python-sdk required for this module')
+
+    clc = _clc_set_credentials(clc_sdk, module)
+
 
     #
     #  Handle each different state
@@ -74,6 +83,7 @@ def main():
 #  Functions to define the Ansible module and its arguments
 #
 
+
 def create_ansible_module():
     argument_spec = define_argument_spec()
 
@@ -86,56 +96,59 @@ def create_ansible_module():
     )
     return module
 
+
 def define_argument_spec():
     argument_spec = clc_common_argument_spec()
     argument_spec.update(
         dict(
-            name = dict(),
-            template = dict(),
-            group = dict(default='Default Group'),
-            network_id = dict(),
-            location = dict(default=None),
-            cpu = dict(default=1),
-            memory = dict(default='1'),
-            alias = dict(default=None),
-            password = dict(default=None),
-            ip_address = dict(default=None),
-            storage_type = dict(default='standard'),
-            type = dict(default='standard'),
-            primary_dns = dict(default=None),
-            secondary_dns = dict(default=None),
-            additional_disks = dict(type='list', default=[]),
-            custom_fields = dict(type='list', default=[]),
-            ttl = dict(default=None),
-            managed_os = dict(default=False),
-            description = dict(default=None),
-            source_server_password = dict(default=None),
-            cpu_autoscale_policy_id = dict(default=None),
-            anti_affinity_policy_id = dict(default=None),
-            packages = dict(type='list', default=[]),
-            state = dict(default='present', choices=['present', 'absent', 'started', 'stopped']),
-            count = dict(type='int', default='1'),
-            exact_count = dict(type='int', default=None),
-            count_group = dict(),
-            server_ids = dict(type='list'),
-            wait = dict(type='bool', default=True),
+            name=dict(),
+            template=dict(),
+            group=dict(default='Default Group'),
+            network_id=dict(),
+            location=dict(default=None),
+            cpu=dict(default=1),
+            memory=dict(default='1'),
+            alias=dict(default=None),
+            password=dict(default=None),
+            ip_address=dict(default=None),
+            storage_type=dict(default='standard'),
+            type=dict(default='standard'),
+            primary_dns=dict(default=None),
+            secondary_dns=dict(default=None),
+            additional_disks=dict(type='list', default=[]),
+            custom_fields=dict(type='list', default=[]),
+            ttl=dict(default=None),
+            managed_os=dict(default=False),
+            description=dict(default=None),
+            source_server_password=dict(default=None),
+            cpu_autoscale_policy_id=dict(default=None),
+            anti_affinity_policy_id=dict(default=None),
+            packages=dict(type='list', default=[]),
+            state=dict(default='present', choices=['present', 'absent', 'started', 'stopped']),
+            count=dict(type='int', default='1'),
+            exact_count=dict(type='int', default=None),
+            count_group=dict(),
+            server_ids=dict(type='list'),
+            wait=dict(type='bool', default=True),
             )
 
     )
     return argument_spec
 
+
 def clc_common_argument_spec():
     return dict(
         v1_api_key=dict(),
         v1_api_passwd=dict(no_log=True),
-        v2_api_username = dict(),
-        v2_api_passwd = dict(no_log=True)
+        v2_api_username=dict(),
+        v2_api_passwd=dict(no_log=True)
     )
 
 #
 #  Functions to execute the module's behaviors
 #  (called from main())
 #
+
 
 def enforce_count(module, clc):
     """
@@ -189,6 +202,7 @@ def enforce_count(module, clc):
                 = delete_servers(module, clc, remove_ids)
 
     return (server_dict_array, changed_server_ids, changed)
+
 
 def create_servers(module, clc, override_count=None):
     """
@@ -289,6 +303,7 @@ def create_servers(module, clc, override_count=None):
 
     return (server_dict_array, created_server_ids, changed)
 
+
 def delete_servers(module, clc, server_ids):
     """
     Deletes the servers on the provided list
@@ -330,6 +345,7 @@ def delete_servers(module, clc, server_ids):
         terminated_server_ids.append(server.id)
 
     return (changed, server_dict_array, terminated_server_ids)
+
 
 def startstop_servers(module, clc, server_ids, state):
     """
@@ -385,7 +401,8 @@ def startstop_servers(module, clc, server_ids, state):
 #  Utility Functions
 #
 
-def _clc_set_credentials(module):
+
+def _clc_set_credentials(clc, module):
         p = module.params
         e = os.environ
 
@@ -396,12 +413,12 @@ def _clc_set_credentials(module):
 
         if (not v2_api_username or not v2_api_passwd):
             module.fail_json(msg = "you must set the clc v2 api username and password on the task or using environment variables")
-            sys.exit(1)
 
         clc.v1.SetCredentials(v1_api_key,v1_api_passwd)
         clc.v2.SetCredentials(v2_api_username,v2_api_passwd)
 
         return clc
+
 
 def _find_running_servers_by_group_name(module, clc, datacenter, count_group):
     group = _find_group(module, clc, datacenter, count_group)
@@ -415,14 +432,16 @@ def _find_running_servers_by_group_name(module, clc, datacenter, count_group):
 
     return servers, running_servers
 
+
 def _find_datacenter(module, clc):
     location = module.params['location']
     try:
         datacenter = clc.v2.Datacenter(location)
     except:
-        module.fail_json(msg = str("Unable to find location: " + location))
+        module.fail_json(msg=str("Unable to find location: " + location))
         sys.exit(1)
     return datacenter
+
 
 def _find_group(module, clc, datacenter, lookup_group=None):
     if not lookup_group:
@@ -430,31 +449,34 @@ def _find_group(module, clc, datacenter, lookup_group=None):
     try:
         group = datacenter.Groups().Get(lookup_group)
     except:
-        module.fail_json(msg = str("Unable to find group: " + lookup_group + " in location: " + datacenter.id))
+        module.fail_json(msg=str("Unable to find group: " + lookup_group + " in location: " + datacenter.id))
         sys.exit(1)
     return group
+
 
 def _find_template(module,clc,datacenter):
     lookup_template = module.params['template']
     try:
         template = datacenter.Templates().Search(lookup_template)[0]
     except:
-        module.fail_json(msg = str("Unable to find a template: "+ lookup_template +" in location: " + datacenter.id))
+        module.fail_json(msg=str("Unable to find a template: "+ lookup_template +" in location: " + datacenter.id))
         sys.exit(1)
     return template
+
 
 def _find_default_network(module, clc, datacenter):
     try:
         network = datacenter.Networks().networks[0]
     except:
-        module.fail_json(msg = str("Unable to find a network in location: " + datacenter.id))
+        module.fail_json(msg=str("Unable to find a network in location: " + datacenter.id))
         sys.exit(1)
     return network
+
 
 def _validate_name(module):
     name = module.params['name']
     if (len(name)<1 or len(name) > 6):
-        module.fail_json(msg = str("name must be a string with a minimum length of 1 and a maximum length of 6"))
+        module.fail_json(msg=str("name must be a string with a minimum length of 1 and a maximum length of 6"))
         sys.exit(1)
     return name
 
@@ -466,6 +488,7 @@ def _validate_name(module):
 #  with a working Server() function before it's returned.  We'll submit a PR to the
 #  clc-sdk team then remove this code.
 #
+
 
 def create_clc_server(clc, name,template,group_id,network_id,cpu=None,memory=None,alias=None,password=None,ip_address=None,
            storage_type="standard",type="standard",primary_dns=None,secondary_dns=None,
@@ -527,21 +550,25 @@ def create_clc_server(clc, name,template,group_id,network_id,cpu=None,memory=Non
     #
 
     # Find the server's UUID from the API response
-    serverUuid = [obj['id'] for obj in res['links'] if obj['rel']=='self'][0]
+    server_uuid = [obj['id'] for obj in res['links'] if obj['rel']=='self'][0]
 
     # Change the request server method to a find_server_by_uuid closure so that it will work
-    result.requests[0].Server = lambda: find_server_by_uuid(clc, serverUuid, alias)
+    result.requests[0].Server = lambda: find_server_by_uuid(clc, server_uuid, alias)
 
     return result
 
 #
 #  This is the function that gets patched to the Request.server object using a lamda closure
 #
+
+
 def find_server_by_uuid(clc, svr_uuid, alias=None):
-    if not alias:  alias = clc.v2.Account.GetAlias()
-    server_obj = clc.v2.API.Call('GET','servers/%s/%s?uuid=true' % (alias,svr_uuid))
+    if not alias:
+        alias = clc.v2.Account.GetAlias()
+
+    server_obj = clc.v2.API.Call('GET', 'servers/%s/%s?uuid=true' % (alias,svr_uuid))
     server_id = server_obj['id']
-    server = clc.v2.Server(id=server_id,alias=alias,server_obj=server_obj)
+    server = clc.v2.Server(id=server_id, alias=alias, server_obj=server_obj)
     return server
 
 #
