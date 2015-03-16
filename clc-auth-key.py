@@ -26,12 +26,13 @@ except ImportError:
 #  by this module are included here rather than in a linked common file.  Don't shoot the messenger.
 #
 #  TODO:  Create a pip package for this module, and for common functions
+#  TODO:  Make the shell commands idempotent and make the changed=flag accurate. 
+#  Right now, it always looks like the module made changes, even though it might not have.
 
 #
 #  main() defines the program flow and behaviors
 #
 def main():
-
     module = create_ansible_module()
     clc = _clc_set_credentials(module)
     p = module.params
