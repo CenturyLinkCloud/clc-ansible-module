@@ -298,6 +298,7 @@ def create_servers(module, clc, override_count=None):
             for server in servers: server.Refresh()
 
         for server in servers:
+            server.data['ipaddress'] = server.details['ipAddresses'][0]['internal']
             server_dict_array.append(server.data)
             created_server_ids.append(server.id)
 

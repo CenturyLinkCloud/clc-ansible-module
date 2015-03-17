@@ -1,0 +1,68 @@
+---
+- name: Add/Delete Servers to Maintain Size of Server Group
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  vars:
+    public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+    server_group: 'Default Group'
+    group_size: 10
+  tasks:
+    - name: Generate Server Admin Password
+      command: openssl rand -base64 15
+      register: serverpass
+      changed_when: False
+
+    - name: Build New Servers if Needed
+      clc-server:
+        name: dbsvr
+        template: ubuntu-14-64
+        password: "{{ serverpass.stdout }}"
+        exact_count: "{{ group_size }}"
+        group: "{{ server_group }}"
+        count_group: "{{ server_group }}"
+      register: clc
+
+    - name: Wait for SSH to Come up on New Servers
+      wait_for: host={{ item.ipaddress }} port=22 delay=5 timeout=320 state=started
+      with_items: clc.servers
+
+    - name: Update known_hosts With New Servers
+      shell: "ssh-keygen -R {{ item.ipaddress }} && ssh-keyscan -t rsa -H {{ item.ipaddress }} >> ~/.ssh/known_hosts"
+      with_items: clc.servers
+
+    - name: Deploy Ssh Key to New Servers
+      shell: "echo '{{ public_key }}'|sshpass -p '{{ serverpass.stdout }}' ssh root@{{ item.ipaddress }} 'cat >> ~/.ssh/authorized_keys'"
+      with_items: clc.servers
+
+    - name: Add New Servers to the newservers Group
+      add_host:
+        name={{ item.name }}
+        ansible_ssh_host={{ item.ipaddress }}
+        ansible_ssh_user=root
+        groupname=newservers
+      with_items: clc.servers
+
+- name: Add Deployment User
+  hosts: newservers
+  tasks:
+    - group:
+        name=deploy
+        state=present
+
+    - lineinfile:
+        dest=/etc/sudoers
+        state=present
+        regexp='%deploy ALL'
+        line='%deploy ALL=(ALL) NOPASSWD:ALL'
+
+    - user:
+        name=msdcdeploy
+        groups=deploy
+        state=present
+
+    - authorized_key:
+        user=msdcdeploy
+        state=present
+        key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
