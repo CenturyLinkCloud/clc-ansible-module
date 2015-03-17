@@ -65,38 +65,5 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```| `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
 
-
-
-
-## clc-auth-key Module
-
-Push a SSH key to a user's authorized keys file on a list of servers.  Uses the CLC Server.Credentials API to login.
-
-### Example Playbook
-```yaml
----
-- name: deploy ubuntu hosts at CLC (Yay!)
-  hosts: localhost
-  gather_facts: False
-  connection: local
-  tasks:
-    - name: Insure that exactly 3 Ubuntu servers are running in Default Group
-      clc-server:
-        name: test
-        template: ubuntu-14-64
-        exact_count: 3
-        group: 'Default Group'
-        count_group: 'Default Group'
-      register: clc
-
-    - name: Deploy ssh key to servers
-      clc-auth-key:
-        server_ids: "{{ clc.server_ids }}"
-        path_to_keyfile: ~/.ssh/id_rsa.pub
-
-    - name: debug
-      debug: var=clc.server_ids
-```
-
 
 ## Dynamic Inventory Module
