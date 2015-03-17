@@ -1,20 +1,19 @@
 ---
-- name: deploy ubuntu hosts at CLC (Yay!)
+- name: Deploy ubuntu hosts at CLC
   hosts: localhost
+  vars:
+    server_group: 'Default Group'
+    server_count: 3
   gather_facts: False
   connection: local
   tasks:
-    - name: Insure that exactly 3 Ubuntu servers are running in Default Group
+    - name: Deploy 3 Ubuntu Servers at CLC
       clc-server:
-        name: test
+        name: ubusvr
         template: ubuntu-14-64
-        exact_count: 3
-        group: 'Default Group'
-        count_group: 'Default Group'
+        count: "{{ server_count }}"
+        group: "{{ server_group }}"
       register: clc
-    - name: Deploy ssh key to servers
-      clc-auth-key:
-
 
     - name: debug
       debug: var=clc.server_ids
