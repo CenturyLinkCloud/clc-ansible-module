@@ -14,7 +14,7 @@
       changed_when: False
 
     - name: Build New Servers if Needed
-      clc-server:
+      clc_server:
         name: dbsvr
         template: ubuntu-14-64
         password: "{{ serverpass.stdout }}"

@@ -8,7 +8,7 @@
   connection: local
   tasks:
     - name: Deploy 3 Ubuntu Servers at CLC
-      clc-server:
+      clc_server:
         name: ubusvr
         template: ubuntu-14-64
         count: "{{ server_count }}"
