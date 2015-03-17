@@ -14,7 +14,7 @@ export CLC_V2_API_PASSWD = <your Control Portal Password>
 ```
 
 
-## clc-server Module
+## clc_server Module
 
 Create, delete, start, or stop a server at CLC.  This module can be run in two modes: **idempotent** and **non-idempotent**. The module is idempotent if you specify the *exact_count* and *count_group* parameters.  In that case, it will create or delete the right number of servers to make sure that the number of running VMs in the *count_group* Server Group matches the number specified by the *exact_count* param.  
 
@@ -28,7 +28,7 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
   connection: local
   tasks:
     - name: Insure that exactly 3 Ubuntu servers are running in Default Group
-      clc-server:
+      clc_server:
         name: test
         template: ubuntu-14-64
         exact_count: 3
@@ -47,7 +47,7 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
   connection: local
   tasks:
     - name: Deploy 3 new Ubuntu VMs to Default Group
-      clc-server:
+      clc_server:
         name: test
         template: ubuntu-14-64
         count: 3
