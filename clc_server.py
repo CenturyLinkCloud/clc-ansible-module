@@ -4,6 +4,7 @@ import sys
 import os
 import datetime
 import json
+from retrying import retry
 from ansible.module_utils.basic import *
 
 #
@@ -295,7 +296,8 @@ def create_servers(module, clc, override_count=None):
 
         if wait:
             sum(requests).WaitUntilComplete()
-            for server in servers: server.Refresh()
+            for server in servers:
+                _refresh_server_w_retry(server)
 
         for server in servers:
             server.data['ipaddress'] = server.details['ipAddresses'][0]['internal']
@@ -390,7 +392,8 @@ def startstop_servers(module, clc, server_ids, state):
 
     if wait:
         sum(requests).WaitUntilComplete()
-        for server in changed_servers: server.Refresh()
+        for server in changed_servers:
+            _refresh_server_w_retry(server)
 
     for server in changed_servers:
         server_dict_array.append(server.data)
@@ -416,6 +419,7 @@ def _clc_set_credentials(clc, module):
         return clc
 
 
+@retry(stop_max_attempt_number=10, wait_fixed=5000)
 def _find_running_servers_by_group_name(module, clc, datacenter, count_group):
     group = _find_group(module, clc, datacenter, count_group)
 
@@ -428,6 +432,10 @@ def _find_running_servers_by_group_name(module, clc, datacenter, count_group):
 
     return servers, running_servers
 
+
+@retry(stop_max_attempt_number=10, wait_fixed=5000)
+def _refresh_server_w_retry(server):
+    server.Refresh()
 
 def _find_datacenter(module, clc):
     location = module.params['location']
