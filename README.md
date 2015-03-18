@@ -19,8 +19,8 @@ sudo pip install retrying
 In order to use these playbooks, you must set the following environment variables:
 
 ```
-export CLC_V2_API_USERNAME = <your Control Portal Username>
-export CLC_V2_API_PASSWD = <your Control Portal Password>
+export CLC_V2_API_USERNAME=<your Control Portal Username>
+export CLC_V2_API_PASSWD=<your Control Portal Password>
 ```
 
 ## clc_server Module
