@@ -1,0 +1,27 @@
+---
+- name: Set Hostname to Lowercase so Mysql doesn't fail
+  hosts: Default_Group
+  sudo: yes
+  gather_facts: false
+  remote_user: msdcdeploy
+  tasks:
+    - name:  Determine Lowercase Hostname
+      shell: "hostname|perl -ne 'print lc'"
+      register: lc_hostname
+      changed_when: false
+
+    - hostname: name='{{ lc_hostname.stdout }}'
+
+- name: install and configure rdbms on mysql hosts
+  hosts: Default_Group
+  sudo: yes
+  gather_facts: true
+  remote_user: msdcdeploy
+  roles:
+    - role: overdrive3000.percona  #installs percona
+      root_password: svvs123
+#    - role: ANXS.mysql  #installs mysql
+#      mysql_root_password: svvs123
+  tasks:
+    - name: install python mysqldb package
+      apt:  name=python-mysqldb state=present
