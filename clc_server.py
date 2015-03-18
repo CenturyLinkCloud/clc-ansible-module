@@ -570,7 +570,7 @@ def find_server_by_uuid(clc, svr_uuid, alias=None):
     if not alias:
         alias = clc.v2.Account.GetAlias()
 
-    server_obj = clc.v2.API.Call('GET', 'servers/%s/%s?uuid=true' % (alias,svr_uuid))
+    server_obj = clc.v2.API.Call('GET', '/servers/%s/%s?uuid=true' % (alias,svr_uuid))
     server_id = server_obj['id']
     server = clc.v2.Server(id=server_id, alias=alias, server_obj=server_obj)
     return server
