@@ -45,6 +45,8 @@
 
 - name: Add Deployment User
   hosts: newservers
+  vars:
+    public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
   tasks:
     - group:
         name=deploy
@@ -64,5 +66,4 @@
     - authorized_key:
         user=msdcdeploy
         state=present
-        key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
-
+        key="{{ public_key }}"
