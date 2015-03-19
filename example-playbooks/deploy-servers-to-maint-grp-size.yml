@@ -6,7 +6,7 @@
   vars:
     public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
     server_group: 'Default Group'
-    group_size: 10
+    group_size: 15
   tasks:
     - name: Generate Server Admin Password
       command: openssl rand -base64 15
