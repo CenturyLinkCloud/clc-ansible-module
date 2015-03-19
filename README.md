@@ -5,13 +5,11 @@ These are additional, unofficial Ansible modules for managing CenturyLink Cloud.
 To use this, add this directory to to the ANSIBLE_LIBRARY environment variable, or symlink this directory to ./library underneath the directory containing the playbook that needs it.
 
 ####Dependencies
-This module has two dependencies:  The [clc-python-sdk](https://github.com/CenturyLinkCloud/clc-python-sdk) and the Apache [retrying](https://pypi.python.org/pypi/retrying)  package.  You can install both of them with pip:
+This module has one dependency  The [clc-python-sdk](https://github.com/CenturyLinkCloud/clc-python-sdk).  You can install it with pip
 
 ```
 sudo pip install clc-sdk
-sudo pip install retrying
 ```
-**Note:**  Retrying drags along the 'Six' package with it.  An outdated version of Six is preinstalled on some systems (including my Macbook Pro).  Pip will install the newer version, but it may have issues deleting the old.  If you get "wraps" errors running the module, you may need to [manually delete the old version of Six](https://bugs.launchpad.net/keystone/+bug/1378270/comments/7).  
 
 
 ## Authentication

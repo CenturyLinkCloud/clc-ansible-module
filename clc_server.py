@@ -4,7 +4,6 @@ import sys
 import os
 import datetime
 import json
-from retrying import retry
 from ansible.module_utils.basic import *
 
 #
@@ -297,7 +296,7 @@ def create_servers(module, clc, override_count=None):
         if wait:
             sum(requests).WaitUntilComplete()
             for server in servers:
-                _refresh_server_w_retry(server)
+                server.Refresh()
 
         for server in servers:
             server.data['ipaddress'] = server.details['ipAddresses'][0]['internal']
@@ -393,7 +392,7 @@ def startstop_servers(module, clc, server_ids, state):
     if wait:
         sum(requests).WaitUntilComplete()
         for server in changed_servers:
-            _refresh_server_w_retry(server)
+            server.Refresh()
 
     for server in changed_servers:
         server_dict_array.append(server.data)
@@ -409,19 +408,21 @@ def startstop_servers(module, clc, server_ids, state):
 def _clc_set_credentials(clc, module):
         e = os.environ
 
-        v2_api_username = e['CLC_V2_API_USERNAME']
-        v2_api_passwd = e['CLC_V2_API_PASSWD']
+        v2_api_passwd = None
+        v2_api_username = None
 
-        if (not v2_api_username or not v2_api_passwd):
-            module.fail_json(msg = "you must set the clc v2 api username and password on the task or using environment variables")
+        try:
+            v2_api_username = e['CLC_V2_API_USERNAME']
+            v2_api_passwd = e['CLC_V2_API_PASSWD']
+        except KeyError, e:
+            module.fail_json(msg = "you must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables")
 
-        clc.v2.SetCredentials(v2_api_username,v2_api_passwd)
+        clc.v2.SetCredentials(api_username=v2_api_username, api_passwd=v2_api_passwd)
         return clc
 
 
-@retry(stop_max_attempt_number=10, wait_fixed=5000)
 def _find_running_servers_by_group_name(module, clc, datacenter, count_group):
-    group = _find_group(module, clc, datacenter, count_group)
+    group = _find_group(module=module, clc=clc, datacenter=datacenter, lookup_group=count_group)
 
     servers = group.Servers().Servers()
     running_servers = []
@@ -433,7 +434,6 @@ def _find_running_servers_by_group_name(module, clc, datacenter, count_group):
     return servers, running_servers
 
 
-@retry(stop_max_attempt_number=10, wait_fixed=5000)
 def _refresh_server_w_retry(server):
     server.Refresh()
 
@@ -448,40 +448,43 @@ def _find_datacenter(module, clc):
 
 
 def _find_group(module, clc, datacenter, lookup_group=None):
+    result = None
     if not lookup_group:
         lookup_group = module.params['group']
     try:
-        group = datacenter.Groups().Get(lookup_group)
+        result = datacenter.Groups().Get(lookup_group)
     except:
         module.fail_json(msg=str("Unable to find group: " + lookup_group + " in location: " + datacenter.id))
-        sys.exit(1)
-    return group
+
+    return result
 
 
 def _find_template(module,clc,datacenter):
     lookup_template = module.params['template']
+    result = None
     try:
-        template = datacenter.Templates().Search(lookup_template)[0]
+        result = datacenter.Templates().Search(lookup_template)[0]
     except:
         module.fail_json(msg=str("Unable to find a template: "+ lookup_template +" in location: " + datacenter.id))
-        sys.exit(1)
-    return template
+
+    return result
 
 
 def _find_default_network(module, clc, datacenter):
+    result = None
     try:
-        network = datacenter.Networks().networks[0]
+        result = datacenter.Networks().networks[0]
     except:
         module.fail_json(msg=str("Unable to find a network in location: " + datacenter.id))
-        sys.exit(1)
-    return network
+
+    return result
 
 
 def _validate_name(module):
     name = module.params['name']
     if (len(name)<1 or len(name) > 6):
         module.fail_json(msg=str("name must be a string with a minimum length of 1 and a maximum length of 6"))
-        sys.exit(1)
+
     return name
 
 #
@@ -550,7 +553,7 @@ def create_clc_server(clc, name,template,group_id,network_id,cpu=None,memory=Non
     #
     # Interrupt the method and monkey patch the Request object so it returns a valid server
     #
-    # The CLC Python API is broken.  We shouldn't have to do this.
+    # The CLC Python SDK is broken.  We shouldn't have to do this.
     #
 
     # Find the server's UUID from the API response
@@ -570,7 +573,7 @@ def find_server_by_uuid(clc, svr_uuid, alias=None):
     if not alias:
         alias = clc.v2.Account.GetAlias()
 
-    server_obj = clc.v2.API.Call('GET', '/servers/%s/%s?uuid=true' % (alias,svr_uuid))
+    server_obj = clc.v2.API.Call('GET', 'servers/%s/%s?uuid=true' % (alias,svr_uuid))
     server_id = server_obj['id']
     server = clc.v2.Server(id=server_id, alias=alias, server_obj=server_obj)
     return server
@@ -578,5 +581,5 @@ def find_server_by_uuid(clc, svr_uuid, alias=None):
 #
 #  Run the program
 #
-
-main()
+if __name__ == '__main__':
+    main()
