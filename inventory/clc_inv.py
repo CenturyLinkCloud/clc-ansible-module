@@ -89,17 +89,28 @@ class clcInventory(object):
             self.v2_api_passwd = config.get('api','v2_api_passwd')
         else:
             raise ValueError('clc.ini does not have a v2_api_passwd defined')
- 
+
         clc.v1.SetCredentials(self.v1_api_key,self.v1_api_passwd)
-        
         clc.v2.SetCredentials(self.v2_api_username,self.v2_api_passwd)
-        
+
 
         # Cache related
         cache_path = config.get('cache', 'cache_path')
         self.cache_path_cache = cache_path + "/ansible-clc.cache"
         self.cache_path_index = cache_path + "/ansible-clc.index"
         self.cache_max_age = config.getint('cache', 'cache_max_age')
+
+
+    def _clc_set_credentials(self, config):
+        c = config
+        e = os.environ
+
+        self.v2_api_username = e['CLC_V2_API_USERNAME']
+        self.v2_api_passwd = e['CLC_V2_API_PASSWD']
+
+        clc.v2.SetCredentials(self.v2_api_username, self.v2_api_passwd)
+
+        return clc
 
     def parse_cli_args(self):
         '''
