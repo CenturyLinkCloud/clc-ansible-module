@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import clc_server
 import clc as clc_sdk
 import mock
