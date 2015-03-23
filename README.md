@@ -72,5 +72,49 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```| `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
 
+## clc_group Module
+
+Create or deletes Server Groups at CenturyLink Cloud.
+
+###Example Playbook```yaml
+---
+- name: Create Server Group
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create / Verify a Server Group at CenturyLink Cloud
+      clc_group:
+        name: 'My Cool Server Group'
+        parent: 'Default Group'
+        state: present
+      register: clc
+
+    - name: debug
+      debug: var=clc
+```
+```
+---
+- name: Delete Server Group
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete / Verify Absent a Server Group at CenturyLink Cloud
+      clc_group:
+        name: 'My Cool Server Group'
+        parent: 'Default Group'
+        state: absent
+      register: clc
+
+    - name: debug
+      debug: var=clc
+```
+
+###Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `name:` | Y | | | The Name of the Server Group || `description:` | N | none | | A description of the Server Group| `parent:` | N |top level	 | | The parent group of the server group| `location:` | N |the default datcenter associated with the account | | Datacenter to create the group in| `state:` | N | present|present, absent | Whether to create or delete the group
 
 ## Dynamic Inventory Module

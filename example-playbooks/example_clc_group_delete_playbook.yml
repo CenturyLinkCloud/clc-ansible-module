@@ -1,0 +1,15 @@
+---
+- name: Delete Server Group
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete / Verify Absent a Server Group at CenturyLink Cloud
+      clc_group:
+        name: 'My Cool Server Group'
+        parent: 'Default Group'
+        state: absent
+      register: clc
+
+    - name: debug
+      debug: var=clc
