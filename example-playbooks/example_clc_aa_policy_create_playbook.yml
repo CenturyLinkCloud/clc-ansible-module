@@ -1,0 +1,15 @@
+---
+- name: Create Anti Affinity Policy
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create / Verify an Anti Affinity Policy at CenturyLink Cloud
+      clc_aa_policy:
+        name: 'Hammer Time'
+        location: GB3
+        state: present
+      register: clc
+
+    - name: debug
+      debug: var=clc
