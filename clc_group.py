@@ -5,7 +5,6 @@ import os
 import datetime
 import json
 from ansible.module_utils.basic import *
-
 #
 #  Requires the clc-python-sdk.
 #  sudo pip install clc-sdk
@@ -156,7 +155,7 @@ class ClcGroup():
         return result
 
     def _get_group_tree_for_datacenter(self, datacenter=None, alias=None):
-        root_group = self.clc.v2.Datacenter().RootGroup()
+        root_group = self.clc.v2.Datacenter(location=datacenter).RootGroup()
         return self._walk_group_tree(parent_group=None, child_group=root_group)
 
     def _walk_group_tree(self, parent_group, child_group):

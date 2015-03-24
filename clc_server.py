@@ -452,12 +452,31 @@ def _find_group(module, clc, datacenter, lookup_group=None):
     if not lookup_group:
         lookup_group = module.params['group']
     try:
-        result = datacenter.Groups().Get(lookup_group)
+        return datacenter.Groups().Get(lookup_group)
     except:
+        pass
+
+    # That search above only acts on the main 
+    result = _find_group_recursive(module, clc, datacenter.Groups(), lookup_group)
+
+    if result is None:
         module.fail_json(msg=str("Unable to find group: " + lookup_group + " in location: " + datacenter.id))
 
     return result
 
+def _find_group_recursive(module, clc, group_list, lookup_group):
+    result = None
+    for group in group_list.groups:
+        next_victims = group.Subgroups()
+        try:
+            return next_victims.Get(lookup_group)
+        except:
+            result = _find_group_recursive(module, clc, next_victims, lookup_group)
+
+        if result is not None:
+            break
+
+    return result
 
 def _find_template(module,clc,datacenter):
     lookup_template = module.params['template']
