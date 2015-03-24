@@ -40,6 +40,9 @@ class ClcAntiAffinityPolicy():
         else:
             changed, policy = self._ensure_policy_is_present(p)
 
+        if policy:
+            policy = policy.data
+
         self.module.exit_json(changed=changed, policy=policy)
 
     # Ansible module goodness
