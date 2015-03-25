@@ -3,8 +3,7 @@
 from clc_group import ClcGroup
 import clc as clc_sdk
 import mock
-from mock import patch, create_autospec
-import os
+from mock import patch
 import unittest
 
 class TestClcServerFunctions(unittest.TestCase):
@@ -33,7 +32,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
     def test_get_group(self):
         # Setup
-        mock_group = create_autospec(clc_sdk.v2.Group)
+        mock_group = mock.MagicMock(spec=clc_sdk.v2.Group)
         mock_group.name = "MyCoolGroup"
 
         with patch.object(ClcGroup, 'clc') as mock_clc_sdk:
