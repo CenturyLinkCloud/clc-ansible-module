@@ -20,13 +20,26 @@ else:
     clc_found = True
 
 class ClcAntiAffinityPolicy():
-    clc = clc_sdk
-    module = None
-    policy_dict = {}
 
-    def __init__(self):
+    def __init__(self, module):
+        self.module = module
+        self.policy_dict = {}
+        self.clc = clc_sdk
 
-        self._set_ansible_module()
+    # Ansible module goodness
+
+    @staticmethod
+    def define_argument_spec():
+        argument_spec = dict(
+            name=dict(required=True),
+            location=dict(required=True),
+            alias=dict(default=None),
+            state=dict(default='present', choices=['present', 'absent']),
+            )
+        return argument_spec
+
+    # Module Behavior Goodness
+    def do_work(self):
         p = self.module.params
 
         if not clc_found:
@@ -44,27 +57,6 @@ class ClcAntiAffinityPolicy():
             policy = policy.data
 
         self.module.exit_json(changed=changed, policy=policy)
-
-    # Ansible module goodness
-
-    def _set_ansible_module(self):
-        argument_spec = self.define_argument_spec()
-
-        self.module = AnsibleModule(
-            argument_spec=argument_spec
-        )
-
-    @staticmethod
-    def define_argument_spec():
-        argument_spec = dict(
-            name=dict(required=True),
-            location=dict(required=True),
-            alias=dict(default=None),
-            state=dict(default='present', choices=['present', 'absent']),
-            )
-        return argument_spec
-
-    # Module Behavior Goodness
 
     def _clc_set_credentials(self):
             e = os.environ
@@ -122,7 +114,9 @@ class ClcAntiAffinityPolicy():
         return changed, policy
 
 def main():
-    ClcAntiAffinityPolicy()
+    module = AnsibleModule(argument_spec=ClcAntiAffinityPolicy.define_argument_spec()   )
+    me = ClcAntiAffinityPolicy(module)
+    me.do_work()
 
 if __name__ == '__main__':
     main()
