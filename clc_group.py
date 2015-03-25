@@ -20,6 +20,8 @@ else:
 
 class ClcGroup():
 
+    clc = None
+
     def __init__(self, module):
         self.clc = clc_sdk
         self.module = module
@@ -32,7 +34,7 @@ class ClcGroup():
         if not clc_found:
             self.module.fail_json(msg='clc-python-sdk required for this module')
 
-        self._clc_set_credentials()
+        self.set_clc_credentials_from_env()
         self.group_dict = self._get_group_tree_for_datacenter(datacenter=p['location'])
 
         if p['state'] == "absent":
@@ -68,7 +70,7 @@ class ClcGroup():
     #   Module Behavior Functions
     #
 
-    def _clc_set_credentials(self):
+    def set_clc_credentials_from_env(self):
             e = os.environ
 
             v2_api_passwd = None
@@ -161,13 +163,13 @@ class ClcGroup():
         return result
 
 
-    def _get_group(self, module, group_name, datacenter=None, alias=None):
+    def _get_group(self, group_name, datacenter=None, alias=None):
         result = None
         try:
             result = self.clc.v2.Datacenter(location=datacenter, alias=alias).Groups().Get(group_name)
         except CLCException, e:
             if "Group not found" not in e.message:
-                module.fail_json(msg='error looking up group: %s' % e)
+                self.module.fail_json(msg='error looking up group: %s' % e)
         return result
 
 def main():
