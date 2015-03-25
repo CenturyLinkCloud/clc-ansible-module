@@ -129,7 +129,10 @@ def define_argument_spec():
             exact_count=dict(type='int', default=None),
             count_group=dict(),
             server_ids=dict(type='list'),
-            wait=dict(type='bool', default=True),
+            add_public_ip=dict(type='bool', default=False),
+            public_ip_protocol=dict(default='TCP'),
+            public_ip_ports=dict(type='list'),
+            wait=dict(type='bool', default=True)
             )
 
     )
@@ -237,6 +240,9 @@ def create_servers(module, clc, override_count=None):
     cpu_autoscale_policy_id = p['cpu_autoscale_policy_id']
     anti_affinity_policy_id = p['anti_affinity_policy_id']
     packages = p['packages']
+    add_public_ip = p['add_public_ip']
+    public_ip_protocol = p['public_ip_protocol']
+    public_ip_ports = p['public_ip_ports']
     wait = p['wait']
 
     if override_count:
@@ -298,7 +304,13 @@ def create_servers(module, clc, override_count=None):
             for server in servers:
                 server.Refresh()
 
+        if add_public_ip:
+            add_public_ip_to_servers(clc, servers, public_ip_protocol, public_ip_ports, wait)
+
         for server in servers:
+            server = clc.v2.Server(server.id)  # reload server details so public IP shows up
+            if len(server.PublicIPs().public_ips) > 0:
+                server.data['publicip'] = str(server.PublicIPs().public_ips[0])
             server.data['ipaddress'] = server.details['ipAddresses'][0]['internal']
             server_dict_array.append(server.data)
             created_server_ids.append(server.id)
@@ -403,6 +415,19 @@ def startstop_servers(module, clc, server_ids, state):
 #
 #  Utility Functions
 #
+
+def add_public_ip_to_servers(clc, servers, public_ip_protocol, public_ip_ports, wait):
+    ports_lst = []
+    requests = []
+
+    for port in public_ip_ports:
+        ports_lst.append({'protocol': public_ip_protocol, 'port': port})
+
+    for server in servers:
+        requests.append(server.PublicIPs().Add(ports_lst))
+
+    if wait:
+        sum(requests).WaitUntilComplete()
 
 
 def _clc_set_credentials(clc, module):
