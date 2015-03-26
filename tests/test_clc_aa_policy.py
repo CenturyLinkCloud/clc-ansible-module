@@ -33,7 +33,26 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
         except:
             pass
         self.assertEqual(self.policy.module.fail_json.called, True)
-        #self.policy.module.fail_json.assert_called_once_with(msg="you must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables")
+
+    def testLoginMagic(self):
+        self.policy.clc.v2.SetCredentials = mock.MagicMock()
+        with patch.dict('os.environ', {'CLC_V2_API_USERNAME':'passWORD', 'CLC_V2_API_PASSWD':'UsErnaME'}):
+            try:
+                self.policy.do_work()
+            except:
+                # It'll die, and we don't care
+                pass
+
+        self.policy.clc.v2.SetCredentials.assert_called_once_with(api_username='passWORD',api_passwd='UsErnaME')
+
+    def testArgumentSpecContract(self):
+        args = ClcAntiAffinityPolicy.define_argument_spec()
+        self.assertEqual(args, dict(
+            name=dict(required=True),
+            location=dict(required=True),
+            alias=dict(default=None),
+            state=dict(default='present', choices=['present', 'absent']),
+        ))
 
     def testCreateNoChange(self):
         mock_policy = mock.MagicMock(spec=clc_sdk.v2.AntiAffinity)
