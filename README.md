@@ -207,24 +207,21 @@ Creates a public ip on an existing server or servers.
 ---
 - name: Add Public IP to Server
   hosts: localhost
-  vars:
-    server_group: 'Default Group'
-    server_count: 3
   gather_facts: False
   connection: local
   tasks:
-    - name: Deploy 3 Ubuntu Servers at CLC
+    - name: Create Public IP For Servers
       clc_publicip:
         protocol: 'TCP'
         ports:
             - 80
         server_ids:
-            - UC1NJSTTRAIN14
+            - UC1ACCTSRVR01
+            - UC1ACCTSRVR02
       register: clc
 
     - name: debug
-      debug: var=clc.server_ids
-
+      debug: var=clc
 ```
 
 ###Available Parameters
