@@ -1,0 +1,18 @@
+---
+- name: Add Public IP to Server
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create Public IP For Servers
+      clc_publicip:
+        protocol: 'TCP'
+        ports:
+            - 80
+        server_ids:
+            - UC1ACCTSRVR01
+            - UC1ACCTSRVR02
+      register: clc
+
+    - name: debug
+      debug: var=clc

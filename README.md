@@ -199,4 +199,40 @@ Create or deletes Anti Affinity Policities at CenturyLink Cloud.
 | `location:` | Y | | | Datacenter in which the policy lives/should live |
 | `state:` | N | present | present, absent | Whether to create or delete the policy |
 
+## clc_publicip Module
+Creates a public ip on an existing server or servers.
+
+### Example Playbook
+```yaml
+---
+- name: Add Public IP to Server
+  hosts: localhost
+  vars:
+    server_group: 'Default Group'
+    server_count: 3
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Deploy 3 Ubuntu Servers at CLC
+      clc_publicip:
+        protocol: 'TCP'
+        ports:
+            - 80
+        server_ids:
+            - UC1NJSTTRAIN14
+      register: clc
+
+    - name: debug
+      debug: var=clc.server_ids
+
+```
+
+###Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `protocol:` | n |TCP | | The Protocol that the public IP will listen for |
+| `ports:` | Y | | | A list of ports to expose|
+| `server_ids:` | y |  |  | A list of servers to create public ips on. |
+
 ## Dynamic Inventory Module
