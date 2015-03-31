@@ -355,7 +355,6 @@ def delete_servers(module, clc, server_ids):
         sum(requests).WaitUntilComplete()
 
     for server in servers:
-        server_dict_array.append(server.data)
         terminated_server_ids.append(server.id)
 
     return (changed, server_dict_array, terminated_server_ids)
