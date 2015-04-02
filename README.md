@@ -228,8 +228,8 @@ Creates a public ip on an existing server or servers.
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
-| `protocol:` | n |TCP | | The Protocol that the public IP will listen for |
+| `protocol:` | N |TCP | | The Protocol that the public IP will listen for |
 | `ports:` | Y | | | A list of ports to expose|
-| `server_ids:` | y |  |  | A list of servers to create public ips on. |
+| `server_ids:` | Y |  |  | A list of servers to create public ips on. |
 
 ## Dynamic Inventory Module
