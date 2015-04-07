@@ -10,9 +10,7 @@
         ports:
             - 80
         server_ids:
-            - UC1ACCTSRVR01
-            - UC1ACCTSRVR02
+            - UC1NJSTTEST04
+            - UC1NJSTTEST05
+        state: present
       register: clc
-
-    - name: debug
-      debug: var=clc

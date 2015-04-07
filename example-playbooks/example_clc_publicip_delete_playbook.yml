@@ -1,0 +1,13 @@
+---
+- name: Add Public IP to Server
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete All Public IPs For Servers
+      clc_publicip:
+        server_ids:
+            - UC1NJSTTRAIN58
+            - UC1NJSTTRAIN59
+        state: absent
+      register: clc

@@ -218,12 +218,30 @@ Creates a public ip on an existing server or servers.
         server_ids:
             - UC1ACCTSRVR01
             - UC1ACCTSRVR02
+        state: present
       register: clc
 
     - name: debug
       debug: var=clc
 ```
+```yaml
+---
+- name: Delete Public IP from Server
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create Public IP For Servers
+      clc_publicip:
+        server_ids:
+            - UC1ACCTSRVR01
+            - UC1ACCTSRVR02
+        state: absent
+      register: clc
 
+    - name: debug
+      debug: var=clc
+```
 ###Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
@@ -231,5 +249,6 @@ Creates a public ip on an existing server or servers.
 | `protocol:` | N |TCP | | The Protocol that the public IP will listen for |
 | `ports:` | Y | | | A list of ports to expose|
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
+| `state:` | N | `present` | `present`,`absent` | Determine whether to create or delete public IPs.  If `present` module will not create a second public ip if one already exists. |
 
 ## Dynamic Inventory Module
