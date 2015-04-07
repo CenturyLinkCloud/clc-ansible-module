@@ -77,8 +77,7 @@ class ClcPublicIp(object):
     def port_create_command(self, server_ids, protocol, ports):
         servers = self._get_servers_from_clc_api(server_ids, 'Failed to obtain server list from the CLC API')
         servers_w_publicips = [server for server in servers if len(server.PublicIPs().public_ips) > 0]
-        for server in servers_w_publicips:
-            server.PublicIPs().
+
 
     def ip_delete_command(self, server_ids):
         servers           = self._get_servers_from_clc_api(server_ids, 'Failed to obtain server list from the CLC API')
