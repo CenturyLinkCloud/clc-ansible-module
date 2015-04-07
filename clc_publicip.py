@@ -74,6 +74,12 @@ class ClcPublicIp(object):
         return [server.PublicIPs().Add(ports_to_expose) for server in servers_to_change], servers_to_change
 
 
+    def port_create_command(self, server_ids, protocol, ports):
+        servers = self._get_servers_from_clc_api(server_ids, 'Failed to obtain server list from the CLC API')
+        servers_w_publicips = [server for server in servers if len(server.PublicIPs().public_ips) > 0]
+        for server in servers_w_publicips:
+            server.PublicIPs().
+
     def ip_delete_command(self, server_ids):
         servers           = self._get_servers_from_clc_api(server_ids, 'Failed to obtain server list from the CLC API')
         servers_to_change = [server for server in servers if len(server.PublicIPs().public_ips) > 0]
@@ -140,15 +146,16 @@ class ClcPublicIp(object):
 
     def set_clc_credentials_from_env(self):
             e = os.environ
-            v2_api_passwd = None
-            v2_api_username = None
-            try:
-                v2_api_username = e['CLC_V2_API_USERNAME']
-                v2_api_passwd = e['CLC_V2_API_PASSWD']
-            except KeyError, e:
-                return self.module.fail_json(msg = "You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables")
+            v2_api_token = e.get('CLC_V2_API_TOKEN', False)
+            v2_api_username = e.get('CLC_V2_API_USERNAME', False)
+            v2_api_passwd = e.get('CLC_V2_API_PASSWD', False)
 
-            self.clc.v2.SetCredentials(api_username=v2_api_username, api_passwd=v2_api_passwd)
+            if v2_api_token:
+                self.clc._LOGIN_TOKEN_V2 = v2_api_token
+            elif v2_api_username and v2_api_passwd:
+                self.clc.v2.SetCredentials(api_username=v2_api_username, api_passwd=v2_api_passwd)
+            else:
+                return self.module.fail_json(msg = "You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables")
 
 
 def main():

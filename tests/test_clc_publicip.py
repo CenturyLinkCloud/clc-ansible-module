@@ -106,6 +106,16 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
 
 
+    def test_set_clc_credentials_w_token(self):
+        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'Token12345'}):
+            with patch.object(ClcPublicIp, 'clc') as mock_clc_sdk:
+                under_test = ClcPublicIp(self.module)
+                under_test.set_clc_credentials_from_env()
+        self.assertEqual(mock_clc_sdk._LOGIN_TOKEN_V2, 'Token12345')
+        self.assertFalse(mock_clc_sdk.v2.SetCredentials.called)
+        self.assertEqual(self.module.fail_json.called, False)
+
+
     def test_set_clc_credentials_w_creds(self):
         with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
             with patch.object(ClcPublicIp, 'clc') as mock_clc_sdk:
@@ -118,7 +128,6 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         with patch.dict('os.environ', {}, clear=True):
             under_test = ClcPublicIp(self.module)
             under_test.set_clc_credentials_from_env()
-
         self.assertEqual(self.module.fail_json.called, True)
 
 
