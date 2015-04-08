@@ -1,3 +1,5 @@
+![Build Status](http://206.128.156.165/clc-ansible-module/status)
+
 # clc-ansible-module
 
 These are additional, unofficial Ansible modules for managing CenturyLink Cloud.
