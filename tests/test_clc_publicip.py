@@ -137,7 +137,8 @@ class TestClcPublicIpFunctions(unittest.TestCase):
 
 
     @patch.object(ClcPublicIp, 'run_clc_commands')
-    def test_process_request_state_present(self, mock_run_clc_commands):
+    @patch.object(ClcPublicIp, 'set_clc_credentials_from_env')
+    def test_process_request_state_present(self, mock_set_clc_creds, mock_run_clc_commands):
         test_params = {
             'server_ids': ['TESTSVR1', 'TESTSVR2']
             , 'ports': [80]
@@ -154,7 +155,8 @@ class TestClcPublicIpFunctions(unittest.TestCase):
 
 
     @patch.object(ClcPublicIp, 'run_clc_commands')
-    def test_process_request_state_absent(self, mock_run_clc_commands):
+    @patch.object(ClcPublicIp, 'set_clc_credentials_from_env')
+    def test_process_request_state_absent(self, mock_set_clc_creds, mock_run_clc_commands):
         test_params = {
             'server_ids': ['TESTSVR1', 'TESTSVR2']
             , 'ports': [80]
@@ -171,7 +173,8 @@ class TestClcPublicIpFunctions(unittest.TestCase):
 
 
     @patch.object(ClcPublicIp, 'run_clc_commands')
-    def test_process_request_state_invalid(self, mock_run_clc_commands):
+    @patch.object(ClcPublicIp, 'set_clc_credentials_from_env')
+    def test_process_request_state_invalid(self, mock_set_clc_creds, mock_run_clc_commands):
         test_params = {
             'server_ids': ['TESTSVR1', 'TESTSVR2']
             , 'ports': [80]
