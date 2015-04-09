@@ -21,6 +21,7 @@ else:
 class ClcGroup():
 
     clc = None
+    root_group = None
 
     def __init__(self, module):
         self.clc = clc_sdk
@@ -71,19 +72,21 @@ class ClcGroup():
     #
 
     def set_clc_credentials_from_env(self):
-            e = os.environ
+        env = os.environ
+        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
+        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
+        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
 
-            v2_api_passwd = None
-            v2_api_username = None
-
-            try:
-                v2_api_username = e['CLC_V2_API_USERNAME']
-                v2_api_passwd = e['CLC_V2_API_PASSWD']
-            except KeyError, e:
-                self.module.fail_json(msg = "you must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables")
-
-            self.clc.v2.SetCredentials(api_username=v2_api_username, api_passwd=v2_api_passwd)
-
+        if v2_api_token:
+            self.clc._LOGIN_TOKEN_V2 = v2_api_token
+        elif v2_api_username and v2_api_passwd:
+            self.clc.v2.SetCredentials(
+                api_username=v2_api_username,
+                api_passwd=v2_api_passwd)
+        else:
+            return self.module.fail_json(
+                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
+                    "environment variables")
 
     def _ensure_group_is_absent(self, p):
         changed = False
@@ -101,15 +104,20 @@ class ClcGroup():
     def _ensure_group_is_present(self, p):
         changed = False
         group = None
+        assert self.root_group, "Implementation Error: Root Group not set"
+        parent = p['parent'] if p['parent'] is not None else self.root_group.name
+        group = p['name']
+        description = p['description']
 
-        parent_exists = self._group_exists(group_name=p['parent'], parent_name=None)
-        child_exists = self._group_exists(group_name=p['name'], parent_name=p['parent'])
+
+        parent_exists = self._group_exists(group_name=parent, parent_name=None)
+        child_exists = self._group_exists(group_name=group, parent_name=parent)
 
         if not parent_exists:
-            self.module.fail_json(msg="parent group: " + p['parent'] + " does not exist")
+            self.module.fail_json(msg="parent group: " + parent + " does not exist")
 
         if parent_exists and not child_exists:
-            group = self._create_group(p)
+            group = self._create_group(group=group, parent=parent, description=description)
             changed = True
         else:
             group, parent = self.group_dict[p['name']]
@@ -118,10 +126,10 @@ class ClcGroup():
         return changed, group
 
 
-    def _create_group(self, p):
+    def _create_group(self, group, parent, description):
 
-        (parent, grandparent) = self.group_dict[p['parent']]
-        return parent.Create(name=p['name'], description=p['description'])
+        (parent, grandparent) = self.group_dict[parent]
+        return parent.Create(name=group, description=description)
 
 
     #
@@ -133,35 +141,22 @@ class ClcGroup():
         if group_name in self.group_dict:
             (group, parent) = self.group_dict[group_name]
 
-            if parent_name == parent.name or not parent_name:
-                result = True
-
-        return result
-
-
-
-    def _group_exists(self, group_name, parent_name):
-        result = False
-        if group_name in self.group_dict:
-            group, parent = self.group_dict[group_name]
-
-            if parent_name == parent.name or not parent_name:
+            if parent_name is None or parent_name == parent.name:
                 result = True
 
         return result
 
     def _get_group_tree_for_datacenter(self, datacenter=None, alias=None):
-        root_group = self.clc.v2.Datacenter(location=datacenter).RootGroup()
-        return self._walk_group_tree(parent_group=None, child_group=root_group)
+        self.root_group = self.clc.v2.Datacenter(location=datacenter).RootGroup()
+        return self._walk_groups_recursive(parent_group=None, child_group=self.root_group)
 
-    def _walk_group_tree(self, parent_group, child_group):
+    def _walk_groups_recursive(self, parent_group, child_group):
         result = {str(child_group): (child_group, parent_group)}
         groups = child_group.Subgroups().groups
         if len(groups) > 0:
             for group in groups:
-                result.update(self._walk_group_tree(child_group, group))
+                result.update(self._walk_groups_recursive(child_group, group))
         return result
-
 
     def _get_group(self, group_name, datacenter=None, alias=None):
         result = None
