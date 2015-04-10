@@ -12,21 +12,24 @@ try:
     import json
 except ImportError:
     import simplejson as json
-    
+
+
 class clcInventory(object):
+
     def __init__(self):
         ''' Main execution path '''
 
         # Inventory grouped by instance IDs, tags, security groups, regions,
         # and availability zones
         self.inventory = {}
-        
+
         # Index of hostname (address) to instance ID
         self.index = {}
 
         # Read settings and parse CLI arguments
         self.read_settings()
         self.parse_cli_args()
+        self.get_clc_credentials_from_env()
 
         # Cache
         if self.args.refresh_cache:
@@ -44,7 +47,7 @@ class clcInventory(object):
                 data_to_print = self.get_inventory_from_cache()
             else:
                 data_to_print = self.json_format_dict(self.inventory, True)
-                
+
         print data_to_print
 
     def is_cache_valid(self):
@@ -58,41 +61,17 @@ class clcInventory(object):
                     return True
 
         return False
-        
+
     def read_settings(self):
         ''' Reads the settings from the clc.ini file '''
 
         config = ConfigParser.SafeConfigParser()
-        clc_default_ini_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'clc_settings.ini')
+        clc_default_ini_path = os.path.join(
+            os.path.dirname(
+                os.path.realpath(__file__)),
+            'clc_settings.ini')
         clc_ini_path = os.environ.get('CLC_INI_PATH', clc_default_ini_path)
         config.read(clc_ini_path)
-
-        if not config.has_section('api'):
-            raise ValueError('clc.ini file must contain a [api] section')
-
-        if config.has_option('api', 'v1_api_key'):
-            self.v1_api_key = config.get('api','v1_api_key')
-        else:
-            raise ValueError('clc.ini does not have a v1_api_key defined')
-
-        if config.has_option('api', 'v1_api_passwd'):
-            self.v1_api_passwd = config.get('api','v1_api_passwd')
-        else:
-            raise ValueError('clc.ini does not have a v1_api_passwd defined')
-
-        if config.has_option('api', 'v2_api_username'):
-            self.v2_api_username = config.get('api','v2_api_username')
-        else:
-            raise ValueError('clc.ini does not have a v2_api_username defined')
-
-        if config.has_option('api', 'v2_api_passwd'):
-            self.v2_api_passwd = config.get('api','v2_api_passwd')
-        else:
-            raise ValueError('clc.ini does not have a v2_api_passwd defined')
-
-        clc.v1.SetCredentials(self.v1_api_key,self.v1_api_passwd)
-        clc.v2.SetCredentials(self.v2_api_username,self.v2_api_passwd)
-
 
         # Cache related
         cache_path = config.get('cache', 'cache_path')
@@ -100,35 +79,42 @@ class clcInventory(object):
         self.cache_path_index = cache_path + "/ansible-clc.index"
         self.cache_max_age = config.getint('cache', 'cache_max_age')
 
+    def get_clc_credentials_from_env(self):
+        env = os.environ
+        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
+        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
+        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
 
-    def _clc_set_credentials(self, config):
-        c = config
-        e = os.environ
-
-        self.v2_api_username = e['CLC_V2_API_USERNAME']
-        self.v2_api_passwd = e['CLC_V2_API_PASSWD']
-
-        clc.v2.SetCredentials(self.v2_api_username, self.v2_api_passwd)
-
-        return clc
+        if v2_api_token:
+            clc._LOGIN_TOKEN_V2 = v2_api_token
+        elif v2_api_username and v2_api_passwd:
+            clc.v2.SetCredentials(
+                api_username=v2_api_username,
+                api_passwd=v2_api_passwd)
 
     def parse_cli_args(self):
         '''
         Command line argument processing
         '''
 
-        parser = argparse.ArgumentParser(description='Produce an Ansible Inventory file based from CenturyLink Cloud servers and groups')
+        parser = argparse.ArgumentParser(
+            description='Produce an Ansible Inventory file based from CenturyLink Cloud servers and groups')
         parser.add_argument('--list', action='store_true', default=True,
-                           help='List instances (default: True)')
-        parser.add_argument('--host', action='store',
-                           help='Get all the variables about a specific instance')
-        parser.add_argument('--refresh-cache', action='store_true', default=False,
-                           help='Force refresh of cache by making API requests to CenturyLink Cloud')
+                            help='List instances (default: True)')
+        parser.add_argument(
+            '--host',
+            action='store',
+            help='Get all the variables about a specific instance')
+        parser.add_argument(
+            '--refresh-cache',
+            action='store_true',
+            default=False,
+            help='Force refresh of cache by making API requests to CenturyLink Cloud')
         self.args = parser.parse_args()
-        
+
     def do_api_calls_update_cache(self):
-        ''' 
-        Do API calls to a location, and save data in cache files 
+        '''
+        Do API calls to a location, and save data in cache files
         '''
 
         self.get_nodes()
@@ -138,42 +124,48 @@ class clcInventory(object):
         Gets the list of all nodes
         '''
 
-        for node in clc.v1.Server.GetServers(location='VA1',group=None,alias=None):
-            self.add_node(node)
-            
+        groups = self._get_groups_for_datacenter()
+
+        for group in groups:
+            child, parent = groups[group]
+            servers = child.Servers().servers
+            for node in servers:
+                self.add_node(node.data)
+
         self.write_to_cache(self.inventory, self.cache_path_cache)
         self.write_to_cache(self.index, self.cache_path_index)
- 
+
     def get_node(self, node_id):
         '''
         Gets details about a specific node
         '''
 
-        return [node for node in clc.v1.Server.GetServers(location='VA1',group=None,alias=None) if node.ID == node_id][0]
-
+        return clc.v2.Server(node_id)
 
     def add_node(self, node):
         '''
         Adds a node to the inventory and index, as long as it is
-        addressable 
+        addressable
         '''
 
         # Only want running instances
-        if node['PowerState'] != "Started":
+        if node['details']['powerState'] != "started":
             return
 
         # Select the best destination address
-        if not node['IPAddress'] == []:
-            dest = node['IPAddress']
+        for address in node['details']['ipAddresses']:
+            if 'internal' in address:
+                dest = address['internal']
+                break
         if not dest:
             # Skip instances we cannot address (e.g. private VPC subnet)
             return
 
         # Add to index
-        self.index[dest] = node['Name']
+        self.index[dest] = node['name']
 
         # Inventory: Group by instance ID (always a group of 1)
-        self.inventory[node['Name']] = [dest]
+        self.inventory[node['name']] = [dest]
         '''
         # Inventory: Group by region
         self.push(self.inventory, region, dest)
@@ -184,17 +176,19 @@ class clcInventory(object):
         # Inventory: Group by instance type
         self.push(self.inventory, self.to_safe('type_' + node.instance_type), dest)
         '''
-        # Inventory: Group by key pair
- #       if node.extra['HardwareGroupID']:
- #           self.push(self.inventory, self.to_safe('key_' + node.extra['keyname']), dest)
-            
+
         # Inventory: Group by security group, quick thing to handle single sg
-        if node['HardwareGroupUUID']:
-            self.push(self.inventory, self.to_safe(self.group_name_from_UUID(node['HardwareGroupUUID'])), dest)
+        if node['groupId']:
+            self.push(
+                self.inventory,
+                self.to_safe(
+                    self.group_name_from_UUID(
+                        node['groupId'])),
+                dest)
 
     def group_name_from_UUID(self, uuid):
         return str(clc.v2.Group(id=uuid))
-        
+
     def get_host_info(self):
         '''
         Get variables about a specific host
@@ -224,7 +218,7 @@ class clcInventory(object):
                 instance_vars[key] = value
             elif type(value) in [str, unicode]:
                 instance_vars[key] = value.strip()
-            elif type(value) == type(None):
+            elif isinstance(value, type(None)):
                 instance_vars[key] = ''
             elif key == 'ec2_region':
                 instance_vars[key] = value.name
@@ -239,16 +233,17 @@ class clcInventory(object):
                     group_ids.append(group.id)
                     group_names.append(group.name)
                 instance_vars["ec2_security_group_ids"] = ','.join(group_ids)
-                instance_vars["ec2_security_group_names"] = ','.join(group_names)
+                instance_vars["ec2_security_group_names"] = ','.join(
+                    group_names)
             else:
                 pass
                 # TODO Product codes if someone finds them useful
-                #print key
-                #print type(value)
-                #print value
+                # print key
+                # print type(value)
+                # print value
 
         return self.json_format_dict(instance_vars, True)
-        
+
     def push(self, my_dict, key, element):
         '''
         Pushed an element onto an array that may not have been defined in
@@ -256,10 +251,9 @@ class clcInventory(object):
         '''
 
         if key in my_dict:
-            my_dict[key].append(element);
+            my_dict[key].append(element)
         else:
             my_dict[key] = [element]
-
 
     def get_inventory_from_cache(self):
         '''
@@ -271,7 +265,6 @@ class clcInventory(object):
         json_inventory = cache.read()
         return json_inventory
 
-
     def load_index_from_cache(self):
         '''
         Reads the index from the cache file sets self.index
@@ -280,7 +273,6 @@ class clcInventory(object):
         cache = open(self.cache_path_index, 'r')
         json_index = cache.read()
         self.index = json.loads(json_index)
-
 
     def write_to_cache(self, data, filename):
         '''
@@ -291,7 +283,6 @@ class clcInventory(object):
         cache = open(filename, 'w')
         cache.write(json_data)
         cache.close()
-
 
     def to_safe(self, word):
         '''
@@ -312,9 +303,22 @@ class clcInventory(object):
         else:
             return json.dumps(data)
 
+    def _get_groups_for_datacenter(self, datacenter=None, alias=None):
+        root_group = clc.v2.Datacenter(location=datacenter).RootGroup()
+        return self._walk_groups_recursive(parent_group=None, child_group=root_group)
+
+    def _walk_groups_recursive(self, parent_group, child_group):
+        result = {str(child_group): (child_group, parent_group)}
+        groups = child_group.Subgroups().groups
+        if len(groups) > 0:
+            for group in groups:
+                result.update(self._walk_groups_recursive(child_group, group))
+        return result
+
+
 def main():
     clcInventory()
-    
+
 
 if __name__ == '__main__':
-	main()
+    main()
