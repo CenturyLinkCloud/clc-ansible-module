@@ -5,7 +5,6 @@ import os
 import datetime
 import json
 from ansible.module_utils.basic import *
-from time import sleep
 
 #
 #  Requires the clc-python-sdk.
@@ -602,9 +601,6 @@ def create_clc_server(clc, name,template,group_id,network_id,cpu=None,memory=Non
 
     # Find the server's UUID from the API response
     server_uuid = [obj['id'] for obj in res['links'] if obj['rel']=='self'][0]
-
-    # A hack to allow the server a little time to become visible
-    sleep(30)
 
     # Change the request server method to a find_server_by_uuid closure so that it will work
     result.requests[0].Server = lambda: find_server_by_uuid(clc, server_uuid, alias)
