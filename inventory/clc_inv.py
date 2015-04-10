@@ -17,6 +17,9 @@ except ImportError:
 class clcInventory(object):
 
     def __init__(self):
+        pass
+
+    def process_inventory(self):
         ''' Main execution path '''
 
         # Inventory grouped by instance IDs, tags, security groups, regions,
@@ -39,7 +42,7 @@ class clcInventory(object):
 
         # Data to print
         if self.args.host:
-            data_to_print = self.get_host_info()
+            data_to_print = json_format_Dict([], True)
 
         elif self.args.list:
             # Display list of instances for inventory
@@ -128,7 +131,12 @@ class clcInventory(object):
 
         for group in groups:
             child, parent = groups[group]
-            servers = child.Servers().servers
+            try:
+                servers = child.Servers().servers
+            except clc.CLCException, e:
+                if 'Server does not exist' in e.message:
+                    return
+
             for node in servers:
                 self.add_node(node.data)
 
@@ -188,61 +196,6 @@ class clcInventory(object):
 
     def group_name_from_UUID(self, uuid):
         return str(clc.v2.Group(id=uuid))
-
-    def get_host_info(self):
-        '''
-        Get variables about a specific host
-        '''
-
-        if len(self.index) == 0:
-            # Need to load index from cache
-            self.load_index_from_cache()
-
-        if not self.args.host in self.index:
-            # try updating the cache
-            self.do_api_calls_update_cache()
-            if not self.args.host in self.index:
-                # host migh not exist anymore
-                return self.json_format_dict({}, True)
-
-        node_id = self.index[self.args.host]
-
-        node = self.get_node(node_id)
-        instance_vars = {}
-        for key in vars(instance):
-            value = getattr(instance, key)
-            key = self.to_safe('ec2_' + key)
-
-            # Handle complex types
-            if type(value) in [int, bool]:
-                instance_vars[key] = value
-            elif type(value) in [str, unicode]:
-                instance_vars[key] = value.strip()
-            elif isinstance(value, type(None)):
-                instance_vars[key] = ''
-            elif key == 'ec2_region':
-                instance_vars[key] = value.name
-            elif key == 'ec2_tags':
-                for k, v in value.iteritems():
-                    key = self.to_safe('ec2_tag_' + k)
-                    instance_vars[key] = v
-            elif key == 'ec2_groups':
-                group_ids = []
-                group_names = []
-                for group in value:
-                    group_ids.append(group.id)
-                    group_names.append(group.name)
-                instance_vars["ec2_security_group_ids"] = ','.join(group_ids)
-                instance_vars["ec2_security_group_names"] = ','.join(
-                    group_names)
-            else:
-                pass
-                # TODO Product codes if someone finds them useful
-                # print key
-                # print type(value)
-                # print value
-
-        return self.json_format_dict(instance_vars, True)
 
     def push(self, my_dict, key, element):
         '''
@@ -317,8 +270,8 @@ class clcInventory(object):
 
 
 def main():
-    clcInventory()
-
+    clc_inventory = clcInventory()
+    clc_inventory.process_inventory()
 
 if __name__ == '__main__':
     main()
