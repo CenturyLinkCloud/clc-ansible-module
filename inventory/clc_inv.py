@@ -51,9 +51,11 @@ def print_inventory_json():
     '''
     _set_clc_credentials_from_env()
 
-    groups = _find_all_groups()
-    servers = _get_servers_from_groups(groups)
-    hostvars = _find_all_hostvars_for_servers(servers)
+    groups         = _find_all_groups()
+    servers        = _get_servers_from_groups(groups)
+    hostvars       = _find_all_hostvars_for_servers(servers)
+    dynamic_groups = _build_dynamic_groups_from_hostvars(hostvars)
+    groups.update(dynamic_groups)
 
     result = groups
     result['_meta'] = hostvars
@@ -73,7 +75,7 @@ def _find_all_groups():
     p.close()
     p.join()
     results = [result for result in results if result]  # Filter out results with no values
-    return _parse_groups_results_to_dict(results)
+    return _parse_groups_result_to_dict(results)
 
 def _find_groups_for_datacenter(datacenter):
     '''
@@ -135,7 +137,34 @@ def _find_hostvars_for_single_server(server_id):
 
     return result
 
-def _parse_groups_results_to_dict(lst):
+def _build_dynamic_groups_from_hostvars(hostvars):
+    '''
+    Build a dictionary of dynamically generated groups, parsed from
+    the hostvars of each server.
+    :param hostvars: hostvars to process
+    :return: dictionary of dynamically built groups based on server attributes
+    '''
+    result = {}
+    result.update(_build_datacenter_groups(hostvars=hostvars))
+    return result
+
+def _build_datacenter_groups(hostvars):
+    '''
+    Return a dictionary of groups, one for each datacenter, containing all
+    of the servers in that datacenter
+    :param hostvars: The hostvars dictionary to parse
+    :return: Dictionary of dynamically built Datacenter groups
+    '''
+    result = {}
+    hostvars = hostvars.get('hostvars')
+    for server in hostvars:
+        datacenter = hostvars[server]['clc_data']['locationId']
+        if datacenter not in result:
+            result[datacenter] = []
+        result[datacenter] += [server]
+    return result
+
+def _parse_groups_result_to_dict(lst):
     '''
     Return a parsed list of groups that can be converted to Ansible Inventory JSON
     :param lst: list of group results to parse
