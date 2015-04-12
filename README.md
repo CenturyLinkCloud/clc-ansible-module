@@ -1,7 +1,7 @@
 ![Build Status](http://206.128.156.165/build/status/clc-ansible-module)
 # clc-ansible-module
 
-[**NEW! Dynamic Inventory Script**](#dyninventory)
+[**NEW! Dynamic Inventory Script**](#dyn_inventory)
 
 These are additional, unofficial Ansible modules for managing CenturyLink Cloud.
 
@@ -254,7 +254,7 @@ Creates a public ip on an existing server or servers.
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
 | `state:` | N | `present` | `present`,`absent` | Determine whether to create or delete public IPs.  If `present` module will not create a second public ip if one already exists. |
 
-## <a name="dyn_inventory"></a>Dynamic Inventory Script
+## <a id="dyn_inventory"></a>Dynamic Inventory Script
 
 Scans all datacenters and returns an inventory of servers and server groups to Ansible.  This script returns all information about hosts in the inventory _meta dictionary.
 
