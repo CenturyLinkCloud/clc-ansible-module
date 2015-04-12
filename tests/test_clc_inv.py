@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import clc_inv as clc_inv
-from clc_inv import clcInventory
 import clc as clc_sdk
 from clc import CLCException
 import mock
