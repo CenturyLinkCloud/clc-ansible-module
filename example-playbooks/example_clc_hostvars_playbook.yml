@@ -1,0 +1,7 @@
+---
+- name: Read Hostvars for Servers 
+  hosts: all
+  gather_facts: False
+  tasks:
+    - name: Print PowerState returned by Dynamic Inventory / CLC API
+      debug: msg="PowerState={{ hostvars[inventory_hostname]['clc_data']['details']['powerState'] }}"

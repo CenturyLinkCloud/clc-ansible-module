@@ -252,4 +252,20 @@ Creates a public ip on an existing server or servers.
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
 | `state:` | N | `present` | `present`,`absent` | Determine whether to create or delete public IPs.  If `present` module will not create a second public ip if one already exists. |
 
-## Dynamic Inventory Module
+## Dynamic Inventory Script
+
+Scans all datacenters and returns an inventory of servers and server groups to Ansible.  This script returns all information about hosts in the inventory _meta dictionary.
+
+The following information is returned for each host:
+
+| hostvar | Description |
+|---------| :-----------:|
+| `ansible_ssh_host` | Set to the first internal ip address|
+| `clc_custom_fields` | A dictionary of custom fields set on the server in the Control Portal|
+| `clc_data` | A dictionary of all the data returned by the API|
+
+### Usage
+```
+ansible all -i inventory/clc_inv.py -m ping
+```
+
