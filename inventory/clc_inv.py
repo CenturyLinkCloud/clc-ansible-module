@@ -24,6 +24,10 @@ The following information is returned for each host:
 '''
 
 #  @author: Brian Albrecht
+#
+#  TODO: Add caching
+#  TODO: Add ability to specify AccountAlias
+#  TODO: Add ability to limit to inventory queryies to certain datacenters
 
 import sys
 import os
