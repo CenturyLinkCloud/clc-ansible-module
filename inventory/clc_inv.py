@@ -27,7 +27,7 @@ The following information is returned for each host:
 #
 #  TODO: Add caching
 #  TODO: Add ability to specify AccountAlias
-#  TODO: Add ability to limit to inventory queryies to certain datacenters
+#  TODO: Add ability to limit inventory queries to certain datacenters
 
 import sys
 import os
