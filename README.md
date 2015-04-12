@@ -1,6 +1,8 @@
 ![Build Status](http://206.128.156.165/build/status/clc-ansible-module)
 # clc-ansible-module
 
+[**NEW! Dynamic Inventory Script**](#dyninventory)
+
 These are additional, unofficial Ansible modules for managing CenturyLink Cloud.
 
 To use this, add this directory to to the ANSIBLE_LIBRARY environment variable, or symlink this directory to ./library underneath the directory containing the playbook that needs it.
@@ -252,7 +254,7 @@ Creates a public ip on an existing server or servers.
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
 | `state:` | N | `present` | `present`,`absent` | Determine whether to create or delete public IPs.  If `present` module will not create a second public ip if one already exists. |
 
-## Dynamic Inventory Script
+## <a name="dyn_inventory"></a>Dynamic Inventory Script
 
 Scans all datacenters and returns an inventory of servers and server groups to Ansible.  This script returns all information about hosts in the inventory _meta dictionary.
 
@@ -265,7 +267,17 @@ The following information is returned for each host:
 | `clc_data` | A dictionary of all the data returned by the API|
 
 ### Usage
-```
+Command Line:
+```bash
 ansible all -i inventory/clc_inv.py -m ping
 ```
-
+Access the CLC hostvars from a play:
+```yaml
+---
+- name: Read Hostvars for Servers 
+  hosts: all
+  gather_facts: False
+  tasks:
+    - name: Print PowerState returned by Dynamic Inventory / CLC API
+      debug: msg="PowerState={{ hostvars[inventory_hostname]['clc_data']['details']['powerState'] }}"
+```
