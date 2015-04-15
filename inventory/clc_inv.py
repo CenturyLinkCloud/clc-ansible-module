@@ -136,7 +136,7 @@ def _find_hostvars_for_single_server(server_id):
             'clc_data': server.data,
             'clc_custom_fields': server.data['details']['customFields']
         }
-    except CLCException, KeyError:
+    except (CLCException, KeyError):
         return  # Skip any servers that return bad data or an api exception
 
     return result
@@ -192,7 +192,7 @@ def _get_servers_from_groups(groups):
 
 def _flatten_list(lst):
     '''
-    Flattens a list of lists until at least one value is not iterable
+    Flattens a list of lists until at least one value is no longer iterable
     :param lst: list to flatten
     :return: flattened list
     '''
@@ -234,6 +234,9 @@ def _set_clc_credentials_from_env():
         clc.v2.SetCredentials(
             api_username=v2_api_username,
             api_passwd=v2_api_passwd)
+    else:
+        print "You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables to use the CenturyLink Cloud dynamic inventory script."
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
