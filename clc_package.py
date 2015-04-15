@@ -37,6 +37,8 @@ class ClcPackage():
         server_ids = p['server_ids']
         packages = p['packages']
         state = p['state']
+		
+		self.clc_install_packages(server_ids,packages)
 
     @staticmethod
     def define_argument_spec():
