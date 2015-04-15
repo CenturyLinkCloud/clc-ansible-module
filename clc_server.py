@@ -27,7 +27,6 @@ else:
 #  Ansible requires modules to be self contained, so all of the functions required
 #  by this module are included here rather than in a linked common file.  Don't shoot the messenger.
 #
-#  TODO:  Create a pip package for this module, and for common functions
 
 #
 #  main() defines the program flow and what behaviors happen for each state
