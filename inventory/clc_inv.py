@@ -136,7 +136,7 @@ def _find_hostvars_for_single_server(server_id):
             'clc_data': server.data,
             'clc_custom_fields': server.data['details']['customFields']
         }
-    except CLCException, KeyError:
+    except (CLCException, KeyError):
         return  # Skip any servers that return bad data or an api exception
 
     return result
