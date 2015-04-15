@@ -15,8 +15,6 @@ class TestClcInvFunctions(unittest.TestCase):
         self.module = mock.MagicMock()
         self.datacenter=mock.MagicMock()
 
-
-
     @patch('clc_inv.clc')
     def test_find_hostvars_for_single_server(self, mock_clc_sdk):
         server = mock.MagicMock()
