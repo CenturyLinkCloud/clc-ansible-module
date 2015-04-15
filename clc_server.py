@@ -620,6 +620,23 @@ def find_server_by_uuid(clc, svr_uuid, alias=None):
     server_id = server_obj['id']
     server = clc.v2.Server(id=server_id, alias=alias, server_obj=server_obj)
     return server
+	
+def modify_clc_server(clc, acct_alias, server_id, cpu, memory):
+    if not acct_alias:
+        acct_alias = clc.v2.Account.GetAlias()
+    if not server_id:
+        raise(clc.CLCException("Server Id is required"))
+    # Fetch the existing server information
+    server = clc.v2.Server(server_id)
+
+    current_memory = server.memory
+    current_cpu = server.cpu
+    if memory != current_memory or cpu != current_cpu:
+        #server.Change(cpu=cpu, memory=memory, description=None)
+        #server.SetMemory(memory).WaitUntilComplete()
+        job_obj = clc.v2.API.Call('PATCH', 'servers/%s/%s' % (acct_alias,server_id), json.dumps([{"op":"set", "member":"memory", "value":memory},{"op":"set","member":"cpu", "value":cpu}]))
+        result = clc.v2.Requests(job_obj)
+        return result	
 
 #
 #  Run the program
