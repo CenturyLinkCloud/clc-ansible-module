@@ -1,8 +1,22 @@
 #!/usr/bin/python
 
-import sys
-import os
-import datetime
+"""
+CenturyLink Cloud Server Package Installation
+=============================================
+This is an Ansible module which executes a set of packages
+on a given set of CLC servers by making calls to the
+clc-sdk Python SDK.
+NOTE:  This script assumes that environment variables are already set
+with control portal credentials in the format of:
+    export CLC_V2_API_USERNAME=<your Control Portal Username>
+    export CLC_V2_API_PASSWD=<your Control Portal Password>
+These credentials are required to use the CLC API and must be provided.
+"""
+
+#
+#  @author: Siva Popuri
+#
+
 import json
 from ansible.module_utils.basic import *
 #
@@ -27,27 +41,33 @@ class ClcPackage():
         self.module = module
 
     def process_request(self):
+        """
+        The root function which handles the Ansible module execution
+        :return: TODO:
+        """
         p = self.module.params
 
         if not clc_found:
             self.module.fail_json(msg='clc-python-sdk required for this module')
 
-        self.set_clc_credentials_from_env()
+        self._set_clc_creds_from_env()
 
         server_ids = p['server_ids']
         packages = p['packages']
         state = p['state']
-        self.clc_install_packages(server_ids,packages)
+        self.clc_install_packages(self, server_ids, packages)
 
     @staticmethod
     def define_argument_spec():
-        package = dict(
-            package_id=dict(required=True),
-            parameters=dict(type="list")
-        )
+        """
+        This function defnines the dictionary object required for
+        package module
+        :return: the package dictionary object
+        """
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
-            packages=dict(dict(package_id=dict(required=True), pamrameters=dict(type="list")), type='list', required=True),
+            packages=dict(dict(package_id=dict(required=True),
+                               pamrameters=dict(type="list")), type='list', required=True),
             state=dict(default='present', choices=['present', 'absent'])
         )
         return argument_spec
@@ -57,21 +77,37 @@ class ClcPackage():
     #
 
     def clc_install_packages(self, server_list, package_list):
+        """
+        Read all servers from CLC and executes each package from package_list
+        :param server_list: The target list of servers where the packages needs to be installed
+        :param package_list: The list of packages to be installed
+        :return: the list of affected servers
+        """
+        #TODO : Add more meaningful return information
+
         servers = self._get_servers_from_clc(server_list, 'Failed to get servers from CLC')
         try:
             for package in package_list:
                 servers.ExecutePackage(package_id=package.package_id,  parameters=package.parameters)
         except CLCException as ex:
-            self.module.fail_json('Failed while installing package : %s with Error : %s' %(package,ex))
+            self.module.fail_json('Failed while installing package : %s with Error : %s' %(package.package_id,ex))
         return servers
 
     def _get_servers_from_clc(self, server_list, message):
+        """
+        Internal function to fetch list of CLC server objects from a list of server ids
+        :param the list server ids
+        :return the list of CLC server objects
+        """
         try:
             return self.clc.v2.Servers(server_list).servers
         except CLCException as ex:
             self.module.fail_json(msg=message + '%s' %ex)
 
     def _set_clc_creds_from_env(self):
+        """
+        Internal function to set the CLC credentials
+        """
         env = os.environ
         v2_api_token = env.get('CLC_V2_API_TOKEN', False)
         v2_api_username = env.get('CLC_V2_API_USERNAME', False)
@@ -90,6 +126,10 @@ class ClcPackage():
         return self
 
 def main():
+    """
+    Main function
+    :return: None
+    """
     module = AnsibleModule(
             argument_spec=ClcPackage.define_argument_spec()
         )
