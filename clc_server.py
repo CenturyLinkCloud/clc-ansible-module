@@ -299,9 +299,15 @@ def create_servers(module, clc, override_count=None):
             servers.append(server)
 
         if wait:
-            sum(requests).WaitUntilComplete()
-            for server in servers:
-                server.Refresh()
+            # Requests.WaitUntilComplete() returns the count of failed requests
+            if sum(requests).WaitUntilComplete():
+                # NOTE: It would make much more sense if this returned a Requests object with the
+                #       error requests in tact or threw an exception with these data, but, alas
+                #       it does not, so we're going with the generic error message 
+                raise(clc.CLCException("One or more of your Server creates failed"))
+            else:
+                for server in servers:
+                    server.Refresh()
 
         if add_public_ip:
             add_public_ip_to_servers(clc, servers, public_ip_protocol, public_ip_ports, wait)
@@ -582,8 +588,8 @@ def create_clc_server(clc, name,template,group_id,network_id,cpu=None,memory=Non
     # TODO - validate addition_disks path not in template reserved paths
     # TODO - validate antiaffinity policy id set only with type=hyperscale
 
-    res = clc.v2.API.Call('POST','servers/%s' % (alias),
-             json.dumps({'name': name, 'description': description, 'groupId': group_id, 'sourceServerId': template,
+    res = clc.v2.API.Call(method='POST',url='servers/%s' % (alias),
+             payload=json.dumps({'name': name, 'description': description, 'groupId': group_id, 'sourceServerId': template,
                          'isManagedOS': managed_os, 'primaryDNS': primary_dns, 'secondaryDNS': secondary_dns,
                          'networkId': network_id, 'ipAddress': ip_address, 'password': password,
                          'sourceServerPassword': source_server_password, 'cpu': cpu, 'cpuAutoscalePolicyId': cpu_autoscale_policy_id,
