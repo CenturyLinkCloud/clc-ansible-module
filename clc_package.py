@@ -68,7 +68,7 @@ class ClcPackage():
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
             package_id=dict(required=True),
-            package_params=dict()
+            package_params=dict(type='dict', default={})
         )
         return argument_spec
 
