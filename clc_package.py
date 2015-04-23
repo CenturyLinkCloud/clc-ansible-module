@@ -53,9 +53,10 @@ class ClcPackage():
         self._set_clc_creds_from_env()
 
         server_ids = p['server_ids']
-        packages = p['packages']
-        state = p['state']
-        self.clc_install_packages(self, server_ids, packages)
+        package_id = p['package_id']
+        package_params = p['package_params']
+        self.clc_install_packages(server_ids, package_id, package_params)
+        self.module.exit_json("Finished")
 
     @staticmethod
     def define_argument_spec():
@@ -66,9 +67,8 @@ class ClcPackage():
         """
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
-            packages=dict(dict(package_id=dict(required=True),
-                               pamrameters=dict(type="list")), type='list', required=True),
-            state=dict(default='present', choices=['present', 'absent'])
+            package_id=dict(required=True),
+            package_params=dict()
         )
         return argument_spec
 
@@ -76,7 +76,7 @@ class ClcPackage():
     #   Module Behavior Functions
     #
 
-    def clc_install_packages(self, server_list, package_list):
+    def clc_install_packages(self, server_list, package_id, package_params):
         """
         Read all servers from CLC and executes each package from package_list
         :param server_list: The target list of servers where the packages needs to be installed
@@ -87,10 +87,10 @@ class ClcPackage():
 
         servers = self._get_servers_from_clc(server_list, 'Failed to get servers from CLC')
         try:
-            for package in package_list:
-                servers.ExecutePackage(package_id=package.package_id,  parameters=package.parameters)
+            for server in servers:
+                server.ExecutePackage(package_id=package_id,  parameters=package_params)
         except CLCException as ex:
-            self.module.fail_json('Failed while installing package : %s with Error : %s' %(package.package_id,ex))
+            self.module.fail_json(msg='Failed while installing package : %s with Error : %s' %(package_id,ex))
         return servers
 
     def _get_servers_from_clc(self, server_list, message):
