@@ -59,9 +59,82 @@ class ClcSnapshot():
         server_ids = p['server_ids']
         expiration_days = p['expiration_days']
         wait = p['wait']
+        state = p['state']
+        command_list = []
+
         acct_alias = self.clc.v2.Account.GetAlias()
-        result = self.clc_create_snapshot(acct_alias, server_ids, expiration_days, wait)
-        self.module.exit_json(result)
+        if state == 'present':
+            command_list.append(
+                lambda: self.clc_create_servers_snapshot(
+                    server_ids=server_ids,
+                    expiration_days=expiration_days))
+        elif state == 'absent':
+            command_list.append(
+                lambda: self.clc_delete_servers_snapshot(
+                    server_ids=server_ids))
+        else:
+            return self.module.fail_json(msg="Unknown State: " + state)
+
+        has_made_changes, result_servers = self.run_clc_commands(
+            command_list)
+        return self.module.exit_json(
+            changed=has_made_changes,
+            servers=result_servers)
+        #result = self.clc_ensure_snapshot(acct_alias, server_ids, expiration_days, state, wait)
+        #self.module.exit_json(msg="Finished processing the snapshot request!!!")
+
+    def run_clc_commands(self, command_list):
+        requests_list = []
+        changed_servers = []
+        for command in command_list:
+            requests, servers = command()
+            requests_list += requests
+            changed_servers += servers
+        self._wait_for_requests_to_complete(requests_list)
+        has_made_changes, result_changed_servers = self._parse_server_results(
+            changed_servers)
+        return has_made_changes, result_changed_servers
+
+    def _wait_for_requests_to_complete(self, requests_lst, action='create'):
+        for request in requests_lst:
+            request.WaitUntilComplete()
+            for request_details in request.requests:
+                if request_details.Status() != 'succeeded':
+                    self.module.fail_json(
+                        msg='Unable to ' +
+                        action +
+                        ' Public IP for ' +
+                        request.server.id +
+                        ': ' +
+                        request.Status())
+
+    @staticmethod
+    def _parse_server_results(servers):
+        servers_result = []
+        changed = False
+        snapshot = ''
+        for server in servers:
+            has_snapshot = len(server.GetSnapshots()) > 0
+            if has_snapshot:
+                changed = True
+                snapshot = str(server.GetSnapshots()[0])
+            ipaddress = server.data['details']['ipAddresses'][0]['internal']
+            server.data['ipaddress'] = ipaddress
+            server.data['snapshot'] = snapshot
+            servers_result.append(server.data)
+        return changed, servers_result
+
+    def _get_servers_from_clc_api(self, server_ids, message):
+        try:
+            return self.clc.v2.Servers(server_ids).servers
+        except CLCException as exception:
+            self.module.fail_json(msg=message + ': %s' % exception)
+
+    def _get_servers_from_clc_api(self, server_ids, message):
+        try:
+            return self.clc.v2.Servers(server_ids).servers
+        except CLCException as exception:
+            self.module.fail_json(msg=message + ': %s' % exception)
 
     @staticmethod
     def define_argument_spec():
@@ -73,7 +146,8 @@ class ClcSnapshot():
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
             expiration_days=dict(required=True),
-            wait=dict(default=True)
+            wait=dict(default=True),
+            state=dict(default='present', choices=['present', 'absent']),
         )
         return argument_spec
 
@@ -81,7 +155,65 @@ class ClcSnapshot():
     #   Module Behavior Functions
     #
 
-    def clc_create_snapshot(self, acct_alias, server_list, expiration_days, wait):
+    def clc_create_server_snapshot(self, acct_alias, server_id, expiration_days):
+        try:
+            server = self.clc.v2.Server(server_id)
+            res = server.CreateSnapshot(delete_existing=True, expiration_days=expiration_days)
+            '''
+            res = self.clc.v2.API.Call('POST','/v2/operations/%s/servers/createSnapshot' % (acct_alias),
+                                       json.dumps({'serverIds': server_id, 'snapshotExpirationDays': expiration_days}))
+            '''
+        except CLCException as ex:
+            self.module.fail_json(msg='Failed to create snap shot with Error : %s' %(ex))
+        return res
+
+    def clc_create_servers_snapshot(self, server_ids, expiration_days):
+        try:
+            servers = self._get_servers_from_clc(
+            server_ids,
+            'Failed to obtain server list from the CLC API')
+            servers_to_change = [
+                server for server in servers if len(
+                    server.GetSnapshots()) == 0]
+            return [server.CreateSnapshot(delete_existing=True, expiration_days=expiration_days)
+                    for server in servers_to_change], servers_to_change
+            '''
+            res = self.clc.v2.API.Call('POST','/v2/operations/%s/servers/createSnapshot' % (acct_alias),
+                                       json.dumps({'serverIds': server_id, 'snapshotExpirationDays': expiration_days}))
+            '''
+        except CLCException as ex:
+            self.module.fail_json(msg='Failed to create snap shot with Error : %s' %(ex))
+
+    def clc_delete_server_snapshot(self, server_id):
+        '''
+        deletes the existing server snapshot
+        :param acct_alias: account alias for the server
+        :param server_id: the target clc server id
+        :return: nothing
+        '''
+        try:
+            server = self.clc.v2.Server(server_id)
+            req = server.DeleteSnapshot()
+        except CLCException as ex:
+            self.module.fail_json(msg='Failed to delete snap shot for server %s. Error : %s' %(server_id,ex))
+        return req
+
+    def clc_delete_servers_snapshot(self, server_ids):
+        '''
+        deletes the existing servers snapshot
+        :param server_id: the target clc server id
+        :return: nothing
+        '''
+        servers = self._get_servers_from_clc(
+            server_ids,
+            'Failed to obtain server list from the CLC API')
+        servers_to_change = [
+            server for server in servers if len(
+                server.GetSnapshots()) == 1]
+        return [server.DeleteSnapshot()
+                for server in servers_to_change], servers_to_change
+
+    def clc_ensure_snapshot(self, acct_alias, server_list, expiration_days, state, wait):
         """
         Create a snapshot for the given list of servers
         :param server_list: The target list of servers where the packages needs to be installed
@@ -90,16 +222,27 @@ class ClcSnapshot():
         :return: the result of snapshot job
         """
 
-        servers = self._get_servers_from_clc(server_list, 'Failed to get servers from CLC')
+        requests = []
+        command_list = []
+        #servers = self._get_servers_from_clc(server_list, 'Failed to get servers from CLC')
+        servers = self.clc.v2.Servers(server_list).Servers()
         try:
-            #server.CreateSnapshot(delete_existing=True, expiration_days=expiration_days)
-            res = self.clc.v2.API.Call('POST','/v2/operations/%s/servers/createSnapshot' % (acct_alias), json.dumps({'serverIds': server_list, 'snapshotExpirationDays': expiration_days}))
-            result = self.clc.v2.Requests(res)
+            for server in servers:
+                print("******* IP : %s *******" %(server))
+                if state == 'present':
+                    request = self.clc_create_server_snapshot(acct_alias, server.id, expiration_days)
+                    requests.append(request)
+                if state == 'absent':
+                    request = self.clc_delete_servers_snapshot(server_list)
+                    requests.append(request)
+                else:
+                    return self.module.fail_json(msg="Unknown State: " + state)
             if wait:
-                result.waitUntilFinished()
+                sum(requests).WaitUntilFinished()
         except CLCException as ex:
             self.module.fail_json(msg='Failed to create snap shot with Error : %s' %(ex))
-        return result
+        return requests
+
 
     def _get_servers_from_clc(self, server_list, message):
         """
