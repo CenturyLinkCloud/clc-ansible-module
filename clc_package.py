@@ -27,18 +27,21 @@ try:
     import clc as clc_sdk
     from clc import CLCException
 except ImportError:
-    clc_found = False
+    CLC_FOUND = False
     clc_sdk = None
 else:
-    clc_found = True
+    CLC_FOUND = True
 
 class ClcPackage():
 
-    clc = None
+    clc = clc_sdk
+    module = None
 
     def __init__(self, module):
-        self.clc = clc_sdk
         self.module = module
+        if not CLC_FOUND:
+            self.module.fail_json(
+                msg='clc-python-sdk required for this module')
 
     def process_request(self):
         """
@@ -47,7 +50,7 @@ class ClcPackage():
         """
         p = self.module.params
 
-        if not clc_found:
+        if not CLC_FOUND:
             self.module.fail_json(msg='clc-python-sdk required for this module')
 
         self._set_clc_creds_from_env()
