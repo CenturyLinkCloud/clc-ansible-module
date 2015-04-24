@@ -101,6 +101,60 @@ class TestClcPackageFunctions(unittest.TestCase):
         result = ClcPackage.define_argument_spec()
         self.assertIsInstance(result, dict)
 
+    @patch.object(ClcPackage, 'clc')
+    def test_get_servers_from_clc_api(self, mock_clc_sdk):
+        mock_clc_sdk.v2.Servers.side_effect = CLCException("Server Not Found")
+        under_test = ClcPackage(self.module)
+        under_test._get_servers_from_clc(['TESTSVR1', 'TESTSVR2'], 'FAILED TO OBTAIN LIST')
+        self.module.fail_json.assert_called_once_with(msg='FAILED TO OBTAIN LIST: Server Not Found')
+
+    @patch.object(ClcPackage, '_set_clc_creds_from_env')
+    @patch.object(ClcPackage, 'clc_install_packages')
+    def test_process_request_w_valid_args(self, mock_set_clc_creds, mock_install_packages):
+        test_params = {
+            'server_ids': ['TESTSVR1', 'TESTSVR2']
+            , 'package_id': 'TSTPKGID1'
+            , 'package_params': {}
+        }
+        self.module.params = test_params
+        under_test = ClcPackage(self.module)
+        under_test.process_request()
+
+        self.assertTrue(mock_set_clc_creds.called)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcPackage, '_set_clc_creds_from_env')
+    @patch.object(ClcPackage, 'clc_install_packages')
+    def test_process_request_w_no_server_ids(self, mock_set_clc_creds, mock_install_packages):
+        test_params = {
+            'server_ids': []
+            ,'package_id': 'TSTPKGID1'
+            , 'package_params': {}
+        }
+        self.module.params = test_params
+        under_test = ClcPackage(self.module)
+        under_test.process_request()
+
+        self.assertTrue(mock_set_clc_creds.called)
+        self.assertTrue(self.module.fail_json.called)
+        self.module.fail_json.assert_called_once_with(msg='Error: server_ids is required')
+
+    @patch.object(ClcPackage, '_set_clc_creds_from_env')
+    @patch.object(ClcPackage, 'clc_install_packages')
+    def test_process_request_w_no_package_id(self, mock_set_clc_creds, mock_install_packages):
+        test_params = {
+            'server_ids': ['TESTSVR1, TESTSVR2']
+            , 'package_id': ''
+            , 'package_params': {}
+        }
+        self.module.params = test_params
+        under_test = ClcPackage(self.module)
+        under_test.process_request()
+
+        self.assertTrue(mock_set_clc_creds.called)
+        self.assertTrue(self.module.fail_json.called)
+        self.module.fail_json.assert_called_once_with(msg='Error: package_id is required')
+
 
 if __name__ == '__main__':
     unittest.main()

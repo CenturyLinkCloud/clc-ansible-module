@@ -58,8 +58,12 @@ class ClcPackage():
         server_ids = p['server_ids']
         package_id = p['package_id']
         package_params = p['package_params']
+        if not server_ids or len(server_ids) == 0:
+            self.module.fail_json(msg='Error: server_ids is required')
+        if not package_id:
+            self.module.fail_json(msg='Error: package_id is required')
         self.clc_install_packages(server_ids, package_id, package_params)
-        self.module.exit_json("Finished")
+        self.module.exit_json(msg="Finished")
 
     @staticmethod
     def define_argument_spec():
@@ -105,7 +109,7 @@ class ClcPackage():
         try:
             return self.clc.v2.Servers(server_list).servers
         except CLCException as ex:
-            self.module.fail_json(msg=message + '%s' %ex)
+            self.module.fail_json(msg=message + ': %s' %ex)
 
     def _set_clc_creds_from_env(self):
         """
