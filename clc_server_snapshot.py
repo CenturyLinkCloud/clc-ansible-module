@@ -34,15 +34,18 @@ except ImportError:
     clc_found = False
     clc_sdk = None
 else:
-    clc_found = True
+    CLC_FOUND = True
 
 class ClcSnapshot():
 
-    clc = None
+    clc = clc_sdk
+    module = None
 
     def __init__(self, module):
-        self.clc = clc_sdk
         self.module = module
+        if not CLC_FOUND:
+            self.module.fail_json(
+                msg='clc-python-sdk required for this module')
 
     def process_request(self):
         """
@@ -51,7 +54,7 @@ class ClcSnapshot():
         """
         p = self.module.params
 
-        if not clc_found:
+        if not CLC_FOUND:
             self.module.fail_json(msg='clc-python-sdk required for this module')
 
         self._set_clc_creds_from_env()
@@ -271,7 +274,7 @@ class ClcSnapshot():
         try:
             return self.clc.v2.Servers(server_list).servers
         except CLCException as ex:
-            self.module.fail_json(msg=message + '%s' %ex)
+            self.module.fail_json(msg=message + ': %s' %ex)
 
     def _set_clc_creds_from_env(self):
         """
