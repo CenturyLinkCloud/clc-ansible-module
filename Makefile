@@ -1,2 +1,2 @@
 test:
-	nosetests --exe -v
+	nosetests --exe -v --with-xunit
