@@ -254,6 +254,66 @@ Creates a public ip on an existing server or servers.
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
 | `state:` | N | `present` | `present`,`absent` | Determine whether to create or delete public IPs.  If `present` module will not create a second public ip if one already exists. |
 
+## clc_serer_snapshot Module
+Create/Delete/Restore a snapshot on an existing server or servers.
+
+### Example Playbook
+```yaml
+---
+- name: Create a snapshot on a set of servers
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create server snapshot
+      clc_server_snapshot:
+        server_ids:
+            - UC1ACCTSRVR01
+            - UC1ACCTSRVR02
+        expiration_days: 1
+        wait: True
+        state: present
+```
+```yaml
+---
+- name: Restore a snapshot on a set of servers
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Restore server snapshot
+      clc_server_snapshot:
+        server_ids:
+            - UC1ACCTSRVR01
+            - UC1ACCTSRVR02
+        wait: True
+        state: restore
+```
+```yaml
+---
+- name: Delete a snapshot on a set of servers
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete server snapshot
+      clc_server_snapshot:
+        server_ids:
+            - UC1ACCTSRVR01
+            - UC1ACCTSRVR02
+        wait: True
+        state: absent
+```
+
+###Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `server_ids:` | Y |  |  | A list of servers to create public ips on. |
+| `expiration_days:` | N | `7` |  | Take a Hypervisor level snapshot retained for between 1 and 10 days (7 is default). Currently only one snapshop may exist at a time, thus will delete snapshots if one already exists before taking this snapshot. |
+| `state:` | N | `present` | `present`,`absent`,'restore' | Determine whether to create or delete or restore snapshots.  If `present` module will not create a second snapshot if one already exists. |
+| `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
+
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script
 
 Scans all datacenters and returns an inventory of servers and server groups to Ansible.  This script returns all information about hosts in the inventory _meta dictionary.
