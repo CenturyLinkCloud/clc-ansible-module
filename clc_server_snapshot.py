@@ -130,12 +130,6 @@ class ClcSnapshot():
             servers_result.append(ipaddress)
         return changed, servers_result
 
-    def _get_servers_from_clc_api(self, server_ids, message):
-        try:
-            return self.clc.v2.Servers(server_ids).servers
-        except CLCException as exception:
-            self.module.fail_json(msg=message + ': %s' % exception)
-
     @staticmethod
     def define_argument_spec():
         """
@@ -238,11 +232,6 @@ class ClcSnapshot():
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
         return self
-
-    def test_define_argument_spec(self):
-        result = ClcSnapshot.define_argument_spec()
-        self.assertIsInstance(result, dict)
-
 
 
 def main():
