@@ -1,0 +1,25 @@
+---
+- name: Create a snapshot on a set of servers
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create server snapshot
+      clc_server_snapshot:
+        server_ids:
+            - UC1WFSDANS01
+            - UC1WFSDANS02
+        expiration_days: 1
+        wait: True
+        state: present
+      register: clc
+
+    - name: delete server snapshot
+      clc_server_snapshot:
+        server_ids:
+            - UC1WFSDANS01
+            - UC1WFSDANS02
+        expiration_days: 1
+        wait: True
+        state: absent
+      register: clc
