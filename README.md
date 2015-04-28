@@ -254,7 +254,7 @@ Creates a public ip on an existing server or servers.
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
 | `state:` | N | `present` | `present`,`absent` | Determine whether to create or delete public IPs.  If `present` module will not create a second public ip if one already exists. |
 
-## clc_serer_snapshot Module
+## clc_server_snapshot Module
 Create/Delete/Restore a snapshot on an existing server or servers.
 
 ### Example Playbook
