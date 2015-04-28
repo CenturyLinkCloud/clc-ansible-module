@@ -2,3 +2,5 @@
 **/.coverage
 **/htmlcov
 .idea/
+coverage.xml
+nosetests.xml
