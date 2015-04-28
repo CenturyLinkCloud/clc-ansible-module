@@ -137,6 +137,51 @@ class TestClcServerSnapshotFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_once_with(msg='Unknown State: INVALID')
         self.assertFalse(self.module.exit_json.called)
 
+
+    def test_clc_create_servers_snapshot_w_invalid_server(self):
+        server_ids = ['INVALID']
+        exp_days = 7
+        under_test = ClcSnapshot(self.module)
+        under_test.clc_create_servers_snapshot(server_ids, exp_days)
+        self.assertTrue(self.module.fail_json.called)
+
+    def test_clc_delete_servers_snapshot_w_invalid_server(self):
+        server_ids = ['INVALID']
+        under_test = ClcSnapshot(self.module)
+        under_test.clc_delete_servers_snapshot(server_ids)
+        self.assertTrue(self.module.fail_json.called)
+
+    def test_clc_restore_servers_snapshot_w_invalid_server(self):
+        server_ids = ['INVALID']
+        under_test = ClcSnapshot(self.module)
+        under_test.clc_restore_servers_snapshot(server_ids)
+        self.assertTrue(self.module.fail_json.called)
+
+    @patch.object(ClcSnapshot, '_get_servers_from_clc')
+    def test_clc_create_servers_snapshot_w_mock_server(self,mock_get_servers):
+        server_ids = ['INVALID']
+        mock_get_servers.return_value=[mock.MagicMock()]
+        exp_days = 7
+        under_test = ClcSnapshot(self.module)
+        under_test.clc_create_servers_snapshot(server_ids, exp_days)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcSnapshot, '_get_servers_from_clc')
+    def test_clc_create_servers_snapshot_w_mock_server(self,mock_get_servers):
+        server_ids = ['INVALID']
+        mock_get_servers.return_value=[mock.MagicMock()]
+        under_test = ClcSnapshot(self.module)
+        under_test.clc_delete_servers_snapshot(server_ids)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcSnapshot, '_get_servers_from_clc')
+    def test_clc_create_servers_snapshot_w_mock_server(self,mock_get_servers):
+        server_ids = ['INVALID']
+        mock_get_servers.return_value=[mock.MagicMock()]
+        under_test = ClcSnapshot(self.module)
+        under_test.clc_restore_servers_snapshot(server_ids)
+        self.assertFalse(self.module.fail_json.called)
+
     @patch.object(ClcSnapshot, 'clc')
     def test_get_servers_from_clc_api(self, mock_clc_sdk):
         mock_clc_sdk.v2.Servers.side_effect = CLCException("Server Not Found")

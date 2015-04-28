@@ -161,13 +161,15 @@ class ClcSnapshot():
             servers = self._get_servers_from_clc(
             server_ids,
             'Failed to obtain server list from the CLC API')
+            if not servers:
+                return self.module.fail_json(msg='Failed to create snap shot as there are no servers available')
             servers_to_change = [
                 server for server in servers if len(
                     server.GetSnapshots()) == 0]
             return [server.CreateSnapshot(delete_existing=True, expiration_days=expiration_days)
                     for server in servers_to_change], servers_to_change
         except CLCException as ex:
-            self.module.fail_json(msg='Failed to create snap shot with Error : %s' %(ex))
+            return self.module.fail_json(msg='Failed to create snap shot with Error : %s' %(ex))
 
 
     def clc_delete_servers_snapshot(self, server_ids):
@@ -179,6 +181,8 @@ class ClcSnapshot():
         servers = self._get_servers_from_clc(
             server_ids,
             'Failed to obtain server list from the CLC API')
+        if not servers:
+                return self.module.fail_json(msg='Failed to create snap shot as there are no servers available')
         servers_to_change = [
             server for server in servers if len(
                 server.GetSnapshots()) == 1]
@@ -194,6 +198,8 @@ class ClcSnapshot():
         servers = self._get_servers_from_clc(
             server_ids,
             'Failed to obtain server list from the CLC API')
+        if not servers:
+                return self.module.fail_json(msg='Failed to create snap shot as there are no servers available')
         servers_to_change = [
             server for server in servers if len(
                 server.GetSnapshots()) == 1]
