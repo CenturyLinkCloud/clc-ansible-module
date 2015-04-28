@@ -4,6 +4,7 @@ import sys
 import os
 import datetime
 import json
+from time import sleep
 from ansible.module_utils.basic import *
 
 #
@@ -621,10 +622,25 @@ def find_server_by_uuid(clc, svr_uuid, alias=None):
     if not alias:
         alias = clc.v2.Account.GetAlias()
 
-    server_obj = clc.v2.API.Call('GET', 'servers/%s/%s?uuid=true' % (alias,svr_uuid))
-    server_id = server_obj['id']
-    server = clc.v2.Server(id=server_id, alias=alias, server_obj=server_obj)
-    return server
+    attempts = 5
+    backout = 2
+
+    while True:
+        attempts -= 1
+        try:
+            server_obj = clc.v2.API.Call('GET', 'servers/%s/%s?uuid=true' % (alias,svr_uuid))
+            server_id = server_obj['id']
+            server = clc.v2.Server(id=server_id, alias=alias, server_obj=server_obj)
+            return server
+
+        except clc.APIFailedResponse as e:
+            if e.response_status_code != 404:
+                raise e
+            if attempts == 0:
+                raise e
+
+            sleep(backout)
+            backout = backout * 2
 	
 def modify_clc_server(clc, acct_alias, server_id, cpu, memory):
     if not acct_alias:
