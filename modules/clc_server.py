@@ -359,7 +359,7 @@ def delete_servers(module, clc, server_ids):
         requests.append(server.Delete())
 
     if wait:
-        for r in request:
+        for r in requests:
              r.WaitUntilComplete()
 
     for server in servers:
