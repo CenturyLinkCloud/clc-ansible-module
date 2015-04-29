@@ -66,10 +66,6 @@ EXAMPLES = '''
 
 '''
 
-
-
-
-
 import sys
 import os
 import datetime
@@ -102,16 +98,23 @@ class ClcGroup():
             self.module.fail_json(
                 msg='clc-python-sdk required for this module')
 
-    def do_work(self):
-        p = self.module.params
+    def process_request(self):
+        location            = self.module.params.get('location')
+        group_name          = self.module.params.get('name')
+        parent_name         = self.module.params.get('parent')
+        group_description   = self.module.params.get('description')
+        state               = self.module.params.get('state')
 
         self.set_clc_credentials_from_env()
-        self.group_dict = self._get_group_tree_for_datacenter(datacenter=p['location'])
+        self.group_dict = self._get_group_tree_for_datacenter(datacenter=location)
 
-        if p['state'] == "absent":
-            changed, group = self._ensure_group_is_absent(p)
+        if state == "absent":
+            changed, group = self._ensure_group_is_absent(group_name=group_name,
+                                                          parent_name=parent_name)
         else:
-            changed, group = self._ensure_group_is_present(p)
+            changed, group = self._ensure_group_is_present(group_name=group_name,
+                                                           parent_name=parent_name,
+                                                           group_description=group_description)
 
         if group:
             group = group.data
@@ -161,35 +164,34 @@ class ClcGroup():
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
 
-    def _ensure_group_is_absent(self, p):
+    def _ensure_group_is_absent(self, group_name, parent_name):
         '''
         Deletes a Server Group
         '''
         changed = False
         group = None
-        if self._group_exists(group_name=p['name'], parent_name=p['parent']):
-            self._delete_group(p)
+        if self._group_exists(group_name=group_name, parent_name=parent_name):
+            self._delete_group(group_name)
             changed = True
         return changed, group
 
-    def _delete_group(self, p):
+    def _delete_group(self, group_name):
         '''
         Deletes a Server Group
         '''
-        group, parent = self.group_dict[p['name']]
+        group, parent = self.group_dict.get(group_name)
         group.Delete()
 
-    def _ensure_group_is_present(self, p):
+    def _ensure_group_is_present(self, group_name, parent_name, group_description):
         '''
         Creates a Server Group
         '''
         changed = False
         group = None
         assert self.root_group, "Implementation Error: Root Group not set"
-        parent = p['parent'] if p['parent'] is not None else self.root_group.name
-        group = p['name']
-        description = p['description']
-
+        parent = parent_name if parent_name is not None else self.root_group.name
+        group = group_name
+        description = group_description
 
         parent_exists = self._group_exists(group_name=parent, parent_name=None)
         child_exists = self._group_exists(group_name=group, parent_name=parent)
@@ -201,7 +203,7 @@ class ClcGroup():
             group = self._create_group(group=group, parent=parent, description=description)
             changed = True
         else:
-            group, parent = self.group_dict[p['name']]
+            group, parent = self.group_dict[group_name]
             changed = False
 
         return changed, group
@@ -226,9 +228,9 @@ class ClcGroup():
         '''
         result = False
         if group_name in self.group_dict:
-                (group, parent) = self.group_dict[group_name]
-        if parent_name is None or parent_name == parent.name:
-            result = True
+            (group, parent) = self.group_dict[group_name]
+            if parent_name is None or parent_name == parent.name:
+                result = True
         return result
 
     def _get_group_tree_for_datacenter(self, datacenter=None, alias=None):
@@ -263,7 +265,7 @@ def main():
             argument_spec=ClcGroup.define_argument_spec()
         )
     clc_group = ClcGroup(module)
-    clc_group.do_work()
+    clc_group.process_request()
 
 
 if __name__ == '__main__':

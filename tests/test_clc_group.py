@@ -14,7 +14,6 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module = mock.MagicMock()
         self.datacenter=mock.MagicMock()
 
-
     def test_clc_module_not_found(self):
         # Setup Mock Import Function
         import __builtin__ as builtins
@@ -29,6 +28,8 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert Expected Behavior
         self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
 
+        # Reset clc_group
+        reload(clc_group)
 
     def test_clc_set_credentials_w_creds(self):
         with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
@@ -46,6 +47,54 @@ class TestClcServerFunctions(unittest.TestCase):
 
         self.assertEqual(self.module.fail_json.called, True)
 
+    def test_define_argument_spec(self):
+        result = ClcGroup.define_argument_spec()
+        self.assertIsInstance(result, dict)
+
+    @patch.object(clc_group, 'clc_sdk')
+    def test_process_request_state_present(self, mock_clc_sdk):
+        self.module.params = {
+            'location': 'UC1',
+            'name': 'MyCoolGroup',
+            'parent': 'Default Group',
+            'description': 'Test Group',
+            'state': 'present'
+        }
+        mock_group = mock.MagicMock()
+        mock_group.data = {"name": "MyCoolGroup"}
+
+        under_test = ClcGroup(self.module)
+        under_test.set_clc_credentials_from_env = mock.MagicMock()
+        under_test._ensure_group_is_present = mock.MagicMock(return_value=(True, mock_group))
+
+        under_test.process_request()
+
+        self.assertEqual(self.module.fail_json.called, False)
+        self.module.exit_json.assert_called_once_with(changed=True, group=mock_group.data)
+
+    @patch.object(clc_group, 'clc_sdk')
+    def test_process_request_state_absent(self, mock_clc_sdk):
+        self.module.params = {
+            'location': 'UC1',
+            'name': 'MyCoolGroup',
+            'parent': 'Default Group',
+            'description': 'Test Group',
+            'state': 'absent'
+        }
+        mock_group = mock.MagicMock()
+        mock_group.data = {"name": "MyCoolGroup"}
+
+        under_test = ClcGroup(self.module)
+        under_test.set_clc_credentials_from_env = mock.MagicMock()
+        under_test._ensure_group_is_absent = mock.MagicMock(return_value=(True, mock_group))
+
+        under_test.process_request()
+
+        self.assertEqual(self.module.fail_json.called, False)
+        self.module.exit_json.assert_called_once_with(changed=True, group=mock_group.data)
+
+    def test_ensure_group_is_present(self):
+        pass
 
     def test_get_group(self):
         # Setup
