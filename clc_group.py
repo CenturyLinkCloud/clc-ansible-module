@@ -1,10 +1,80 @@
 #!/usr/bin/python
+DOCUMENTATION = '''
+module: clc-ansible-module
+short_desciption: Create/delete Server Groups at Centurylink Cloud
+description:
+  - Create or delete Server Groups at Centurylink Centurylink Cloud
+options:
+  name:
+    description: 
+      - The name of the Server Group
+  description:
+    description: 
+      - A description of the Server Group
+  parent:
+    description: 
+      - The parent group of the server group
+  location:
+    description: 
+      - Datacenter to create the group in
+  state:
+    description: 
+      - Whether to create or delete the group
+    default: present
+    choices: ['present', 'absent']  
+
+
+'''
+
+EXAMPLES = '''
+
+# Create a Server Group
+
+---
+- name: Create Server Group
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create / Verify a Server Group at CenturyLink Cloud
+      clc_group:
+        name: 'My Cool Server Group'
+        parent: 'Default Group'
+        state: present
+      register: clc
+
+    - name: debug
+      debug: var=clc
+
+# Delete a Server Group
+
+---
+- name: Delete Server Group
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete / Verify Absent a Server Group at CenturyLink Cloud
+      clc_group:
+        name: 'My Cool Server Group'
+        parent: 'Default Group'
+        state: absent
+      register: clc
+
+    - name: debug
+      debug: var=clc
+
+'''
+
+
+
+
 
 import sys
 import os
 import datetime
 import json
-from ansible.module_utils.basic import *
+# from ansible.module_utils.basic import *
 #
 #  Requires the clc-python-sdk.
 #  sudo pip install clc-sdk
@@ -72,6 +142,9 @@ class ClcGroup():
     #
 
     def set_clc_credentials_from_env(self):
+        '''
+        Sets CLC Credentials
+        '''
         env = os.environ
         v2_api_token = env.get('CLC_V2_API_TOKEN', False)
         v2_api_username = env.get('CLC_V2_API_USERNAME', False)
@@ -89,19 +162,27 @@ class ClcGroup():
                     "environment variables")
 
     def _ensure_group_is_absent(self, p):
+        '''
+        Deletes a Server Group
+        '''
         changed = False
         group = None
-
         if self._group_exists(group_name=p['name'], parent_name=p['parent']):
             self._delete_group(p)
             changed = True
         return changed, group
 
     def _delete_group(self, p):
+        '''
+        Deletes a Server Group
+        '''
         group, parent = self.group_dict[p['name']]
         group.Delete()
 
     def _ensure_group_is_present(self, p):
+        '''
+        Creates a Server Group
+        '''
         changed = False
         group = None
         assert self.root_group, "Implementation Error: Root Group not set"
@@ -127,6 +208,9 @@ class ClcGroup():
 
 
     def _create_group(self, group, parent, description):
+        '''
+        Creates a Server Group
+        '''
 
         (parent, grandparent) = self.group_dict[parent]
         return parent.Create(name=group, description=description)
@@ -137,16 +221,20 @@ class ClcGroup():
     #
 
     def _group_exists(self, group_name, parent_name):
+        '''
+        Check to see if a group exists
+        '''
         result = False
         if group_name in self.group_dict:
-            (group, parent) = self.group_dict[group_name]
-
-            if parent_name is None or parent_name == parent.name:
-                result = True
-
+                (group, parent) = self.group_dict[group_name]
+        if parent_name is None or parent_name == parent.name:
+            result = True
         return result
 
     def _get_group_tree_for_datacenter(self, datacenter=None, alias=None):
+        '''
+        Get a datacenter's server group tree
+        '''
         self.root_group = self.clc.v2.Datacenter(location=datacenter).RootGroup()
         return self._walk_groups_recursive(parent_group=None, child_group=self.root_group)
 
@@ -159,6 +247,9 @@ class ClcGroup():
         return result
 
     def _get_group(self, group_name, datacenter=None, alias=None):
+        '''
+        Get a specified Server Group
+        '''
         result = None
         try:
             result = self.clc.v2.Datacenter(location=datacenter, alias=alias).Groups().Get(group_name)
