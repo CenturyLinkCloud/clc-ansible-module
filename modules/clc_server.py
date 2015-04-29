@@ -301,14 +301,15 @@ def create_servers(module, clc, override_count=None):
 
         if wait:
             # Requests.WaitUntilComplete() returns the count of failed requests
-            if sum(requests).WaitUntilComplete():
-                # NOTE: It would make much more sense if this returned a Requests object with the
-                #       error requests in tact or threw an exception with these data, but, alas
-                #       it does not, so we're going with the generic error message 
-                raise(clc.CLCException("One or more of your Server creates failed"))
-            else:
-                for server in servers:
-                    server.Refresh()
+            for r in requests:
+                if r.WaitUntilComplete():
+                     # NOTE: It would make much more sense if this returned a Requests object with the
+                     #       error requests in tact or threw an exception with these data, but, alas
+                     #       it does not, so we're going with the generic error message 
+                     raise(clc.CLCException("One or more of your Server creates failed"))
+                else:
+                     for server in servers:
+                        server.Refresh()
 
         if add_public_ip:
             add_public_ip_to_servers(clc, servers, public_ip_protocol, public_ip_ports, wait)
@@ -358,7 +359,8 @@ def delete_servers(module, clc, server_ids):
         requests.append(server.Delete())
 
     if wait:
-        sum(requests).WaitUntilComplete()
+        for r in request:
+             r.WaitUntilComplete()
 
     for server in servers:
         terminated_server_ids.append(server.id)
@@ -407,7 +409,8 @@ def startstop_servers(module, clc, server_ids, state):
             changed = True
 
     if wait:
-        sum(requests).WaitUntilComplete()
+        for r in requests:
+            r.WaitUntilComplete()
         for server in changed_servers:
             server.Refresh()
 
@@ -432,7 +435,8 @@ def add_public_ip_to_servers(clc, servers, public_ip_protocol, public_ip_ports, 
         requests.append(server.PublicIPs().Add(ports_lst))
 
     if wait:
-        sum(requests).WaitUntilComplete()
+	for r in requests:
+            r.WaitUntilComplete()
 
 
 def _clc_set_credentials(clc, module):
