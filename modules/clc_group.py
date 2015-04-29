@@ -83,10 +83,10 @@ try:
     import clc as clc_sdk
     from clc import CLCException
 except ImportError:
-    clc_found = False
+    CLC_FOUND = False
     clc_sdk = None
 else:
-    clc_found = True
+    CLC_FOUND = True
 
 class ClcGroup():
 
@@ -98,12 +98,12 @@ class ClcGroup():
         self.module = module
         self.group_dict = {}
 
+        if not CLC_FOUND:
+            self.module.fail_json(
+                msg='clc-python-sdk required for this module')
 
     def do_work(self):
         p = self.module.params
-
-        if not clc_found:
-            self.module.fail_json(msg='clc-python-sdk required for this module')
 
         self.set_clc_credentials_from_env()
         self.group_dict = self._get_group_tree_for_datacenter(datacenter=p['location'])

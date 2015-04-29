@@ -14,6 +14,22 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module = mock.MagicMock()
         self.datacenter=mock.MagicMock()
 
+
+    def test_clc_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'clc': raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_group)
+            clc_group.ClcGroup(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
+
+
     def test_clc_set_credentials_w_creds(self):
         with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
             with patch.object(clc_group, 'clc_sdk') as mock_clc_sdk:
