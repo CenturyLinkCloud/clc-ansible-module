@@ -69,7 +69,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
         under_test.process_request()
 
-        self.assertEqual(self.module.fail_json.called, False)
+        self.assertFalse(self.module.fail_json.called)
         self.module.exit_json.assert_called_once_with(changed=True, group=mock_group.data)
 
     @patch.object(clc_group, 'clc_sdk')
@@ -90,11 +90,138 @@ class TestClcServerFunctions(unittest.TestCase):
 
         under_test.process_request()
 
-        self.assertEqual(self.module.fail_json.called, False)
+        self.assertFalse(self.module.fail_json.called)
         self.module.exit_json.assert_called_once_with(changed=True, group=mock_group.data)
 
-    def test_ensure_group_is_present(self):
-        pass
+    def test_ensure_group_is_present_group_not_exist(self):
+
+        # Setup Test
+        mock_group = mock.MagicMock()
+        mock_group.name = "MockGroup"
+
+        mock_parent = mock.MagicMock()
+        mock_parent.name = "MockParent"
+        mock_parent.Create.return_value = mock_group
+
+        mock_grandparent = mock.MagicMock()
+        mock_grandparent.name = "MockGrandparent"
+
+        mock_rootgroup = mock.MagicMock()
+        mock_rootgroup.name = "MockRootGroup"
+
+        mock_group_dict = {mock_parent.name: (mock_parent, mock_grandparent)}
+
+        under_test = ClcGroup(self.module)
+        under_test.group_dict = mock_group_dict
+        under_test.root_group = mock_rootgroup
+
+        # Test
+        result_changed, result_group = under_test._ensure_group_is_present(group_name=mock_group.name,
+                                                                           parent_name=mock_parent.name,
+                                                                           group_description="Mock Description")
+        # Assert Expected Result
+        self.assertTrue(result_changed)
+        self.assertEqual(result_group, mock_group)
+        self.assertFalse(self.module.fail_json.called)
+
+    def test_ensure_group_is_present_parent_not_exist(self):
+
+        # Setup Test
+        mock_group = mock.MagicMock()
+        mock_group.name = "MockGroup"
+
+        mock_parent = mock.MagicMock()
+        mock_parent.name = "MockParent"
+
+        mock_rootgroup = mock.MagicMock()
+        mock_rootgroup.name = "MockRootGroup"
+
+        mock_group_dict = {}
+
+        under_test = ClcGroup(self.module)
+        under_test.group_dict = mock_group_dict
+        under_test.root_group = mock_rootgroup
+
+        # Test
+        result_changed, result_group = under_test._ensure_group_is_present(group_name=mock_group.name,
+                                                                           parent_name=mock_parent.name,
+                                                                           group_description="Mock Description")
+        # Assert Expected Result
+        self.module.fail_json.assert_called_once_with(msg="parent group: " + mock_parent.name + " does not exist")
+
+    def test_ensure_group_is_present_parent_and_group_exist(self):
+
+        # Setup Test
+        mock_group = mock.MagicMock()
+        mock_group.name = "MockGroup"
+
+        mock_parent = mock.MagicMock()
+        mock_parent.name = "MockParent"
+        mock_parent.Create.return_value = mock_group
+
+        mock_grandparent = mock.MagicMock()
+        mock_grandparent.name = "MockGrandparent"
+
+        mock_rootgroup = mock.MagicMock()
+        mock_rootgroup.name = "MockRootGroup"
+
+        mock_group_dict = {mock_parent.name: (mock_parent, mock_grandparent),
+                           mock_group.name: (mock_group, mock_parent)}
+
+        under_test = ClcGroup(self.module)
+        under_test.group_dict = mock_group_dict
+        under_test.root_group = mock_rootgroup
+
+        # Test
+        result_changed, result_group = under_test._ensure_group_is_present(group_name=mock_group.name,
+                                                                           parent_name=mock_parent.name,
+                                                                           group_description="Mock Description")
+        # Assert Expected Result
+        self.assertFalse(result_changed)
+        self.assertEqual(result_group, mock_group)
+        self.assertFalse(self.module.fail_json.called)
+
+    def test_ensure_group_is_absent_group_exists(self):
+
+        # Setup Test
+        mock_group = mock.MagicMock()
+        mock_group.name = "MockGroup"
+
+        mock_parent = mock.MagicMock()
+        mock_parent.name = "MockParent"
+
+        mock_group_dict = {mock_group.name: (mock_group, mock_parent)}
+
+        under_test = ClcGroup(self.module)
+        under_test.group_dict = mock_group_dict
+
+        # Test
+        result_changed, result_group = under_test._ensure_group_is_absent(group_name=mock_group.name,
+                                                                          parent_name=mock_parent.name)
+        # Assert Expected Result
+        self.assertEqual(result_changed, True)
+        mock_group.Delete.assert_called_once()
+
+    def test_ensure_group_is_absent_group_not_exists(self):
+
+        # Setup Test
+        mock_group = mock.MagicMock()
+        mock_group.name = "MockGroup"
+
+        mock_parent = mock.MagicMock()
+        mock_parent.name = "MockParent"
+
+        mock_group_dict = {}
+
+        under_test = ClcGroup(self.module)
+        under_test.group_dict = mock_group_dict
+
+        # Test
+        result_changed, result_group = under_test._ensure_group_is_absent(group_name=mock_group.name,
+                                                                          parent_name=mock_parent.name)
+        # Assert Expected Result
+        self.assertEqual(result_changed, False)
+        self.assertFalse(mock_group.Delete.called)
 
     def test_get_group(self):
         # Setup
@@ -144,7 +271,18 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(result, None)
         self.assertEqual(self.module.fail_json.called, True)
 
+    @patch.object(clc_group, 'AnsibleModule')
+    @patch.object(clc_group, 'ClcGroup')
+    def test_main(self, mock_ClcGroup, mock_AnsibleModule):
+        mock_ClcGroup_instance          = mock.MagicMock()
+        mock_AnsibleModule_instance     = mock.MagicMock()
+        mock_ClcGroup.return_value      = mock_ClcGroup_instance
+        mock_AnsibleModule.return_value = mock_AnsibleModule_instance
 
+        clc_group.main()
+
+        mock_ClcGroup.assert_called_once_with(mock_AnsibleModule_instance)
+        mock_ClcGroup_instance.process_request.assert_called_once
 
 if __name__ == '__main__':
     unittest.main()

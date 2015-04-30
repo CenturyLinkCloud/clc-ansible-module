@@ -70,7 +70,7 @@ import sys
 import os
 import datetime
 import json
-# from ansible.module_utils.basic import *
+from ansible.module_utils.basic import *
 #
 #  Requires the clc-python-sdk.
 #  sudo pip install clc-sdk
@@ -183,28 +183,32 @@ class ClcGroup():
         group.Delete()
 
     def _ensure_group_is_present(self, group_name, parent_name, group_description):
-        '''
-        Creates a Server Group
-        '''
-        changed = False
-        group = None
+        """
+        Checks to see if a server group exists, creates it if it doesn't.
+        :param group_name: the name of the group to validate/create
+        :param parent_name: the name of the parent group for group_name
+        :param group_description: a short description of the server group (used when creating)
+        :return: (changed, group) -
+            changed:  Boolean- whether a change was made,
+            group:  A clc group object for the group
+        """
         assert self.root_group, "Implementation Error: Root Group not set"
         parent = parent_name if parent_name is not None else self.root_group.name
         group = group_name
         description = group_description
+        changed = False
 
         parent_exists = self._group_exists(group_name=parent, parent_name=None)
         child_exists = self._group_exists(group_name=group, parent_name=parent)
 
-        if not parent_exists:
-            self.module.fail_json(msg="parent group: " + parent + " does not exist")
-
-        if parent_exists and not child_exists:
+        if parent_exists and child_exists:
+            group, parent = self.group_dict[group_name]
+            changed = False
+        elif parent_exists and not child_exists:
             group = self._create_group(group=group, parent=parent, description=description)
             changed = True
         else:
-            group, parent = self.group_dict[group_name]
-            changed = False
+            self.module.fail_json(msg="parent group: " + parent + " does not exist")
 
         return changed, group
 
@@ -261,9 +265,8 @@ class ClcGroup():
         return result
 
 def main():
-    module = AnsibleModule(
-            argument_spec=ClcGroup.define_argument_spec()
-        )
+    module = AnsibleModule(argument_spec=ClcGroup.define_argument_spec())
+
     clc_group = ClcGroup(module)
     clc_group.process_request()
 
