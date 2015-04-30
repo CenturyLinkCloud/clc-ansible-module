@@ -287,7 +287,7 @@ class ClcGroup():
         """
         Walk a parent-child tree of groups, starting with the provided child group
         :param parent_group: clc_sdk.Group - the parent group to start the walk
-        :param child_group: clc_sdk.Group - the child group th start the walk
+        :param child_group: clc_sdk.Group - the child group to start the walk
         :return: a dictionary of groups and parents
         """
         result = {str(child_group): (child_group, parent_group)}
@@ -301,7 +301,7 @@ class ClcGroup():
         """
         Get a specified group from the CLC Api
         :param group_name: string - the group to search for
-        :param datacenter: string - the datacenter to query agaisnt (ex: 'UC1')
+        :param datacenter: string - the datacenter to query against (ex: 'UC1')
         :param alias: string - the account alias to search. Defaults to the current user's account
         :return: clc_sdk.Group - a group object representing group_name.
         """
