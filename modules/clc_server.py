@@ -1,11 +1,15 @@
 #!/usr/bin/python
+DOCUMENTATION = '''
+'''
 
+EXAMPLES = '''
+
+'''
 import sys
 import os
 import datetime
 import json
 from time import sleep
-from ansible.module_utils.basic import *
 
 #
 #  Requires the clc-python-sdk.
@@ -13,11 +17,12 @@ from ansible.module_utils.basic import *
 #
 try:
     import clc as clc_sdk
+    from clc import CLCException
 except ImportError:
-    clc_found = False
+    CLC_FOUND = False
     clc_sdk = None
 else:
-    clc_found = True
+    CLC_FOUND = True
 
 #
 #  An Ansible module to Create, Delete, Start and Stop servers in CenturyLink Cloud.
@@ -30,122 +35,133 @@ else:
 #
 
 #
-#  main() defines the program flow and what behaviors happen for each state
-#
-
-
-def main():
-
-    #
-    #  Define the module
-    #
-    module = create_ansible_module()
-    p = module.params
-    state = p['state']
-
-    if not clc_found:
-        module.fail_json(msg='clc-python-sdk required for this module')
-
-    clc = _clc_set_credentials(clc_sdk, module)
-
-
-    #
-    #  Handle each different state
-    #
-
-    if state == 'absent':
-        server_ids = p['server_ids']
-        if not isinstance(server_ids, list):
-            module.fail_json(msg='termination_list needs to be a list of instances to terminate')
-
-        (changed, server_dict_array, new_server_ids) = delete_servers(module, clc, server_ids)
-
-    elif state in ('started', 'stopped'):
-        server_ids = p['server_ids']
-        if not isinstance(server_ids, list):
-            module.fail_json(msg='running list needs to be a list of servers to run: %s' % server_ids)
-
-        (changed, server_dict_array, new_server_ids) = startstop_servers(module, clc, server_ids, state)
-
-    elif state == 'present':
-        # Changed is always set to true when provisioning new instances
-        if not p['template']:
-            module.fail_json(msg='template parameter is required for new instance')
-
-        if p['exact_count'] is None:
-            (server_dict_array, new_server_ids, changed) = create_servers(module, clc)
-        else:
-            (server_dict_array, new_server_ids, changed) = enforce_count(module, clc)
-
-    module.exit_json(changed=changed, server_ids=new_server_ids, servers=server_dict_array)
-
-#
 #  Functions to define the Ansible module and its arguments
 #
 
+class ClcServer():
+    clc = clc_sdk
 
-def create_ansible_module():
-    argument_spec = define_argument_spec()
+    def __init__(self, module):
+        """
+        Construct module
+        """
+        self.clc = clc_sdk
+        self.module = module
+        self.group_dict = {}
 
-    module = AnsibleModule(
-        argument_spec=argument_spec,
+        if not CLC_FOUND:
+            self.module.fail_json(
+                msg='clc-python-sdk required for this module')
+
+    def process_request(self):
+        #
+        #  Define the module
+        #
+        module = create_ansible_module()
+        p = module.params
+        state = p['state']
+
+        if not CLC_FOUND:
+            module.fail_json(msg='clc-python-sdk required for this module')
+
+        self.set_clc_credentials_from_env()
+
+        #
+        #  Handle each different state
+        #
+
+        if state == 'absent':
+            server_ids = p['server_ids']
+            if not isinstance(server_ids, list):
+                module.fail_json(msg='termination_list needs to be a list of instances to terminate')
+
+            (changed, server_dict_array, new_server_ids) = delete_servers(module, self.clc, server_ids)
+
+        elif state in ('started', 'stopped'):
+            server_ids = p['server_ids']
+            if not isinstance(server_ids, list):
+                module.fail_json(msg='running list needs to be a list of servers to run: %s' % server_ids)
+
+            (changed, server_dict_array, new_server_ids) = startstop_servers(module, self.clc, server_ids, state)
+
+        elif state == 'present':
+            # Changed is always set to true when provisioning new instances
+            if not p['template']:
+                module.fail_json(msg='template parameter is required for new instance')
+
+            if p['exact_count'] is None:
+                (server_dict_array, new_server_ids, changed) = create_servers(module, self.clc)
+            else:
+                (server_dict_array, new_server_ids, changed) = enforce_count(module, self.clc)
+
+        module.exit_json(changed=changed, server_ids=new_server_ids, servers=server_dict_array)
+
+    @staticmethod
+    def define_argument_spec():
+        """
+        Define the argument spec for the ansible module
+        :return: argument spec dictionary
+        """
+        argument_spec = dict(name=dict(),
+                             template=dict(),
+                             group=dict(default='Default Group'),
+                             network_id=dict(),
+                             location=dict(default=None),
+                             cpu=dict(default=1),
+                             memory=dict(default='1'),
+                             alias=dict(default=None),
+                             password=dict(default=None),
+                             ip_address=dict(default=None),
+                             storage_type=dict(default='standard'),
+                             type=dict(default='standard'),
+                             primary_dns=dict(default=None),
+                             secondary_dns=dict(default=None),
+                             additional_disks=dict(type='list', default=[]),
+                             custom_fields=dict(type='list', default=[]),
+                             ttl=dict(default=None),
+                             managed_os=dict(default=False),
+                             description=dict(default=None),
+                             source_server_password=dict(default=None),
+                             cpu_autoscale_policy_id=dict(default=None),
+                             anti_affinity_policy_id=dict(default=None),
+                             packages=dict(type='list', default=[]),
+                             state=dict(default='present', choices=['present', 'absent', 'started', 'stopped']),
+                             count=dict(type='int', default='1'),
+                             exact_count=dict(type='int', default=None),
+                             count_group=dict(),
+                             server_ids=dict(type='list'),
+                             add_public_ip=dict(type='bool', default=False),
+                             public_ip_protocol=dict(default='TCP'),
+                             public_ip_ports=dict(type='list'),
+                             wait=dict(type='bool', default=True))
+
         mutually_exclusive = [
                                 ['exact_count', 'count'],
                                 ['exact_count', 'state']
                              ]
-    )
-    return module
+        return {"argument_spec": argument_spec,
+                "mutually_exclusive": mutually_exclusive}
 
+    def set_clc_credentials_from_env(self):
+        """
+        Set the CLC Credentials on the sdk by reading environment variables
+        :return: none
+        """
+        env = os.environ
+        v2_api_token = env.get('Authorization', False)
+        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
+        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
 
-def define_argument_spec():
-    argument_spec = clc_common_argument_spec()
-    argument_spec.update(
-        dict(
-            name=dict(),
-            template=dict(),
-            group=dict(default='Default Group'),
-            network_id=dict(),
-            location=dict(default=None),
-            cpu=dict(default=1),
-            memory=dict(default='1'),
-            alias=dict(default=None),
-            password=dict(default=None),
-            ip_address=dict(default=None),
-            storage_type=dict(default='standard'),
-            type=dict(default='standard'),
-            primary_dns=dict(default=None),
-            secondary_dns=dict(default=None),
-            additional_disks=dict(type='list', default=[]),
-            custom_fields=dict(type='list', default=[]),
-            ttl=dict(default=None),
-            managed_os=dict(default=False),
-            description=dict(default=None),
-            source_server_password=dict(default=None),
-            cpu_autoscale_policy_id=dict(default=None),
-            anti_affinity_policy_id=dict(default=None),
-            packages=dict(type='list', default=[]),
-            state=dict(default='present', choices=['present', 'absent', 'started', 'stopped']),
-            count=dict(type='int', default='1'),
-            exact_count=dict(type='int', default=None),
-            count_group=dict(),
-            server_ids=dict(type='list'),
-            add_public_ip=dict(type='bool', default=False),
-            public_ip_protocol=dict(default='TCP'),
-            public_ip_ports=dict(type='list'),
-            wait=dict(type='bool', default=True)
-            )
-
-    )
-    return argument_spec
-
-
-def clc_common_argument_spec():
-    return dict(
-        v1_api_key=dict(),
-        v1_api_passwd=dict(no_log=True),
-        v2_api_username=dict(),
-        v2_api_passwd=dict(no_log=True)
-    )
+        if v2_api_token:
+            self.clc._LOGIN_TOKEN_V2 = v2_api_token
+        elif v2_api_username and v2_api_passwd:
+            self.clc.v2.SetCredentials(
+                api_username=v2_api_username,
+                api_passwd=v2_api_passwd)
+        else:
+            return self.module.fail_json(
+                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
+                    "environment variables")
 
 #
 #  Functions to execute the module's behaviors
@@ -439,22 +455,6 @@ def add_public_ip_to_servers(clc, servers, public_ip_protocol, public_ip_ports, 
             r.WaitUntilComplete()
 
 
-def _clc_set_credentials(clc, module):
-        e = os.environ
-
-        v2_api_passwd = None
-        v2_api_username = None
-
-        try:
-            v2_api_username = e['CLC_V2_API_USERNAME']
-            v2_api_passwd = e['CLC_V2_API_PASSWD']
-        except KeyError, e:
-            module.fail_json(msg = "you must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables")
-
-        clc.v2.SetCredentials(api_username=v2_api_username, api_passwd=v2_api_passwd)
-        return clc
-
-
 def _find_running_servers_by_group_name(module, clc, datacenter, count_group):
     group = _find_group(module=module, clc=clc, datacenter=datacenter, lookup_group=count_group)
 
@@ -663,8 +663,13 @@ def modify_clc_server(clc, acct_alias, server_id, cpu, memory):
         result = clc.v2.Requests(job_obj)
         return result	
 
-#
-#  Run the program
-#
+def main():
+    argument_dict = ClcServer.define_argument_spec()
+    module = AnsibleModule(**argument_dict)
+
+    clc_server = ClcServer(module)
+    clc_server.process_request()
+
+from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
     main()
