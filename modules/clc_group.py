@@ -6,22 +6,22 @@ description:
   - Create or delete Server Groups at Centurylink Centurylink Cloud
 options:
   name:
-    description: 
+    description:
       - The name of the Server Group
   description:
-    description: 
+    description:
       - A description of the Server Group
   parent:
-    description: 
+    description:
       - The parent group of the server group
   location:
-    description: 
+    description:
       - Datacenter to create the group in
   state:
-    description: 
+    description:
       - Whether to create or delete the group
     default: present
-    choices: ['present', 'absent']  
+    choices: ['present', 'absent']
 
 
 '''
@@ -84,6 +84,7 @@ except ImportError:
 else:
     CLC_FOUND = True
 
+
 class ClcGroup():
 
     clc = None
@@ -106,22 +107,22 @@ class ClcGroup():
         Execute the main code path, and handle the request
         :return: none
         """
-        location            = self.module.params.get('location')
-        group_name          = self.module.params.get('name')
-        parent_name         = self.module.params.get('parent')
-        group_description   = self.module.params.get('description')
-        state               = self.module.params.get('state')
+        location = self.module.params.get('location')
+        group_name = self.module.params.get('name')
+        parent_name = self.module.params.get('parent')
+        group_description = self.module.params.get('description')
+        state = self.module.params.get('state')
 
         self.set_clc_credentials_from_env()
-        self.group_dict = self._get_group_tree_for_datacenter(datacenter=location)
+        self.group_dict = self._get_group_tree_for_datacenter(
+            datacenter=location)
 
         if state == "absent":
-            changed, group = self._ensure_group_is_absent(group_name=group_name,
-                                                          parent_name=parent_name)
+            changed, group = self._ensure_group_is_absent(
+                group_name=group_name, parent_name=parent_name)
         else:
-            changed, group = self._ensure_group_is_present(group_name=group_name,
-                                                           parent_name=parent_name,
-                                                           group_description=group_description)
+            changed, group = self._ensure_group_is_present(
+                group_name=group_name, parent_name=parent_name, group_description=group_description)
 
         if group:
             group = group.data
@@ -147,7 +148,7 @@ class ClcGroup():
             custom_fields=dict(type='list', default=[]),
             server_ids=dict(type='list', default=[]),
             state=dict(default='present', choices=['present', 'absent'])
-            )
+        )
 
         return argument_spec
 
@@ -199,7 +200,11 @@ class ClcGroup():
         group, parent = self.group_dict.get(group_name)
         group.Delete()
 
-    def _ensure_group_is_present(self, group_name, parent_name, group_description):
+    def _ensure_group_is_present(
+            self,
+            group_name,
+            parent_name,
+            group_description):
         """
         Checks to see if a server group exists, creates it if it doesn't.
         :param group_name: the name of the group to validate/create
@@ -222,13 +227,18 @@ class ClcGroup():
             group, parent = self.group_dict[group_name]
             changed = False
         elif parent_exists and not child_exists:
-            group = self._create_group(group=group, parent=parent, description=description)
+            group = self._create_group(
+                group=group,
+                parent=parent,
+                description=description)
             changed = True
         else:
-            self.module.fail_json(msg="parent group: " + parent + " does not exist")
+            self.module.fail_json(
+                msg="parent group: " +
+                parent +
+                " does not exist")
 
         return changed, group
-
 
     def _create_group(self, group, parent, description):
         """
@@ -267,8 +277,11 @@ class ClcGroup():
         :param alias: string - the account alias to search. Defaults to the current user's account
         :return: a dictionary of groups and parents
         """
-        self.root_group = self.clc.v2.Datacenter(location=datacenter).RootGroup()
-        return self._walk_groups_recursive(parent_group=None, child_group=self.root_group)
+        self.root_group = self.clc.v2.Datacenter(
+            location=datacenter).RootGroup()
+        return self._walk_groups_recursive(
+            parent_group=None,
+            child_group=self.root_group)
 
     def _walk_groups_recursive(self, parent_group, child_group):
         """
@@ -294,11 +307,14 @@ class ClcGroup():
         """
         result = None
         try:
-            result = self.clc.v2.Datacenter(location=datacenter, alias=alias).Groups().Get(group_name)
-        except CLCException, e:
+            result = self.clc.v2.Datacenter(
+                location=datacenter,
+                alias=alias).Groups().Get(group_name)
+        except CLCException as e:
             if "Group not found" not in e.message:
                 self.module.fail_json(msg='error looking up group: %s' % e)
         return result
+
 
 def main():
     module = AnsibleModule(argument_spec=ClcGroup.define_argument_spec())
@@ -306,6 +322,6 @@ def main():
     clc_group = ClcGroup(module)
     clc_group.process_request()
 
-from ansible.module_utils.basic import *
+from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
     main()
