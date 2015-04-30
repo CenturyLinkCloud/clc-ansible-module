@@ -61,11 +61,9 @@ class ClcLoadBalancer():
         argument_spec = dict(
             name=dict(required=True),
             description=dict(default=None),
-            parent=dict(default=None),
             location=dict(default=None),
             alias=dict(default=None),
-            custom_fields=dict(type='list', default=[]),
-            server_ids=dict(type='list', default=[]),
+            status=dict(default='enabled', choices=['enabled', 'disabled']),
             state=dict(default='present', choices=['present', 'absent'])
         )
 
