@@ -47,12 +47,15 @@ class ClcLoadBalancer():
         Execute the main code path, and handle the request
         :return: none
         """
+
         loadbalancer_name=self.module.params.get('name')
         loadbalancer_alias=self.module.params.get('alias')
         loadbalancer_location=self.module.params.get('location')
         loadbalancer_description=self.module.params.get('description')
         loadbalancer_status=self.module.params.get('status')
         state=self.module.params.get('state')
+
+        self.set_clc_credentials_from_env()
 
         if state == 'present':
             changed, result_lb = self.ensure_loadbalancer_present(name=loadbalancer_name,
@@ -76,7 +79,7 @@ class ClcLoadBalancer():
         return changed, result
 
     def create_loadbalancer(self,name,alias,location,description,status):
-        result = self.clc.v2.API.Call('POST', 'sharedLoadBalancers/%s/%s' % (alias, location), json.dumps({"name":name,"description":description,"status":status}))
+        result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (alias, location), json.dumps({"name":name,"description":description,"status":status}))
         return result
 
     @staticmethod
