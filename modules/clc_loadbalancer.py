@@ -47,10 +47,37 @@ class ClcLoadBalancer():
         Execute the main code path, and handle the request
         :return: none
         """
-        pass
+        loadbalancer_name=self.module.params.get('name')
+        loadbalancer_alias=self.module.params.get('alias')
+        loadbalancer_location=self.module.params.get('location')
+        loadbalancer_description=self.module.params.get('description')
+        loadbalancer_status=self.module.params.get('status')
+        state=self.module.params.get('state')
+
+        if state == 'present':
+            changed, result_lb = self.ensure_loadbalancer_present(name=loadbalancer_name,
+                                                                  alias=loadbalancer_alias,
+                                                                  location=loadbalancer_location,
+                                                                  description=loadbalancer_description,
+                                                                  status=loadbalancer_status)
+            self.module.exit_json(changed=changed, loadbalancer=result_lb)
+
     #
     #  Functions to define the Ansible module and its arguments
     #
+    def ensure_loadbalancer_present(self,name,alias,location,description,status):
+        changed = True
+        result = self.create_loadbalancer(name=name,
+                                          alias=alias,
+                                          location=location,
+                                          description=description,
+                                          status=status)
+
+        return changed, result
+
+    def create_loadbalancer(self,name,alias,location,description,status):
+        result = self.clc.v2.API.Call('POST', 'sharedLoadBalancers/%s/%s' % (alias, location), json.dumps({"name":name,"description":description,"status":status}))
+        return result
 
     @staticmethod
     def define_argument_spec():
