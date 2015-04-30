@@ -156,7 +156,7 @@ class TestClcPackageFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_once_with(msg='Error: package_id is required')
 
     @patch.object(ClcPackage, '_get_servers_from_clc')
-    def test_clc_install_packages(self, mock_get_servers_from_clc):
+    def test_clc_install_packages_no_server(self, mock_get_servers_from_clc):
         test_params = {
             'server_ids': ['TESTSVR1, TESTSVR2']
             , 'package_id': 'dummyId'
@@ -171,6 +171,27 @@ class TestClcPackageFunctions(unittest.TestCase):
 
         self.assertTrue(mock_get_servers_from_clc.called)
         self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcPackage, '_get_servers_from_clc')
+    def test_clc_install_packages(self, mock_get_servers_from_clc):
+        test_params = {
+            'server_ids': ['TESTSVR1, TESTSVR2']
+            , 'package_id': 'dummyId'
+            , 'package_params': {}
+        }
+        server_ids = ['TESTSVR1, TESTSVR2']
+        package_id = 'dummyId'
+        package_params = {}
+        self.module.params = test_params
+        mock_server_list = self.build_mock_server_list()
+        mock_get_servers_from_clc.return_value=mock_server_list
+        under_test = ClcPackage(self.module)
+        return_servers = under_test.clc_install_packages(server_ids, package_id, package_params)
+
+        self.assertTrue(mock_get_servers_from_clc.called)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(return_servers[0].id,'TESTSVR1','Test Fail')
+        self.assertEqual(return_servers[1].id,'TESTSVR2','Test Fail')
 
     @patch.object(clc_package, 'AnsibleModule')
     @patch.object(clc_package, 'ClcPackage')
