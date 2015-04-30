@@ -90,6 +90,9 @@ class ClcGroup():
     root_group = None
 
     def __init__(self, module):
+        """
+        Construct module
+        """
         self.clc = clc_sdk
         self.module = module
         self.group_dict = {}
@@ -99,6 +102,10 @@ class ClcGroup():
                 msg='clc-python-sdk required for this module')
 
     def process_request(self):
+        """
+        Execute the main code path, and handle the request
+        :return: none
+        """
         location            = self.module.params.get('location')
         group_name          = self.module.params.get('name')
         parent_name         = self.module.params.get('parent')
@@ -127,6 +134,10 @@ class ClcGroup():
 
     @staticmethod
     def define_argument_spec():
+        """
+        Define the argument spec for the ansible module
+        :return: argument spec dictionary
+        """
         argument_spec = dict(
             name=dict(required=True),
             description=dict(default=None),
@@ -145,9 +156,10 @@ class ClcGroup():
     #
 
     def set_clc_credentials_from_env(self):
-        '''
-        Sets CLC Credentials
-        '''
+        """
+        Set the CLC Credentials on the sdk by reading environment variables
+        :return: none
+        """
         env = os.environ
         v2_api_token = env.get('CLC_V2_API_TOKEN', False)
         v2_api_username = env.get('CLC_V2_API_USERNAME', False)
@@ -165,9 +177,12 @@ class ClcGroup():
                     "environment variables")
 
     def _ensure_group_is_absent(self, group_name, parent_name):
-        '''
-        Deletes a Server Group
-        '''
+        """
+        Ensure that group_name is absent by deleting it if necessary
+        :param group_name: string - the name of the clc server group to delete
+        :param parent_name: string - the name of the parent group for group_name
+        :return: changed, group
+        """
         changed = False
         group = None
         if self._group_exists(group_name=group_name, parent_name=parent_name):
@@ -176,9 +191,11 @@ class ClcGroup():
         return changed, group
 
     def _delete_group(self, group_name):
-        '''
-        Deletes a Server Group
-        '''
+        """
+        Delete the provided server group
+        :param group_name: string - the server group to delete
+        :return: none
+        """
         group, parent = self.group_dict.get(group_name)
         group.Delete()
 
@@ -214,22 +231,28 @@ class ClcGroup():
 
 
     def _create_group(self, group, parent, description):
-        '''
-        Creates a Server Group
-        '''
+        """
+        Create the provided server group
+        :param group: clc_sdk.Group - the group to create
+        :param parent: clc_sdk.Parent - the parent group for {group}
+        :param description: string - a text description of the group
+        :return: clc_sdk.Group - the created group
+        """
 
         (parent, grandparent) = self.group_dict[parent]
         return parent.Create(name=group, description=description)
-
 
     #
     #   Utility Functions
     #
 
     def _group_exists(self, group_name, parent_name):
-        '''
+        """
         Check to see if a group exists
-        '''
+        :param group_name: string - the group to check
+        :param parent_name: string - the parent of group_name
+        :return: boolean - whether the group exists
+        """
         result = False
         if group_name in self.group_dict:
             (group, parent) = self.group_dict[group_name]
@@ -238,13 +261,22 @@ class ClcGroup():
         return result
 
     def _get_group_tree_for_datacenter(self, datacenter=None, alias=None):
-        '''
-        Get a datacenter's server group tree
-        '''
+        """
+        Walk the tree of groups for a datacenter
+        :param datacenter: string - the datacenter to walk (ex: 'UC1')
+        :param alias: string - the account alias to search. Defaults to the current user's account
+        :return: a dictionary of groups and parents
+        """
         self.root_group = self.clc.v2.Datacenter(location=datacenter).RootGroup()
         return self._walk_groups_recursive(parent_group=None, child_group=self.root_group)
 
     def _walk_groups_recursive(self, parent_group, child_group):
+        """
+        Walk a parent-child tree of groups, starting with the provided child group
+        :param parent_group: clc_sdk.Group - the parent group to start the walk
+        :param child_group: clc_sdk.Group - the child group th start the walk
+        :return: a dictionary of groups and parents
+        """
         result = {str(child_group): (child_group, parent_group)}
         groups = child_group.Subgroups().groups
         if len(groups) > 0:
@@ -253,9 +285,13 @@ class ClcGroup():
         return result
 
     def _get_group(self, group_name, datacenter=None, alias=None):
-        '''
-        Get a specified Server Group
-        '''
+        """
+        Get a specified group from the CLC Api
+        :param group_name: string - the group to search for
+        :param datacenter: string - the datacenter to query agaisnt (ex: 'UC1')
+        :param alias: string - the account alias to search. Defaults to the current user's account
+        :return: clc_sdk.Group - a group object representing group_name.
+        """
         result = None
         try:
             result = self.clc.v2.Datacenter(location=datacenter, alias=alias).Groups().Get(group_name)
