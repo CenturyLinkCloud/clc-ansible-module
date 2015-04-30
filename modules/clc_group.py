@@ -70,7 +70,7 @@ import sys
 import os
 import datetime
 import json
-from ansible.module_utils.basic import *
+
 #
 #  Requires the clc-python-sdk.
 #  sudo pip install clc-sdk
@@ -270,6 +270,6 @@ def main():
     clc_group = ClcGroup(module)
     clc_group.process_request()
 
-
+from ansible.module_utils.basic import *
 if __name__ == '__main__':
     main()
