@@ -1,11 +1,15 @@
 #!/usr/bin/python
+DOCUMENTATION = '''
+'''
 
+EXAMPLES = '''
+
+'''
 import sys
 import os
 import datetime
 import json
 from time import sleep
-from ansible.module_utils.basic import *
 
 #
 #  Requires the clc-python-sdk.
@@ -13,11 +17,12 @@ from ansible.module_utils.basic import *
 #
 try:
     import clc as clc_sdk
+    from clc import CLCException
 except ImportError:
-    clc_found = False
+    CLC_FOUND = False
     clc_sdk = None
 else:
-    clc_found = True
+    CLC_FOUND = True
 
 #
 #  An Ansible module to Create, Delete, Start and Stop servers in CenturyLink Cloud.
@@ -30,122 +35,156 @@ else:
 #
 
 #
-#  main() defines the program flow and what behaviors happen for each state
-#
-
-
-def main():
-
-    #
-    #  Define the module
-    #
-    module = create_ansible_module()
-    p = module.params
-    state = p['state']
-
-    if not clc_found:
-        module.fail_json(msg='clc-python-sdk required for this module')
-
-    clc = _clc_set_credentials(clc_sdk, module)
-
-
-    #
-    #  Handle each different state
-    #
-
-    if state == 'absent':
-        server_ids = p['server_ids']
-        if not isinstance(server_ids, list):
-            module.fail_json(msg='termination_list needs to be a list of instances to terminate')
-
-        (changed, server_dict_array, new_server_ids) = delete_servers(module, clc, server_ids)
-
-    elif state in ('started', 'stopped'):
-        server_ids = p['server_ids']
-        if not isinstance(server_ids, list):
-            module.fail_json(msg='running list needs to be a list of servers to run: %s' % server_ids)
-
-        (changed, server_dict_array, new_server_ids) = startstop_servers(module, clc, server_ids, state)
-
-    elif state == 'present':
-        # Changed is always set to true when provisioning new instances
-        if not p['template']:
-            module.fail_json(msg='template parameter is required for new instance')
-
-        if p['exact_count'] is None:
-            (server_dict_array, new_server_ids, changed) = create_servers(module, clc)
-        else:
-            (server_dict_array, new_server_ids, changed) = enforce_count(module, clc)
-
-    module.exit_json(changed=changed, server_ids=new_server_ids, servers=server_dict_array)
-
-#
 #  Functions to define the Ansible module and its arguments
 #
 
 
-def create_ansible_module():
-    argument_spec = define_argument_spec()
+class ClcServer():
+    clc = clc_sdk
 
-    module = AnsibleModule(
-        argument_spec=argument_spec,
+    def __init__(self, module):
+        """
+        Construct module
+        """
+        self.clc = clc_sdk
+        self.module = module
+        self.group_dict = {}
+
+        if not CLC_FOUND:
+            self.module.fail_json(
+                msg='clc-python-sdk required for this module')
+
+    def process_request(self):
+        #
+        #  Define the module
+        #
+        p = self.module.params
+        state = p['state']
+
+        if not CLC_FOUND:
+            self.module.fail_json(
+                msg='clc-python-sdk required for this module')
+
+        self.set_clc_credentials_from_env()
+
+        #
+        #  Handle each different state
+        #
+
+        if state == 'absent':
+            server_ids = p['server_ids']
+            if not isinstance(server_ids, list):
+                self.module.fail_json(
+                    msg='termination_list needs to be a list of instances to terminate')
+
+            (changed,
+             server_dict_array,
+             new_server_ids) = delete_servers(self.module,
+                                              self.clc,
+                                              server_ids)
+
+        elif state in ('started', 'stopped'):
+            server_ids = p['server_ids']
+            if not isinstance(server_ids, list):
+                self.module.fail_json(
+                    msg='running list needs to be a list of servers to run: %s' %
+                    server_ids)
+
+            (changed,
+             server_dict_array,
+             new_server_ids) = startstop_servers(self.module,
+                                                 self.clc,
+                                                 server_ids,
+                                                 state)
+
+        elif state == 'present':
+            # Changed is always set to true when provisioning new instances
+            if not p['template']:
+                module.fail_json(
+                    msg='template parameter is required for new instance')
+
+            if p['exact_count'] is None:
+                (server_dict_array,
+                 new_server_ids,
+                 changed) = create_servers(self.module,
+                                           self.clc)
+            else:
+                (server_dict_array,
+                 new_server_ids,
+                 changed) = enforce_count(self.module,
+                                          self.clc)
+
+        self.module.exit_json(
+            changed=changed,
+            server_ids=new_server_ids,
+            servers=server_dict_array)
+
+    @staticmethod
+    def define_argument_spec():
+        """
+        Define the argument spec for the ansible module
+        :return: argument spec dictionary
+        """
+        argument_spec = dict(name=dict(),
+                             template=dict(),
+                             group=dict(default='Default Group'),
+                             network_id=dict(),
+                             location=dict(default=None),
+                             cpu=dict(default=1),
+                             memory=dict(default='1'),
+                             alias=dict(default=None),
+                             password=dict(default=None),
+                             ip_address=dict(default=None),
+                             storage_type=dict(default='standard'),
+                             type=dict(default='standard'),
+                             primary_dns=dict(default=None),
+                             secondary_dns=dict(default=None),
+                             additional_disks=dict(type='list', default=[]),
+                             custom_fields=dict(type='list', default=[]),
+                             ttl=dict(default=None),
+                             managed_os=dict(default=False),
+                             description=dict(default=None),
+                             source_server_password=dict(default=None),
+                             cpu_autoscale_policy_id=dict(default=None),
+                             anti_affinity_policy_id=dict(default=None),
+                             packages=dict(type='list', default=[]),
+                             state=dict(default='present', choices=['present', 'absent', 'started', 'stopped']),
+                             count=dict(type='int', default='1'),
+                             exact_count=dict(type='int', default=None),
+                             count_group=dict(),
+                             server_ids=dict(type='list'),
+                             add_public_ip=dict(type='bool', default=False),
+                             public_ip_protocol=dict(default='TCP'),
+                             public_ip_ports=dict(type='list'),
+                             wait=dict(type='bool', default=True))
+
         mutually_exclusive = [
                                 ['exact_count', 'count'],
                                 ['exact_count', 'state']
                              ]
-    )
-    return module
+        return {"argument_spec": argument_spec,
+                "mutually_exclusive": mutually_exclusive}
 
+    def set_clc_credentials_from_env(self):
+        """
+        Set the CLC Credentials on the sdk by reading environment variables
+        :return: none
+        """
+        env = os.environ
+        v2_api_token = env.get('Authorization', False)
+        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
+        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
 
-def define_argument_spec():
-    argument_spec = clc_common_argument_spec()
-    argument_spec.update(
-        dict(
-            name=dict(),
-            template=dict(),
-            group=dict(default='Default Group'),
-            network_id=dict(),
-            location=dict(default=None),
-            cpu=dict(default=1),
-            memory=dict(default='1'),
-            alias=dict(default=None),
-            password=dict(default=None),
-            ip_address=dict(default=None),
-            storage_type=dict(default='standard'),
-            type=dict(default='standard'),
-            primary_dns=dict(default=None),
-            secondary_dns=dict(default=None),
-            additional_disks=dict(type='list', default=[]),
-            custom_fields=dict(type='list', default=[]),
-            ttl=dict(default=None),
-            managed_os=dict(default=False),
-            description=dict(default=None),
-            source_server_password=dict(default=None),
-            cpu_autoscale_policy_id=dict(default=None),
-            anti_affinity_policy_id=dict(default=None),
-            packages=dict(type='list', default=[]),
-            state=dict(default='present', choices=['present', 'absent', 'started', 'stopped']),
-            count=dict(type='int', default='1'),
-            exact_count=dict(type='int', default=None),
-            count_group=dict(),
-            server_ids=dict(type='list'),
-            add_public_ip=dict(type='bool', default=False),
-            public_ip_protocol=dict(default='TCP'),
-            public_ip_ports=dict(type='list'),
-            wait=dict(type='bool', default=True)
-            )
-
-    )
-    return argument_spec
-
-
-def clc_common_argument_spec():
-    return dict(
-        v1_api_key=dict(),
-        v1_api_passwd=dict(no_log=True),
-        v2_api_username=dict(),
-        v2_api_passwd=dict(no_log=True)
-    )
+        if v2_api_token:
+            self.clc._LOGIN_TOKEN_V2 = v2_api_token
+        elif v2_api_username and v2_api_passwd:
+            self.clc.v2.SetCredentials(
+                api_username=v2_api_username,
+                api_passwd=v2_api_passwd)
+        else:
+            return self.module.fail_json(
+                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
+                    "environment variables")
 
 #
 #  Functions to execute the module's behaviors
@@ -177,18 +216,20 @@ def enforce_count(module, clc):
     # fail here if the exact count was specified without filtering
     # on a group, as this may lead to a undesired removal of instances
     if exact_count and count_group is None:
-        module.fail_json(msg="you must use the 'count_group' option with exact_count")
+        module.fail_json(
+            msg="you must use the 'count_group' option with exact_count")
 
-    servers, running_servers = _find_running_servers_by_group_name(module, clc, datacenter, count_group)
+    servers, running_servers = _find_running_servers_by_group_name(
+        module, clc, datacenter, count_group)
 
     if len(running_servers) == exact_count:
         changed = False
-        
+
     elif len(running_servers) < exact_count:
         changed = True
         to_create = exact_count - len(running_servers)
         if not checkmode:
-            (server_dict_array, changed_server_ids, changed) \
+            server_dict_array, changed_server_ids, changed \
                 = create_servers(module, clc, override_count=to_create)
 
             for server in server_dict_array:
@@ -198,7 +239,7 @@ def enforce_count(module, clc):
         changed = True
         to_remove = len(running_servers) - exact_count
         if not checkmode:
-            all_server_ids = sorted([ x.id for x in running_servers ])
+            all_server_ids = sorted([x.id for x in running_servers])
             remove_ids = all_server_ids[0:to_remove]
 
             (changed, server_dict_array, changed_server_ids) \
@@ -293,8 +334,8 @@ def create_servers(module, clc, override_count=None):
         server_dict_array = []
         created_server_ids = []
 
-        for i in range(0,count):
-            req=create_clc_server(**params)
+        for i in range(0, count):
+            req = create_clc_server(**params)
             server = req.requests[0].Server()
             requests.append(req)
             servers.append(server)
@@ -303,22 +344,30 @@ def create_servers(module, clc, override_count=None):
             # Requests.WaitUntilComplete() returns the count of failed requests
             for r in requests:
                 if r.WaitUntilComplete():
-                     # NOTE: It would make much more sense if this returned a Requests object with the
-                     #       error requests in tact or threw an exception with these data, but, alas
-                     #       it does not, so we're going with the generic error message 
-                     raise(clc.CLCException("One or more of your Server creates failed"))
+                    # NOTE: It would make much more sense if this returned a Requests object with the
+                    #       error requests in tact or threw an exception with these data, but, alas
+                    # it does not, so we're going with the generic error
+                    # message
+                    raise clc
                 else:
-                     for server in servers:
+                    for server in servers:
                         server.Refresh()
 
         if add_public_ip:
-            add_public_ip_to_servers(clc, servers, public_ip_protocol, public_ip_ports, wait)
+            add_public_ip_to_servers(
+                clc,
+                servers,
+                public_ip_protocol,
+                public_ip_ports,
+                wait)
 
         for server in servers:
-            server = clc.v2.Server(server.id)  # reload server details so public IP shows up
+            # reload server details so public IP shows up
+            server = clc.v2.Server(server.id)
             if len(server.PublicIPs().public_ips) > 0:
                 server.data['publicip'] = str(server.PublicIPs().public_ips[0])
-            server.data['ipaddress'] = server.details['ipAddresses'][0]['internal']
+            server.data['ipaddress'] = server.details[
+                'ipAddresses'][0]['internal']
             server_dict_array.append(server.data)
             created_server_ids.append(server.id)
 
@@ -350,7 +399,8 @@ def delete_servers(module, clc, server_ids):
 
     changed = False
     if not isinstance(server_ids, list) or len(server_ids) < 1:
-        module.fail_json(msg='server_ids should be a list of servers, aborting')
+        module.fail_json(
+            msg='server_ids should be a list of servers, aborting')
 
     servers = clc.v2.Servers(server_ids).Servers()
     changed = True
@@ -360,7 +410,7 @@ def delete_servers(module, clc, server_ids):
 
     if wait:
         for r in requests:
-             r.WaitUntilComplete()
+            r.WaitUntilComplete()
 
     for server in servers:
         terminated_server_ids.append(server.id)
@@ -393,19 +443,22 @@ def startstop_servers(module, clc, server_ids, state):
     requests = []
 
     if not isinstance(server_ids, list) or len(server_ids) < 1:
-        module.fail_json(msg='server_ids should be a list of servers, aborting')
+        module.fail_json(
+            msg='server_ids should be a list of servers, aborting')
 
     servers = clc.v2.Servers(server_ids).Servers()
     for server in servers:
         if server.powerState != state:
             changed_servers.append(server)
             try:
-                if state=='started':
+                if state == 'started':
                     requests.append(server.PowerOn())
                 else:
                     requests.append(server.PowerOff())
             except:
-                module.fail_json(msg='Unable to change state for server {0}'.format(server.id))
+                module.fail_json(
+                    msg='Unable to change state for server {0}'.format(
+                        server.id))
             changed = True
 
     if wait:
@@ -424,7 +477,13 @@ def startstop_servers(module, clc, server_ids, state):
 #  Utility Functions
 #
 
-def add_public_ip_to_servers(clc, servers, public_ip_protocol, public_ip_ports, wait):
+
+def add_public_ip_to_servers(
+        clc,
+        servers,
+        public_ip_protocol,
+        public_ip_ports,
+        wait):
     ports_lst = []
     requests = []
 
@@ -435,28 +494,16 @@ def add_public_ip_to_servers(clc, servers, public_ip_protocol, public_ip_ports, 
         requests.append(server.PublicIPs().Add(ports_lst))
 
     if wait:
-	for r in requests:
+        for r in requests:
             r.WaitUntilComplete()
 
 
-def _clc_set_credentials(clc, module):
-        e = os.environ
-
-        v2_api_passwd = None
-        v2_api_username = None
-
-        try:
-            v2_api_username = e['CLC_V2_API_USERNAME']
-            v2_api_passwd = e['CLC_V2_API_PASSWD']
-        except KeyError, e:
-            module.fail_json(msg = "you must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables")
-
-        clc.v2.SetCredentials(api_username=v2_api_username, api_passwd=v2_api_passwd)
-        return clc
-
-
 def _find_running_servers_by_group_name(module, clc, datacenter, count_group):
-    group = _find_group(module=module, clc=clc, datacenter=datacenter, lookup_group=count_group)
+    group = _find_group(
+        module=module,
+        clc=clc,
+        datacenter=datacenter,
+        lookup_group=count_group)
 
     servers = group.Servers().Servers()
     running_servers = []
@@ -470,6 +517,7 @@ def _find_running_servers_by_group_name(module, clc, datacenter, count_group):
 
 def _refresh_server_w_retry(server):
     server.Refresh()
+
 
 def _find_datacenter(module, clc):
     location = module.params['location']
@@ -490,13 +538,23 @@ def _find_group(module, clc, datacenter, lookup_group=None):
     except:
         pass
 
-    # That search above only acts on the main 
-    result = _find_group_recursive(module, clc, datacenter.Groups(), lookup_group)
+    # That search above only acts on the main
+    result = _find_group_recursive(
+        module,
+        clc,
+        datacenter.Groups(),
+        lookup_group)
 
     if result is None:
-        module.fail_json(msg=str("Unable to find group: " + lookup_group + " in location: " + datacenter.id))
+        module.fail_json(
+            msg=str(
+                "Unable to find group: " +
+                lookup_group +
+                " in location: " +
+                datacenter.id))
 
     return result
+
 
 def _find_group_recursive(module, clc, group_list, lookup_group):
     result = None
@@ -505,20 +563,30 @@ def _find_group_recursive(module, clc, group_list, lookup_group):
         try:
             return next_victims.Get(lookup_group)
         except:
-            result = _find_group_recursive(module, clc, next_victims, lookup_group)
+            result = _find_group_recursive(
+                module,
+                clc,
+                next_victims,
+                lookup_group)
 
         if result is not None:
             break
 
     return result
 
-def _find_template(module,clc,datacenter):
+
+def _find_template(module, clc, datacenter):
     lookup_template = module.params['template']
     result = None
     try:
         result = datacenter.Templates().Search(lookup_template)[0]
     except:
-        module.fail_json(msg=str("Unable to find a template: "+ lookup_template +" in location: " + datacenter.id))
+        module.fail_json(
+            msg=str(
+                "Unable to find a template: " +
+                lookup_template +
+                " in location: " +
+                datacenter.id))
 
     return result
 
@@ -528,15 +596,19 @@ def _find_default_network(module, clc, datacenter):
     try:
         result = datacenter.Networks().networks[0]
     except:
-        module.fail_json(msg=str("Unable to find a network in location: " + datacenter.id))
+        module.fail_json(
+            msg=str(
+                "Unable to find a network in location: " +
+                datacenter.id))
 
     return result
 
 
 def _validate_name(module):
     name = module.params['name']
-    if (len(name)<1 or len(name) > 6):
-        module.fail_json(msg=str("name must be a string with a minimum length of 1 and a maximum length of 6"))
+    if (len(name) < 1 or len(name) > 6):
+        module.fail_json(msg=str(
+            "name must be a string with a minimum length of 1 and a maximum length of 6"))
 
     return name
 
@@ -550,11 +622,30 @@ def _validate_name(module):
 #
 
 
-def create_clc_server(clc, name,template,group_id,network_id,cpu=None,memory=None,alias=None,password=None,ip_address=None,
-           storage_type="standard",type="standard",primary_dns=None,secondary_dns=None,
-           additional_disks=[],custom_fields=[],ttl=None,managed_os=False,description=None,
-           source_server_password=None,cpu_autoscale_policy_id=None,anti_affinity_policy_id=None,
-           packages=[]):
+def create_clc_server(
+        clc,
+        name,
+        template,
+        group_id,
+        network_id,
+        cpu=None,
+        memory=None,
+        alias=None,
+        password=None,
+        ip_address=None,
+        storage_type="standard",
+        type="standard",
+        primary_dns=None,
+        secondary_dns=None,
+        additional_disks=[],
+        custom_fields=[],
+        ttl=None,
+        managed_os=False,
+        description=None,
+        source_server_password=None,
+        cpu_autoscale_policy_id=None,
+        anti_affinity_policy_id=None,
+        packages=[]):
     """Creates a new server.
 
     https://t3n.zendesk.com/entries/59565550-Create-Server
@@ -572,34 +663,63 @@ def create_clc_server(clc, name,template,group_id,network_id,cpu=None,memory=Non
 
     """
 
-    if not alias:  alias = clc.v2.Account.GetAlias()
+    if not alias:
+        alias = clc.v2.Account.GetAlias()
 
     if not cpu or not memory:
-        group = clc.v2.Group(id=group_id,alias=alias)
-        if not cpu and group.Defaults("cpu"):  cpu = group.Defaults("cpu")
-        elif not cpu:  raise(clc.CLCException("No default CPU defined"))
+        group = clc.v2.Group(id=group_id, alias=alias)
+        if not cpu and group.Defaults("cpu"):
+            cpu = group.Defaults("cpu")
+        elif not cpu:
+            raise clc
 
-        if not memory and group.Defaults("memory"):  memory = group.Defaults("memory")
-        elif not memory:  raise(clc.CLCException("No default Memory defined"))
-    if not description:  description = name
-    if type.lower() not in ("standard","hyperscale"):  raise(clc.CLCException("Invalid type"))
-    if type.lower() == "standard" and storage_type.lower() not in ("standard","premium"):  raise(clc.CLCException("Invalid storage_type"))
-    if type.lower() == "hyperscale" and storage_type.lower() !=  "hyperscale":  raise(clc.CLCException("Invalid type/storage_type combo"))
-    if ttl and ttl<=3600: raise(clc.CLCException("ttl must be greater than 3600 seconds"))
-    if ttl: ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time())+ttl)
+        if not memory and group.Defaults("memory"):
+            memory = group.Defaults("memory")
+        elif not memory:
+            raise clc
+    if not description:
+        description = name
+    if type.lower() not in ("standard", "hyperscale"):
+        raise clc
+    if type.lower() == "standard" and storage_type.lower() not in (
+            "standard",
+            "premium"):
+        raise clc
+    if type.lower() == "hyperscale" and storage_type.lower() != "hyperscale":
+        raise clc
+    if ttl and ttl <= 3600:
+        raise clc
+    if ttl:
+        ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time()) + ttl)
     # TODO - validate custom_fields as a list of dicts with an id and a value key
     # TODO - validate template exists
     # TODO - validate additional_disks as a list of dicts with a path, sizeGB, and type (partitioned,raw) keys
     # TODO - validate addition_disks path not in template reserved paths
     # TODO - validate antiaffinity policy id set only with type=hyperscale
 
-    res = clc.v2.API.Call(method='POST',url='servers/%s' % (alias),
-             payload=json.dumps({'name': name, 'description': description, 'groupId': group_id, 'sourceServerId': template,
-                         'isManagedOS': managed_os, 'primaryDNS': primary_dns, 'secondaryDNS': secondary_dns,
-                         'networkId': network_id, 'ipAddress': ip_address, 'password': password,
-                         'sourceServerPassword': source_server_password, 'cpu': cpu, 'cpuAutoscalePolicyId': cpu_autoscale_policy_id,
-                         'memoryGB': memory, 'type': type, 'storageType': storage_type, 'antiAffinityPolicyId': anti_affinity_policy_id,
-                         'customFields': custom_fields, 'additionalDisks': additional_disks, 'ttl': ttl, 'packages': packages}))
+    res = clc.v2.API.Call(method='POST',
+                          url='servers/%s' % (alias),
+                          payload=json.dumps({'name': name,
+                                              'description': description,
+                                              'groupId': group_id,
+                                              'sourceServerId': template,
+                                              'isManagedOS': managed_os,
+                                              'primaryDNS': primary_dns,
+                                              'secondaryDNS': secondary_dns,
+                                              'networkId': network_id,
+                                              'ipAddress': ip_address,
+                                              'password': password,
+                                              'sourceServerPassword': source_server_password,
+                                              'cpu': cpu,
+                                              'cpuAutoscalePolicyId': cpu_autoscale_policy_id,
+                                              'memoryGB': memory,
+                                              'type': type,
+                                              'storageType': storage_type,
+                                              'antiAffinityPolicyId': anti_affinity_policy_id,
+                                              'customFields': custom_fields,
+                                              'additionalDisks': additional_disks,
+                                              'ttl': ttl,
+                                              'packages': packages}))
 
     result = clc.v2.Requests(res)
 
@@ -610,10 +730,15 @@ def create_clc_server(clc, name,template,group_id,network_id,cpu=None,memory=Non
     #
 
     # Find the server's UUID from the API response
-    server_uuid = [obj['id'] for obj in res['links'] if obj['rel']=='self'][0]
+    server_uuid = [obj['id']
+                   for obj in res['links'] if obj['rel'] == 'self'][0]
 
-    # Change the request server method to a find_server_by_uuid closure so that it will work
-    result.requests[0].Server = lambda: find_server_by_uuid(clc, server_uuid, alias)
+    # Change the request server method to a find_server_by_uuid closure so
+    # that it will work
+    result.requests[0].Server = lambda: find_server_by_uuid(
+        clc,
+        server_uuid,
+        alias)
 
     return result
 
@@ -632,9 +757,14 @@ def find_server_by_uuid(clc, svr_uuid, alias=None):
     while True:
         attempts -= 1
         try:
-            server_obj = clc.v2.API.Call('GET', 'servers/%s/%s?uuid=true' % (alias,svr_uuid))
+            server_obj = clc.v2.API.Call(
+                'GET', 'servers/%s/%s?uuid=true' %
+                (alias, svr_uuid))
             server_id = server_obj['id']
-            server = clc.v2.Server(id=server_id, alias=alias, server_obj=server_obj)
+            server = clc.v2.Server(
+                id=server_id,
+                alias=alias,
+                server_obj=server_obj)
             return server
 
         except clc.APIFailedResponse as e:
@@ -645,26 +775,39 @@ def find_server_by_uuid(clc, svr_uuid, alias=None):
 
             sleep(backout)
             backout = backout * 2
-	
+
+
 def modify_clc_server(clc, acct_alias, server_id, cpu, memory):
     if not acct_alias:
         acct_alias = clc.v2.Account.GetAlias()
     if not server_id:
-        raise(clc.CLCException("Server Id is required"))
+        raise clc
     # Fetch the existing server information
     server = clc.v2.Server(server_id)
 
     current_memory = server.memory
     current_cpu = server.cpu
     if memory != current_memory or cpu != current_cpu:
-        #server.Change(cpu=cpu, memory=memory, description=None)
-        #server.SetMemory(memory).WaitUntilComplete()
-        job_obj = clc.v2.API.Call('PATCH', 'servers/%s/%s' % (acct_alias,server_id), json.dumps([{"op":"set", "member":"memory", "value":memory},{"op":"set","member":"cpu", "value":cpu}]))
+        job_obj = clc.v2.API.Call('PATCH',
+                                  'servers/%s/%s' % (acct_alias,
+                                                     server_id),
+                                  json.dumps([{"op": "set",
+                                               "member": "memory",
+                                               "value": memory},
+                                              {"op": "set",
+                                               "member": "cpu",
+                                               "value": cpu}]))
         result = clc.v2.Requests(job_obj)
-        return result	
+        return result
 
-#
-#  Run the program
-#
+
+def main():
+    argument_dict = ClcServer.define_argument_spec()
+    module = AnsibleModule(**argument_dict)
+
+    clc_server = ClcServer(module)
+    clc_server.process_request()
+
+from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
     main()
