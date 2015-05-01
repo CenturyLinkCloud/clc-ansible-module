@@ -245,7 +245,7 @@ def enforce_count(module, clc):
             (changed, server_dict_array, changed_server_ids) \
                 = delete_servers(module, clc, remove_ids)
 
-    return (server_dict_array, changed_server_ids, changed)
+    return server_dict_array, changed_server_ids, changed
 
 
 def create_servers(module, clc, override_count=None):
@@ -371,7 +371,7 @@ def create_servers(module, clc, override_count=None):
             server_dict_array.append(server.data)
             created_server_ids.append(server.id)
 
-    return (server_dict_array, created_server_ids, changed)
+    return server_dict_array, created_server_ids, changed
 
 
 def delete_servers(module, clc, server_ids):
@@ -415,7 +415,7 @@ def delete_servers(module, clc, server_ids):
     for server in servers:
         terminated_server_ids.append(server.id)
 
-    return (changed, server_dict_array, terminated_server_ids)
+    return changed, server_dict_array, terminated_server_ids
 
 
 def startstop_servers(module, clc, server_ids, state):
@@ -471,7 +471,7 @@ def startstop_servers(module, clc, server_ids, state):
         server_dict_array.append(server.data)
         result_server_ids.append(server.id)
 
-    return (changed, server_dict_array, result_server_ids)
+    return changed, server_dict_array, result_server_ids
 
 #
 #  Utility Functions
@@ -509,7 +509,7 @@ def _find_running_servers_by_group_name(module, clc, datacenter, count_group):
     running_servers = []
 
     for server in servers:
-        if (server.status == 'active' and server.powerState == 'started'):
+        if server.status == 'active' and server.powerState == 'started':
             running_servers.append(server)
 
     return servers, running_servers
@@ -606,7 +606,7 @@ def _find_default_network(module, clc, datacenter):
 
 def _validate_name(module):
     name = module.params['name']
-    if (len(name) < 1 or len(name) > 6):
+    if len(name) < 1 or len(name) > 6:
         module.fail_json(msg=str(
             "name must be a string with a minimum length of 1 and a maximum length of 6"))
 
