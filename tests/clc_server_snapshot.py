@@ -1,1 +1,1 @@
-../clc_server_snapshot.py
+../modules/clc_server_snapshot.py

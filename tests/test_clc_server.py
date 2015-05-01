@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import clc_server
+from clc_server import ClcServer
 import clc as clc_sdk
 import mock
 from mock import patch, create_autospec
@@ -14,17 +15,44 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module = mock.MagicMock()
         self.datacenter=mock.MagicMock()
 
+    def test_clc_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'clc': raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_server)
+            clc_server.ClcServer(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
+
+        # Reset clc_group
+        reload(clc_server)
+
     def test_clc_set_credentials_w_creds(self):
         with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
-            clc_server._clc_set_credentials(self.clc, self.module)
+            with patch.object(clc_server, 'clc_sdk') as mock_clc_sdk:
+                under_test = ClcServer(self.module)
+                under_test.set_clc_credentials_from_env()
 
-        self.clc.v2.SetCredentials.assert_called_once_with(api_username='hansolo', api_passwd='falcon')
+        mock_clc_sdk.v2.SetCredentials.assert_called_once_with(api_username='hansolo', api_passwd='falcon')
 
 
     def test_clc_set_credentials_w_no_creds(self):
         with patch.dict('os.environ', {}, clear=True):
-            clc_server._clc_set_credentials(self.clc, self.module)
-            self.assertEqual(self.module.fail_json.called, True)
+            under_test = ClcServer(self.module)
+            under_test.set_clc_credentials_from_env()
+
+        self.assertEqual(self.module.fail_json.called, True)
+
+    def test_define_argument_spec(self):
+        result = ClcServer.define_argument_spec()
+        self.assertIsInstance(result, dict)
+        self.assertTrue('argument_spec' in result)
+        self.assertTrue('mutually_exclusive' in result)
 
     @patch.object(clc_server, '_find_group')
     def test_find_running_servers_by_group_name(self, mock_find_group):
@@ -173,6 +201,19 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)
+
+    @patch.object(clc_server, 'AnsibleModule')
+    @patch.object(clc_server, 'ClcServer')
+    def test_main(self, mock_ClcServer, mock_AnsibleModule):
+        mock_ClcServer_instance          = mock.MagicMock()
+        mock_AnsibleModule_instance      = mock.MagicMock()
+        mock_ClcServer.return_value      = mock_ClcServer_instance
+        mock_AnsibleModule.return_value  = mock_AnsibleModule_instance
+
+        clc_server.main()
+
+        mock_ClcServer.assert_called_once_with(mock_AnsibleModule_instance)
+        mock_ClcServer_instance.process_request.assert_called_once
 
 if __name__ == '__main__':
     unittest.main()
