@@ -1,12 +1,15 @@
 #!/usr/bin/python
 
-import clc_server
-from clc_server import ClcServer
+import unittest
+
+from uuid import UUID
 import clc as clc_sdk
 import mock
 from mock import patch, create_autospec
-import os
-import unittest
+
+import clc_server
+from clc_server import ClcServer
+
 
 class TestClcServerFunctions(unittest.TestCase):
 
@@ -133,7 +136,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.datacenter.Templates().Search = mock.MagicMock()
 
         # Function Under Test
-        result_template = clc_server._find_template(module=self.module, clc=self.clc, datacenter=self.datacenter)
+        result_template = clc_server._find_template_id(module=self.module, clc=self.clc, datacenter=self.datacenter)
 
         # Assert Result
         self.datacenter.Templates().Search.assert_called_once_with("MyCoolTemplate")
@@ -144,21 +147,24 @@ class TestClcServerFunctions(unittest.TestCase):
         self.datacenter.Templates().Search = mock.MagicMock(side_effect=clc_sdk.CLCException("Template not found"))
 
         # Function Under Test
-        result_template = clc_server._find_template(module=self.module, clc=self.clc, datacenter=self.datacenter)
+        result_template = clc_server._find_template_id(module=self.module, clc=self.clc, datacenter=self.datacenter)
 
         # Assert Result
         self.datacenter.Templates().Search.assert_called_once_with("MyCoolTemplateNotFound")
         self.assertEqual(self.module.fail_json.called, True)
 
-    def test_find_default_network(self):
+    def test_find_default_network_id(self):
         # Setup
-        self.datacenter.Networks().networks = ['TestReturnVlan']
+        mock_network = mock.MagicMock()
+        mock_network.name = 'TestReturnVlan'
+        mock_network.id = UUID('12345678123456781234567812345678')
+        self.datacenter.Networks().networks = [mock_network]
 
         # Function Under Test
-        result = clc_server._find_default_network(self.module, self.clc, self.datacenter)
+        result = clc_server._find_default_network_id(self.module, self.clc, self.datacenter)
 
         # Assert Result
-        self.assertEqual(result, 'TestReturnVlan')
+        self.assertEqual(result, mock_network.id)
         self.assertEqual(self.module.fail_json.called, False)
 
     def test_find_default_network_not_found(self):
@@ -166,7 +172,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.datacenter.Networks = mock.MagicMock(side_effect=clc_sdk.CLCException("Network not found"))
 
         # Function Under Test
-        result = clc_server._find_default_network(self.module, self.clc, self.datacenter)
+        result = clc_server._find_default_network_id(self.module, self.clc, self.datacenter)
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)

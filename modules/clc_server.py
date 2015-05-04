@@ -79,9 +79,9 @@ class ClcServer():
 
             (changed,
              server_dict_array,
-             new_server_ids) = delete_servers(self.module,
-                                              self.clc,
-                                              server_ids)
+             new_server_ids) = ClcServer._delete_servers(module=self.module,
+                                                         clc=self.clc,
+                                                         server_ids=server_ids)
 
         elif state in ('started', 'stopped'):
             server_ids = p['server_ids']
@@ -92,27 +92,27 @@ class ClcServer():
 
             (changed,
              server_dict_array,
-             new_server_ids) = startstop_servers(self.module,
-                                                 self.clc,
-                                                 server_ids,
-                                                 state)
+             new_server_ids) = ClcServer._startstop_servers(self.module,
+                                                            self.clc,
+                                                            server_ids,
+                                                            state)
 
         elif state == 'present':
             # Changed is always set to true when provisioning new instances
             if not p['template']:
-                module.fail_json(
+                self.module.fail_json(
                     msg='template parameter is required for new instance')
 
             if p['exact_count'] is None:
                 (server_dict_array,
                  new_server_ids,
-                 changed) = create_servers(self.module,
-                                           self.clc)
+                 changed) = ClcServer._create_servers(self.module,
+                                                      self.clc)
             else:
                 (server_dict_array,
                  new_server_ids,
-                 changed) = enforce_count(self.module,
-                                          self.clc)
+                 changed) = ClcServer._enforce_count(self.module,
+                                                     self.clc)
 
         self.module.exit_json(
             changed=changed,
@@ -191,312 +191,297 @@ class ClcServer():
 #  (called from main())
 #
 
+    @staticmethod
+    def _enforce_count(module, clc):
+        """
+        Enforces that there is the right number of servers in the provided group.
+        Starts or stops servers as necessary.
 
-def enforce_count(module, clc):
-    """
-    Enforces that there is the right number of servers in the provided group.
-    Starts or stops servers as necessary.
+        module : AnsibleModule object
+        clc : authenticated CLC connection
 
-    module : AnsibleModule object
-    clc : authenticated CLC connection
-
-    Returns:
-        A list of dictionaries with server information
-        about the instances that were launched or deleted
-    """
-    p = module.params
-    changed_server_ids = None
-    changed = False
-    checkmode = False
-    count_group = p['count_group']
-    datacenter = _find_datacenter(module, clc)
-    exact_count = p['exact_count']
-    server_dict_array = []
-
-    # fail here if the exact count was specified without filtering
-    # on a group, as this may lead to a undesired removal of instances
-    if exact_count and count_group is None:
-        module.fail_json(
-            msg="you must use the 'count_group' option with exact_count")
-
-    servers, running_servers = _find_running_servers_by_group(
-        module, clc, datacenter, count_group)
-
-    if len(running_servers) == exact_count:
+        Returns:
+            A list of dictionaries with server information
+            about the instances that were launched or deleted
+        """
+        p = module.params
+        changed_server_ids = None
         changed = False
+        checkmode = False
+        count_group = p['count_group']
+        datacenter = _find_datacenter(module, clc)
+        exact_count = p['exact_count']
+        server_dict_array = []
 
-    elif len(running_servers) < exact_count:
-        changed = True
-        to_create = exact_count - len(running_servers)
-        if not checkmode:
-            server_dict_array, changed_server_ids, changed \
-                = create_servers(module, clc, override_count=to_create)
+        # fail here if the exact count was specified without filtering
+        # on a group, as this may lead to a undesired removal of instances
+        if exact_count and count_group is None:
+            module.fail_json(
+                msg="you must use the 'count_group' option with exact_count")
 
-            for server in server_dict_array:
-                running_servers.append(server)
+        servers, running_servers = _find_running_servers_by_group(
+            module, clc, datacenter, count_group)
 
-    elif len(running_servers) > exact_count:
-        changed = True
-        to_remove = len(running_servers) - exact_count
-        if not checkmode:
-            all_server_ids = sorted([x.id for x in running_servers])
-            remove_ids = all_server_ids[0:to_remove]
+        if len(running_servers) == exact_count:
+            changed = False
 
-            (changed, server_dict_array, changed_server_ids) \
-                = delete_servers(module, clc, remove_ids)
+        elif len(running_servers) < exact_count:
+            changed = True
+            to_create = exact_count - len(running_servers)
+            if not checkmode:
+                server_dict_array, changed_server_ids, changed \
+                    = ClcServer._create_servers(module, clc, override_count=to_create)
 
-    return server_dict_array, changed_server_ids, changed
+                for server in server_dict_array:
+                    running_servers.append(server)
 
+        elif len(running_servers) > exact_count:
+            changed = True
+            to_remove = len(running_servers) - exact_count
+            if not checkmode:
+                all_server_ids = sorted([x.id for x in running_servers])
+                remove_ids = all_server_ids[0:to_remove]
 
-def create_servers(module, clc, override_count=None):
-    """
-    Creates new servers
+                (changed, server_dict_array, changed_server_ids) \
+                    = ClcServer._delete_servers(module, clc, remove_ids)
 
-    module : AnsibleModule object
-    clc : authenticated CLC connection
+        return server_dict_array, changed_server_ids, changed
 
-    Returns:
-        A list of dictionaries with server information
-        about the instances that were launched
-    """
-    p = module.params
-    name = _validate_name(module)
+    @staticmethod
+    def _wait_for_requests(clc, requests, servers, wait):
+        if wait:
+            # Requests.WaitUntilComplete() returns the count of failed requests
+            failed_requests_count = sum([request.WaitUntilComplete() for request in requests])
 
-    network_id = p['network_id']
-    cpu = p['cpu']
-    memory = p['memory']
-    alias = p['alias']
-    password = p['password']
-    ip_address = p['ip_address']
-    storage_type = p['storage_type']
-    svr_type = p['type']
-    primary_dns = p['primary_dns']
-    secondary_dns = p['secondary_dns']
-    additional_disks = p['additional_disks']
-    custom_fields = p['custom_fields']
-    ttl = p['ttl']
-    managed_os = p['managed_os']
-    description = p['description']
-    source_server_password = p['source_server_password']
-    cpu_autoscale_policy_id = p['cpu_autoscale_policy_id']
-    anti_affinity_policy_id = p['anti_affinity_policy_id']
-    packages = p['packages']
-    add_public_ip = p['add_public_ip']
-    public_ip_protocol = p['public_ip_protocol']
-    public_ip_ports = p['public_ip_ports']
-    wait = p['wait']
+            if failed_requests_count > 0:
+                raise clc
+            else:
+                ClcServer._refresh_servers(servers)
 
-    if override_count:
-        count = override_count
-    else:
-        count = p['count']
+    @staticmethod
+    def _create_servers(module, clc, override_count=None):
+        """
+        Creates new servers
 
-    datacenter = _find_datacenter(module, clc)
-    group = _find_group(module, clc, datacenter)
-    template = _find_template(module, clc, datacenter)
+        module : AnsibleModule object
+        clc : authenticated CLC connection
 
-    if not network_id:
-        network_id = _find_default_network(module, clc, datacenter).id
-
-    params = {
-        'clc': clc,
-        'name': name,
-        'template': template.id,
-        'group_id': group.id,
-        'network_id': network_id,
-        'cpu': cpu,
-        'memory': memory,
-        'alias': alias,
-        'password': password,
-        'ip_address': ip_address,
-        'storage_type': storage_type,
-        'type': svr_type,
-        'primary_dns': primary_dns,
-        'secondary_dns': secondary_dns,
-        'additional_disks': additional_disks,
-        'custom_fields': custom_fields,
-        'ttl': ttl,
-        'managed_os': managed_os,
-        'description': description,
-        'source_server_password': source_server_password,
-        'cpu_autoscale_policy_id': cpu_autoscale_policy_id,
-        'anti_affinity_policy_id': anti_affinity_policy_id,
-        'packages': packages
-    }
-
-    if count == 0:
-        changed = False
-    else:
-        changed = True
-
+        Returns:
+            A list of dictionaries with server information
+            about the instances that were launched
+        """
+        p = module.params
         requests = []
         servers = []
         server_dict_array = []
         created_server_ids = []
 
-        for i in range(0, count):
-            req = create_clc_server(**params)
-            server = req.requests[0].Server()
-            requests.append(req)
-            servers.append(server)
+        add_public_ip = p['add_public_ip']
+        public_ip_protocol = p['public_ip_protocol']
+        public_ip_ports = p['public_ip_ports']
+        wait = p['wait']
 
-        if wait:
-            # Requests.WaitUntilComplete() returns the count of failed requests
-            for r in requests:
-                if r.WaitUntilComplete():
-                    # NOTE: It would make much more sense if this returned a Requests object with the
-                    #       error requests in tact or threw an exception with these data, but, alas
-                    # it does not, so we're going with the generic error
-                    # message
-                    raise clc
-                else:
-                    for server in servers:
-                        server.Refresh()
+        datacenter = _find_datacenter(module, clc)
 
-        if add_public_ip:
-            add_public_ip_to_servers(
-                clc,
-                servers,
-                public_ip_protocol,
-                public_ip_ports,
-                wait)
+        network_id = p['network_id'] if p['network_id'] else _find_default_network_id(module, clc, datacenter)
 
+        params = {
+            'clc': clc,
+            'name': _validate_name(module),
+            'template': _find_template_id(module, clc, datacenter),
+            'group_id': _find_group(module, clc, datacenter).id,
+            'network_id': network_id,
+            'cpu': p['cpu'],
+            'memory': p['memory'],
+            'alias': p['alias'],
+            'password': p['password'],
+            'ip_address': p['ip_address'],
+            'storage_type': p['storage_type'],
+            'type': p['type'],
+            'primary_dns': p['primary_dns'],
+            'secondary_dns': p['secondary_dns'],
+            'additional_disks': p['additional_disks'],
+            'custom_fields': p['custom_fields'],
+            'ttl': p['ttl'],
+            'managed_os': p['managed_os'],
+            'description': p['description'],
+            'source_server_password': p['source_server_password'],
+            'cpu_autoscale_policy_id': p['cpu_autoscale_policy_id'],
+            'anti_affinity_policy_id': p['anti_affinity_policy_id'],
+            'packages': p['packages']
+        }
+
+        count = override_count if override_count else p['count']
+
+        changed = False if count == 0 else True
+
+        if changed:
+            for i in range(0, count):
+                req = create_clc_server(**params)
+                server = req.requests[0].Server()
+                requests.append(req)
+                servers.append(server)
+
+            ClcServer._wait_for_requests(clc, requests, servers, wait)
+
+            ClcServer._add_public_ip_to_servers(
+                should_add_public_ip=add_public_ip,
+                servers=servers,
+                public_ip_protocol=public_ip_protocol,
+                public_ip_ports=public_ip_ports,
+                wait=wait)
+
+            for server in servers:
+                # reload server details so public IP shows up
+                server = clc.v2.Server(server.id)
+                if len(server.PublicIPs().public_ips) > 0:
+                    server.data['publicip'] = str(server.PublicIPs().public_ips[0])
+                server.data['ipaddress'] = server.details[
+                    'ipAddresses'][0]['internal']
+                server_dict_array.append(server.data)
+                created_server_ids.append(server.id)
+
+        return server_dict_array, created_server_ids, changed
+
+
+    @staticmethod
+    def _refresh_servers(servers):
         for server in servers:
-            # reload server details so public IP shows up
-            server = clc.v2.Server(server.id)
-            if len(server.PublicIPs().public_ips) > 0:
-                server.data['publicip'] = str(server.PublicIPs().public_ips[0])
-            server.data['ipaddress'] = server.details[
-                'ipAddresses'][0]['internal']
-            server_dict_array.append(server.data)
-            created_server_ids.append(server.id)
-
-    return server_dict_array, created_server_ids, changed
-
-
-def delete_servers(module, clc, server_ids):
-    """
-    Deletes the servers on the provided list
-
-    module: Ansible module object
-    clc: authenticated clc connection object
-    server_ids: a list of servers to terminate in the form of
-      [ {id: <server-id>}, ..]
-
-    Returns a dictionary of server information
-    about the servers terminated.
-
-    If the server to be terminated is running
-    "changed" will be set to False.
-
-    """
-    # Whether to wait for termination to complete before returning
-    p = module.params
-    wait = p['wait']
-    terminated_server_ids = []
-    server_dict_array = []
-    requests = []
-
-    changed = False
-    if not isinstance(server_ids, list) or len(server_ids) < 1:
-        module.fail_json(
-            msg='server_ids should be a list of servers, aborting')
-
-    servers = clc.v2.Servers(server_ids).Servers()
-    changed = True
-
-    for server in servers:
-        requests.append(server.Delete())
-
-    if wait:
-        for r in requests:
-            r.WaitUntilComplete()
-
-    for server in servers:
-        terminated_server_ids.append(server.id)
-
-    return changed, server_dict_array, terminated_server_ids
-
-
-def startstop_servers(module, clc, server_ids, state):
-    """
-    Starts or stops a list of existing servers
-
-    module: Ansible module object
-    clc: authenticated ec2 connection object
-    server_ids: The list of servers to start in the form of
-      [ {id: <server-id>}, ..]
-    state: Intended state ("started" or "stopped")
-
-    Returns a dictionary of instance information
-    about the servers started/stopped.
-
-    If the instance was not able to change state,
-    "changed" will be set to False.
-    """
-    p = module.params
-    wait = p['wait']
-    changed = False
-    changed_servers = []
-    server_dict_array = []
-    result_server_ids = []
-    requests = []
-
-    if not isinstance(server_ids, list) or len(server_ids) < 1:
-        module.fail_json(
-            msg='server_ids should be a list of servers, aborting')
-
-    servers = clc.v2.Servers(server_ids).Servers()
-    for server in servers:
-        if server.powerState != state:
-            changed_servers.append(server)
-            try:
-                if state == 'started':
-                    requests.append(server.PowerOn())
-                else:
-                    requests.append(server.PowerOff())
-            except:
-                module.fail_json(
-                    msg='Unable to change state for server {0}'.format(
-                        server.id))
-            changed = True
-
-    if wait:
-        for r in requests:
-            r.WaitUntilComplete()
-        for server in changed_servers:
             server.Refresh()
 
-    for server in changed_servers:
-        server_dict_array.append(server.data)
-        result_server_ids.append(server.id)
+    @staticmethod
+    def _add_public_ip_to_servers(
+            should_add_public_ip,
+            servers,
+            public_ip_protocol,
+            public_ip_ports,
+            wait):
 
-    return changed, server_dict_array, result_server_ids
+        if should_add_public_ip:
+            ports_lst = []
+            requests = []
+
+            for port in public_ip_ports:
+                ports_lst.append({'protocol': public_ip_protocol, 'port': port})
+
+            for server in servers:
+                requests.append(server.PublicIPs().Add(ports_lst))
+
+            if wait:
+                for r in requests:
+                    r.WaitUntilComplete()
+
+    @staticmethod
+    def _delete_servers(module, clc, server_ids):
+        """
+        Deletes the servers on the provided list
+
+        module: Ansible module object
+        clc: authenticated clc connection object
+        server_ids: a list of servers to terminate in the form of
+          [ {id: <server-id>}, ..]
+
+        Returns a dictionary of server information
+        about the servers terminated.
+
+        If the server to be terminated is running
+        "changed" will be set to False.
+
+        """
+        # Whether to wait for termination to complete before returning
+        p = module.params
+        wait = p['wait']
+        terminated_server_ids = []
+        server_dict_array = []
+        requests = []
+
+        changed = False
+        if not isinstance(server_ids, list) or len(server_ids) < 1:
+            module.fail_json(
+            module.fail_json(
+                msg='server_ids should be a list of servers, aborting'))
+
+        servers = clc.v2.Servers(server_ids).Servers()
+        changed = True
+
+        for server in servers:
+            requests.append(server.Delete())
+
+        if wait:
+            for r in requests:
+                r.WaitUntilComplete()
+
+        for server in servers:
+            terminated_server_ids.append(server.id)
+
+        return changed, server_dict_array, terminated_server_ids
+
+    @staticmethod
+    def _reset_server_power_state(module, server, state):
+        result = None
+        try:
+            if state == 'started':
+                result=server.PowerOn()
+            else:
+                result=server.PowerOff()
+        except:
+            module.fail_json(
+                msg='Unable to change state for server {0}'.format(
+                    server.id))
+            return result
+        return result
+
+    @staticmethod
+    def _startstop_servers(module, clc, server_ids, state):
+        """
+        Starts or stops a list of existing servers
+
+        module: Ansible module object
+        clc: authenticated ec2 connection object
+        server_ids: The list of servers to start in the form of
+          [ {id: <server-id>}, ..]
+        state: Intended state ("started" or "stopped")
+
+        Returns a dictionary of instance information
+        about the servers started/stopped.
+
+        If the instance was not able to change state,
+        "changed" will be set to False.
+        """
+        p = module.params
+        wait = p['wait']
+        changed = False
+        changed_servers = []
+        server_dict_array = []
+        result_server_ids = []
+        requests = []
+
+        if not isinstance(server_ids, list) or len(server_ids) < 1:
+            module.fail_json(
+                msg='server_ids should be a list of servers, aborting')
+
+        servers=clc.v2.Servers(server_ids).Servers()
+        for server in servers:
+            if server.powerState != state:
+                changed_servers.append(server)
+                requests.append(ClcServer._reset_server_power_state(module, server, state))
+                changed = True
+
+        if wait:
+            for r in requests:
+                r.WaitUntilComplete()
+            for server in changed_servers:
+                server.Refresh()
+
+        for server in changed_servers:
+            server_dict_array.append(server.data)
+            result_server_ids.append(server.id)
+
+        return changed, server_dict_array, result_server_ids
 
 #
 #  Utility Functions
 #
-
-
-def add_public_ip_to_servers(
-        clc,
-        servers,
-        public_ip_protocol,
-        public_ip_ports,
-        wait):
-    ports_lst = []
-    requests = []
-
-    for port in public_ip_ports:
-        ports_lst.append({'protocol': public_ip_protocol, 'port': port})
-
-    for server in servers:
-        requests.append(server.PublicIPs().Add(ports_lst))
-
-    if wait:
-        for r in requests:
-            r.WaitUntilComplete()
-
 
 def _find_running_servers_by_group(module, clc, datacenter, count_group):
     group = _find_group(
@@ -513,10 +498,6 @@ def _find_running_servers_by_group(module, clc, datacenter, count_group):
             running_servers.append(server)
 
     return servers, running_servers
-
-
-def _refresh_server_w_retry(server):
-    server.Refresh()
 
 
 def _find_datacenter(module, clc):
@@ -575,7 +556,7 @@ def _find_group_recursive(module, clc, group_list, lookup_group):
     return result
 
 
-def _find_template(module, clc, datacenter):
+def _find_template_id(module, clc, datacenter):
     lookup_template = module.params['template']
     result = None
     try:
@@ -587,11 +568,11 @@ def _find_template(module, clc, datacenter):
                 lookup_template +
                 " in location: " +
                 datacenter.id))
+        return result
+    return result.id
 
-    return result
 
-
-def _find_default_network(module, clc, datacenter):
+def _find_default_network_id(module, clc, datacenter):
     result = None
     try:
         result = datacenter.Networks().networks[0]
@@ -600,8 +581,9 @@ def _find_default_network(module, clc, datacenter):
             msg=str(
                 "Unable to find a network in location: " +
                 datacenter.id))
+        return result
 
-    return result
+    return result.id
 
 
 def _validate_name(module):
