@@ -55,7 +55,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertTrue('mutually_exclusive' in result)
 
     @patch.object(clc_server, '_find_group')
-    def test_find_running_servers_by_group_name(self, mock_find_group):
+    def test_find_running_servers_by_group(self, mock_find_group):
         # Setup
         mock_group = create_autospec(clc_sdk.v2.Group)
 
@@ -71,7 +71,7 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_find_group.return_value = mock_group
 
         # Function Under Test
-        result_servers, result_runningservers = clc_server._find_running_servers_by_group_name(self.module, self.clc, self.datacenter, "MyCoolGroup")
+        result_servers, result_runningservers = clc_server._find_running_servers_by_group(self.module, self.clc, self.datacenter, "MyCoolGroup")
 
         # Results
         mock_find_group.assert_called_once_with(module=self.module, clc=self.clc, datacenter=self.datacenter, lookup_group="MyCoolGroup")

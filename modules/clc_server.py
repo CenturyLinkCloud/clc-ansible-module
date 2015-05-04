@@ -219,7 +219,7 @@ def enforce_count(module, clc):
         module.fail_json(
             msg="you must use the 'count_group' option with exact_count")
 
-    servers, running_servers = _find_running_servers_by_group_name(
+    servers, running_servers = _find_running_servers_by_group(
         module, clc, datacenter, count_group)
 
     if len(running_servers) == exact_count:
@@ -498,7 +498,7 @@ def add_public_ip_to_servers(
             r.WaitUntilComplete()
 
 
-def _find_running_servers_by_group_name(module, clc, datacenter, count_group):
+def _find_running_servers_by_group(module, clc, datacenter, count_group):
     group = _find_group(
         module=module,
         clc=clc,
