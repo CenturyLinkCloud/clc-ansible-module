@@ -1,0 +1,38 @@
+---
+- name: Integration Test clc_server Module
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Test Server Create
+      clc_server:
+        name: inttst
+        template: ubuntu-14-64
+        count: 1 
+        group: "Default Group" 
+      register: clc
+
+    - name: Test Stop Server
+      clc_server:
+        server_ids: "{{ clc.server_ids }}"
+        state: stopped
+
+    - name: Test Stop Server (when already stopped)
+      clc_server:
+        server_ids: "{{ clc.server_ids }}"
+        state: stopped
+
+    - name: Test Start Server
+      clc_server:
+        server_ids: "{{ clc.server_ids }}"
+        state: started
+
+    - name: Test Start Server (when already started)
+      clc_server:
+        server_ids: "{{ clc.server_ids }}"
+        state: started
+
+    - name: Test Server Delete
+      clc_server:
+        server_ids: "{{ clc.server_ids }}"
+        state: absent
