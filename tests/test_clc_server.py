@@ -39,7 +39,7 @@ class TestClcServerFunctions(unittest.TestCase):
         with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
             with patch.object(clc_server, 'clc_sdk') as mock_clc_sdk:
                 under_test = ClcServer(self.module)
-                under_test.set_clc_credentials_from_env()
+                under_test._set_clc_credentials_from_env()
 
         mock_clc_sdk.v2.SetCredentials.assert_called_once_with(api_username='hansolo', api_passwd='falcon')
 
@@ -47,12 +47,12 @@ class TestClcServerFunctions(unittest.TestCase):
     def test_clc_set_credentials_w_no_creds(self):
         with patch.dict('os.environ', {}, clear=True):
             under_test = ClcServer(self.module)
-            under_test.set_clc_credentials_from_env()
+            under_test._set_clc_credentials_from_env()
 
         self.assertEqual(self.module.fail_json.called, True)
 
     def test_define_argument_spec(self):
-        result = ClcServer.define_argument_spec()
+        result = ClcServer._define_module_argument_spec()
         self.assertIsInstance(result, dict)
         self.assertTrue('argument_spec' in result)
         self.assertTrue('mutually_exclusive' in result)
@@ -146,26 +146,28 @@ class TestClcServerFunctions(unittest.TestCase):
         self.datacenter.Templates().Search.assert_called_once_with("MyCoolTemplateNotFound")
         self.assertEqual(self.module.fail_json.called, True)
 
-    def test_find_default_network_id(self):
+    def test_find_network_id_default(self):
         # Setup
         mock_network = mock.MagicMock()
         mock_network.name = 'TestReturnVlan'
         mock_network.id = UUID('12345678123456781234567812345678')
         self.datacenter.Networks().networks = [mock_network]
+        self.module.params = {}
 
         # Function Under Test
-        result = ClcServer._find_default_network_id(self.module, self.datacenter)
+        result = ClcServer._find_network_id(self.module, self.datacenter)
 
         # Assert Result
         self.assertEqual(result, mock_network.id)
         self.assertEqual(self.module.fail_json.called, False)
 
-    def test_find_default_network_not_found(self):
+    def test_find_network_id_not_found(self):
         # Setup
         self.datacenter.Networks = mock.MagicMock(side_effect=clc_sdk.CLCException("Network not found"))
+        self.module.params = {}
 
         # Function Under Test
-        result = ClcServer._find_default_network_id(self.module, self.datacenter)
+        result = ClcServer._find_network_id(self.module, self.datacenter)
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)
@@ -175,10 +177,9 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = {"name": "MyName"}  # Name is 6 Characters - Pass
 
         # Function Under Test
-        result = ClcServer._validate_name(self.module)
+        ClcServer._validate_name(self.module)
 
         # Assert Result
-        self.assertEqual(result, "MyName")
         self.assertEqual(self.module.fail_json.called, False)
 
     def test_validate_name_too_long(self):

@@ -59,8 +59,6 @@ class ClcServer():
         Process the request - Main Code Path
         :return: Returns with either an exit_json or fail_json
         """
-        p = self.module.params
-        state = p['state']
 
         if not CLC_FOUND:
             self.module.fail_json(
@@ -68,8 +66,13 @@ class ClcServer():
 
         self._set_clc_credentials_from_env()
 
+        self.module.params = ClcServer._validate_module_params(self.clc,
+                                                               self.module)
+        p = self.module.params
+        state = p['state']
+
         #
-        #  Handle each different state
+        #  Handle each state
         #
 
         if state == 'absent':
@@ -137,7 +140,7 @@ class ClcServer():
                              password=dict(default=None),
                              ip_address=dict(default=None),
                              storage_type=dict(default='standard'),
-                             type=dict(default='standard'),
+                             type=dict(default='standard', choices=['standard', 'hyperscale']),
                              primary_dns=dict(default=None),
                              secondary_dns=dict(default=None),
                              additional_disks=dict(type='list', default=[]),
@@ -187,6 +190,147 @@ class ClcServer():
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
 
+    @staticmethod
+    def _validate_module_params(clc, module):
+        params = module.params
+        datacenter = ClcServer._find_datacenter(clc, module)
+
+        ClcServer._validate_types(module)
+        ClcServer._validate_name(module)
+
+        params['alias']          = ClcServer._find_alias(clc, module)
+        params['cpu']            = ClcServer._find_cpu(clc, module)
+        params['memory']         = ClcServer._find_memory(clc, module)
+        params['description']    = ClcServer._find_description(module)
+        params['ttl']            = ClcServer._find_ttl(clc, module)
+        params['template']       = ClcServer._find_template_id(module, datacenter)
+        params['group']          = ClcServer._find_group(module, datacenter).id
+        params['network_id']     = ClcServer._find_network_id(module, datacenter)
+
+        return params
+
+    @staticmethod
+    def _find_datacenter(clc, module):
+        location = module.params['location']
+        try:
+            datacenter = clc.v2.Datacenter(location)
+            return datacenter
+        except CLCException:
+            module.fail_json(msg=str("Unable to find location: " + location))
+
+    @staticmethod
+    def _find_alias(clc, module):
+        alias  = module.params.get('alias')
+        if not alias:
+            alias = clc.v2.Account.GetAlias()
+        return alias
+
+    @staticmethod
+    def _find_cpu(clc, module):
+        cpu = module.params.get('cpu')
+        group_id = module.params.get('group_id')
+        alias = module.params.get('alias')
+        state = module.params.get('state')
+
+        if not cpu and state == 'present':
+            group = clc.v2.Group(id=group_id,
+                                 alias=alias)
+            if group.Defaults("cpu"):
+                cpu = group.Defaults("cpu")
+            else:
+                module.fail_json(msg=str("Cannot determine a default cpu value. Please provide a value for cpu."))
+        return cpu
+
+    @staticmethod
+    def _find_memory(clc, module):
+        memory = module.params.get('memory')
+        group_id = module.params.get('group_id')
+        alias = module.params.get('alias')
+        state = module.params.get('state')
+
+        if not memory and state == 'present':
+            group = clc.v2.Group(id=group_id,
+                                 alias=alias)
+            if group.Defaults("memory"):
+                memory = group.Defaults("memory")
+            else:
+                module.fail_json(msg=str("Cannot determine a default memory value. Please provide a value for memory."))
+        return memory
+
+    @staticmethod
+    def _find_description(module):
+        description = module.params.get('description')
+        if not description:
+            description = module.params.get('name')
+        return description
+
+    @staticmethod
+    def _validate_types(module):
+        state = module.params['state']
+        type = module.params.get('type').lower()
+        storage_type = module.params.get('storage_type').lower()
+
+        if state == "present":
+            if type == "standard" and storage_type not in ("standard", "premium"):
+                module.fail_json(msg=str("Standard VMs must have storage_type = 'standard' or 'premium'"))
+
+            if type == "hyperscale" and storage_type != "hyperscale":
+                module.fail_json(msg=str("Hyperscale VMs must have storage_type = 'hyperscale'"))
+
+    @staticmethod
+    def _find_ttl(clc, module):
+        ttl = module.params.get('ttl')
+
+        if ttl:
+            if ttl <= 3600:
+                module.fail_json(msg=str("Ttl cannot be <= 3600"))
+            else:
+                ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time()) + ttl)
+        return ttl
+
+    # TODO: Refactor except
+    @staticmethod
+    def _find_template_id(module, datacenter):
+        lookup_template = module.params['template']
+        state = module.params['state']
+        result = None
+
+        if state == 'present':
+            try:
+                result = datacenter.Templates().Search(lookup_template)[0].id
+            except CLCException:
+                module.fail_json(
+                    msg=str(
+                        "Unable to find a template: " +
+                        lookup_template +
+                        " in location: " +
+                        datacenter.id))
+        return result
+
+    @staticmethod
+    def _find_network_id(module, datacenter):
+        network_id = module.params.get('network_id')
+
+        if not network_id:
+            try:
+                network_id = datacenter.Networks().networks[0].id
+            except CLCException:
+                module.fail_json(
+                    msg=str(
+                        "Unable to find a network in location: " +
+                        datacenter.id))
+
+        return network_id
+
+    @staticmethod
+    def _validate_name(module):
+        name = module.params['name']
+        state = module.params['state']
+
+        if state == 'present' and (len(name) < 1 or len(name) > 6):
+                module.fail_json(msg=str(
+                    "When state = 'present', name must be a string with a minimum length of 1 and a maximum length of 6"))
+
 #
 #  Functions to execute the module's behaviors
 #  (called from main())
@@ -210,7 +354,7 @@ class ClcServer():
         changed = False
         checkmode = False
         count_group = p['count_group']
-        datacenter = ClcServer._find_datacenter(module, clc)
+        datacenter = ClcServer._find_datacenter(clc, module)
         exact_count = p['exact_count']
         server_dict_array = []
 
@@ -281,15 +425,11 @@ class ClcServer():
         public_ip_ports = p['public_ip_ports']
         wait = p['wait']
 
-        datacenter = ClcServer._find_datacenter(module, clc)
-
-        network_id = p['network_id'] if p['network_id'] else ClcServer._find_default_network_id(module, datacenter)
-
         params = {
-            'name': ClcServer._validate_name(module),
-            'template': ClcServer._find_template_id(module, datacenter),
-            'group_id': ClcServer._find_group(module, datacenter).id,
-            'network_id': network_id,
+            'name': p['name'],
+            'template': p['template'],
+            'group_id': p['group'],
+            'network_id': p['network_id'],
             'cpu': p['cpu'],
             'memory': p['memory'],
             'alias': p['alias'],
@@ -459,7 +599,7 @@ class ClcServer():
             module.fail_json(
                 msg='server_ids should be a list of servers, aborting')
 
-        servers=clc.v2.Servers(server_ids).Servers()
+        servers = clc.v2.Servers(server_ids).Servers()
         for server in servers:
             if server.powerState != state:
                 changed_servers.append(server)
@@ -532,55 +672,6 @@ class ClcServer():
 
         return result
 
-    @staticmethod
-    def _find_datacenter(module, clc):
-        location = module.params['location']
-        try:
-            datacenter = clc.v2.Datacenter(location)
-        except:
-            module.fail_json(msg=str("Unable to find location: " + location))
-            sys.exit(1)
-        return datacenter
-
-    @staticmethod
-    def _find_template_id(module, datacenter):
-        lookup_template = module.params['template']
-        result = None
-        try:
-            result = datacenter.Templates().Search(lookup_template)[0]
-        except:
-            module.fail_json(
-                msg=str(
-                    "Unable to find a template: " +
-                    lookup_template +
-                    " in location: " +
-                    datacenter.id))
-            return result
-        return result.id
-
-    @staticmethod
-    def _find_default_network_id(module, datacenter):
-        result = None
-        try:
-            result = datacenter.Networks().networks[0]
-        except:
-            module.fail_json(
-                msg=str(
-                    "Unable to find a network in location: " +
-                    datacenter.id))
-            return result
-
-        return result.id
-
-    @staticmethod
-    def _validate_name(module):
-        name = module.params['name']
-        if len(name) < 1 or len(name) > 6:
-            module.fail_json(msg=str(
-                "name must be a string with a minimum length of 1 and a maximum length of 6"))
-
-        return name
-
 
     @staticmethod
     def _create_clc_server(
@@ -592,8 +683,6 @@ class ClcServer():
         :param server_params: a dictionary of params to use to create the servers
         :return: clc-sdk.Request object linked to the queued server request
         """
-
-        server_params = ClcServer._validate_server_params(clc, server_params)
 
         res = clc.v2.API.Call(method='POST',
                               url='servers/%s' % (server_params.get('alias')),
@@ -630,7 +719,7 @@ class ClcServer():
 
         # Change the request server method to a _find_server_by_uuid closure so
         # that it will work
-        result.requests[0].Server = lambda: ClcServer._find_server_by_uuid(
+        result.requests[0].Server = lambda: ClcServer._find_server_by_uuid_w_retry(
             clc,
             server_uuid,
             server_params.get('alias'))
@@ -642,7 +731,7 @@ class ClcServer():
     #
 
     @staticmethod
-    def _find_server_by_uuid(clc, svr_uuid, alias=None):
+    def _find_server_by_uuid_w_retry(clc, svr_uuid, alias=None):
         if not alias:
             alias = clc.v2.Account.GetAlias()
 
@@ -671,87 +760,6 @@ class ClcServer():
 
                 sleep(backout)
                 backout = backout * 2
-
-    @staticmethod
-    def _validate_server_params(clc, server_params):
-
-        server_params['alias']          = ClcServer._find_alias(clc, server_params)
-        server_params['cpu']            = ClcServer._find_cpu(clc, server_params)
-        server_params['memory']         = ClcServer._find_memory(clc, server_params)
-        server_params['description']    = ClcServer._find_description(clc, server_params)
-        server_params['ttl']            = ClcServer._find_ttl(clc, server_params)
-
-        ClcServer._validate_types(clc, server_params)
-
-        return server_params
-
-    @staticmethod
-    def _find_alias(clc, server_params):
-        alias  = server_params.get('alias')
-        if not alias:
-            alias = clc.v2.Account.GetAlias()
-        return alias
-
-    @staticmethod
-    def _find_cpu(clc, server_params):
-        cpu = server_params.get('cpu')
-        group_id = server_params.get('group_id')
-        alias = server_params.get('alias')
-
-        if not cpu:
-            group = clc.v2.Group(id=group_id,
-                                 alias=alias)
-            if group.Defaults("cpu"):
-                cpu = group.Defaults("cpu")
-            else:
-                raise clc
-        return cpu
-
-    @staticmethod
-    def _find_memory(clc, server_params):
-        memory = server_params.get('memory')
-        group_id = server_params.get('group_id')
-        alias = server_params.get('alias')
-
-        if not memory:
-            group = clc.v2.Group(id=group_id,
-                                 alias=alias)
-            if group.Defaults("memory"):
-                memory = group.Defaults("memory")
-            else:
-                raise clc
-        return memory
-
-    @staticmethod
-    def _find_description(clc, server_params):
-        description = server_params.get('description')
-        if not description:
-            description = server_params.get('name')
-        return description
-
-    @staticmethod
-    def _validate_types(clc, server_params):
-        if server_params.get('type').lower() not in ("standard", "hyperscale"):
-            raise clc
-        if server_params.get('type').lower() == "standard" \
-                and server_params.get('storage_type').lower() not in (
-                        "standard",
-                        "premium"):
-            raise clc
-        if server_params.get('type').lower() == "hyperscale" \
-                and server_params.get('storage_type').lower() != "hyperscale":
-            raise clc
-
-    @staticmethod
-    def _find_ttl(clc, server_params):
-        ttl = server_params.get('ttl')
-
-        if ttl:
-            if ttl <= 3600:
-                raise clc
-            else:
-                ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time()) + server_params.get('ttl'))
-        return ttl
 
     @staticmethod
     def _modify_clc_server(clc, acct_alias, server_id, cpu, memory):
