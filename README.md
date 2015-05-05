@@ -314,6 +314,36 @@ Create/Delete/Restore a snapshot on an existing server or servers.
 | `state:` | N | `present` | `present`,`absent`,'restore' | Determine whether to create or delete or restore snapshots.  If `present` module will not create a second snapshot if one already exists. |
 | `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
 
+## clc_package Module
+Executes a package on existing set of servers.
+
+### Example Playbook
+```yaml
+---
+---
+- name: Install a package on set of servers
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create server snapshot
+      clc_package:
+        server_ids:
+            - UC1ACCTSRVR01
+            - UC1ACCTSRVR02
+        package_id: 77abb844-579d-478d-3955-c69ab4a7ba1a
+        package_params: {}
+```
+
+###Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `server_ids:` | Y |  |  | A list of servers to create public ips on. |
+| `package_id:` | Y |  |  | The package id which needs to be deployed |
+| `package_params:` | N | {} |  | The arguments required for the package execution. These arguments needs to be in JSON format |
+
+
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script
 
 Scans all datacenters and returns an inventory of servers and server groups to Ansible.  This script returns all information about hosts in the inventory _meta dictionary.
