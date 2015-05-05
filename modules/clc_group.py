@@ -1,6 +1,6 @@
 #!/usr/bin/python
 DOCUMENTATION = '''
-module: clc-ansible-module
+module: clc_group
 short_desciption: Create/delete Server Groups at Centurylink Cloud
 description:
   - Create or delete Server Groups at Centurylink Centurylink Cloud
