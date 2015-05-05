@@ -55,9 +55,10 @@ class ClcServer():
                 msg='clc-python-sdk required for this module')
 
     def process_request(self):
-        #
-        #  Define the module
-        #
+        """
+        Process the request - Main Code Path
+        :return: Returns with either an exit_json or fail_json
+        """
         p = self.module.params
         state = p['state']
 
@@ -209,7 +210,7 @@ class ClcServer():
         changed = False
         checkmode = False
         count_group = p['count_group']
-        datacenter = _find_datacenter(module, clc)
+        datacenter = ClcServer._find_datacenter(module, clc)
         exact_count = p['exact_count']
         server_dict_array = []
 
@@ -219,8 +220,7 @@ class ClcServer():
             module.fail_json(
                 msg="you must use the 'count_group' option with exact_count")
 
-        servers, running_servers = _find_running_servers_by_group(
-            module, clc, datacenter, count_group)
+        servers, running_servers = ClcServer._find_running_servers_by_group(module, datacenter, count_group)
 
         if len(running_servers) == exact_count:
             changed = False
@@ -281,15 +281,15 @@ class ClcServer():
         public_ip_ports = p['public_ip_ports']
         wait = p['wait']
 
-        datacenter = _find_datacenter(module, clc)
+        datacenter = ClcServer._find_datacenter(module, clc)
 
-        network_id = p['network_id'] if p['network_id'] else _find_default_network_id(module, clc, datacenter)
+        network_id = p['network_id'] if p['network_id'] else ClcServer._find_default_network_id(module, datacenter)
 
         params = {
             'clc': clc,
-            'name': _validate_name(module),
-            'template': _find_template_id(module, clc, datacenter),
-            'group_id': _find_group(module, clc, datacenter).id,
+            'name': ClcServer._validate_name(module),
+            'template': ClcServer._find_template_id(module, datacenter),
+            'group_id': ClcServer._find_group(module, datacenter).id,
             'network_id': network_id,
             'cpu': p['cpu'],
             'memory': p['memory'],
@@ -479,308 +479,300 @@ class ClcServer():
 
         return changed, server_dict_array, result_server_ids
 
-#
-#  Utility Functions
-#
+    #
+    #  Utility Functions
+    #
+    @staticmethod
+    def _find_running_servers_by_group(module, datacenter, count_group):
+        group = ClcServer._find_group(module=module, datacenter=datacenter, lookup_group=count_group)
 
-def _find_running_servers_by_group(module, clc, datacenter, count_group):
-    group = _find_group(
-        module=module,
-        clc=clc,
-        datacenter=datacenter,
-        lookup_group=count_group)
+        servers = group.Servers().Servers()
+        running_servers = []
 
-    servers = group.Servers().Servers()
-    running_servers = []
+        for server in servers:
+            if server.status == 'active' and server.powerState == 'started':
+                running_servers.append(server)
 
-    for server in servers:
-        if server.status == 'active' and server.powerState == 'started':
-            running_servers.append(server)
+        return servers, running_servers
 
-    return servers, running_servers
-
-
-def _find_datacenter(module, clc):
-    location = module.params['location']
-    try:
-        datacenter = clc.v2.Datacenter(location)
-    except:
-        module.fail_json(msg=str("Unable to find location: " + location))
-        sys.exit(1)
-    return datacenter
-
-
-def _find_group(module, clc, datacenter, lookup_group=None):
-    result = None
-    if not lookup_group:
-        lookup_group = module.params['group']
-    try:
-        return datacenter.Groups().Get(lookup_group)
-    except:
-        pass
-
-    # That search above only acts on the main
-    result = _find_group_recursive(
-        module,
-        clc,
-        datacenter.Groups(),
-        lookup_group)
-
-    if result is None:
-        module.fail_json(
-            msg=str(
-                "Unable to find group: " +
-                lookup_group +
-                " in location: " +
-                datacenter.id))
-
-    return result
-
-
-def _find_group_recursive(module, clc, group_list, lookup_group):
-    result = None
-    for group in group_list.groups:
-        next_victims = group.Subgroups()
+    @staticmethod
+    def _find_group(module, datacenter, lookup_group=None):
+        result = None
+        if not lookup_group:
+            lookup_group = module.params['group']
         try:
-            return next_victims.Get(lookup_group)
+            return datacenter.Groups().Get(lookup_group)
         except:
-            result = _find_group_recursive(
-                module,
-                clc,
-                next_victims,
-                lookup_group)
+            pass
 
-        if result is not None:
-            break
+        # The search above only acts on the main
+        result = ClcServer._find_group_recursive(module, datacenter.Groups(), lookup_group)
 
-    return result
+        if result is None:
+            module.fail_json(
+                msg=str(
+                    "Unable to find group: " +
+                    lookup_group +
+                    " in location: " +
+                    datacenter.id))
 
-
-def _find_template_id(module, clc, datacenter):
-    lookup_template = module.params['template']
-    result = None
-    try:
-        result = datacenter.Templates().Search(lookup_template)[0]
-    except:
-        module.fail_json(
-            msg=str(
-                "Unable to find a template: " +
-                lookup_template +
-                " in location: " +
-                datacenter.id))
-        return result
-    return result.id
-
-
-def _find_default_network_id(module, clc, datacenter):
-    result = None
-    try:
-        result = datacenter.Networks().networks[0]
-    except:
-        module.fail_json(
-            msg=str(
-                "Unable to find a network in location: " +
-                datacenter.id))
         return result
 
-    return result.id
+    @staticmethod
+    def _find_group_recursive(module, group_list, lookup_group):
+        result = None
+        for group in group_list.groups:
+            subgroups = group.Subgroups()
+            try:
+                return subgroups.Get(lookup_group)
+            except:
+                result = ClcServer._find_group_recursive(module, subgroups, lookup_group)
 
+            if result is not None:
+                break
 
-def _validate_name(module):
-    name = module.params['name']
-    if len(name) < 1 or len(name) > 6:
-        module.fail_json(msg=str(
-            "name must be a string with a minimum length of 1 and a maximum length of 6"))
+        return result
 
-    return name
-
-#
-#  This is a hack.  The clc-python-sdk has a defect in its Server.Create function.  It submits a server create request
-#  and returns a Request object, but that Request is broken and unable to reference the server that is being created.
-#
-#  To work around it, we copied the Server.Create function here from the sdk, and then monkey patch the Request object
-#  with a working Server() function before it's returned.  We'll submit a PR to the
-#  clc-sdk team then remove this code.
-#
-
-
-def create_clc_server(
-        clc,
-        name,
-        template,
-        group_id,
-        network_id,
-        cpu=None,
-        memory=None,
-        alias=None,
-        password=None,
-        ip_address=None,
-        storage_type="standard",
-        type="standard",
-        primary_dns=None,
-        secondary_dns=None,
-        additional_disks=[],
-        custom_fields=[],
-        ttl=None,
-        managed_os=False,
-        description=None,
-        source_server_password=None,
-        cpu_autoscale_policy_id=None,
-        anti_affinity_policy_id=None,
-        packages=[]):
-    """Creates a new server.
-
-    https://t3n.zendesk.com/entries/59565550-Create-Server
-
-    cpu and memory are optional and if not provided we pull from the default server size values associated with
-    the provided group_id.
-
-    Set ttl as number of seconds before server is to be terminated.  Must be >3600
-
-    >>> d = clc.v2.Datacenter()
-    >>> clc.v2.Server.Create(name="api2",cpu=1,memory=1,group_id="wa1-4416",
-                             template=d.Templates().Search("centos-6-64")[0].id,
-                             network_id=d.Networks().networks[0].id).WaitUntilComplete()
-    0
-
-    """
-
-    if not alias:
-        alias = clc.v2.Account.GetAlias()
-
-    if not cpu or not memory:
-        group = clc.v2.Group(id=group_id, alias=alias)
-        if not cpu and group.Defaults("cpu"):
-            cpu = group.Defaults("cpu")
-        elif not cpu:
-            raise clc
-
-        if not memory and group.Defaults("memory"):
-            memory = group.Defaults("memory")
-        elif not memory:
-            raise clc
-    if not description:
-        description = name
-    if type.lower() not in ("standard", "hyperscale"):
-        raise clc
-    if type.lower() == "standard" and storage_type.lower() not in (
-            "standard",
-            "premium"):
-        raise clc
-    if type.lower() == "hyperscale" and storage_type.lower() != "hyperscale":
-        raise clc
-    if ttl and ttl <= 3600:
-        raise clc
-    if ttl:
-        ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time()) + ttl)
-    # TODO - validate custom_fields as a list of dicts with an id and a value key
-    # TODO - validate template exists
-    # TODO - validate additional_disks as a list of dicts with a path, sizeGB, and type (partitioned,raw) keys
-    # TODO - validate addition_disks path not in template reserved paths
-    # TODO - validate antiaffinity policy id set only with type=hyperscale
-
-    res = clc.v2.API.Call(method='POST',
-                          url='servers/%s' % (alias),
-                          payload=json.dumps({'name': name,
-                                              'description': description,
-                                              'groupId': group_id,
-                                              'sourceServerId': template,
-                                              'isManagedOS': managed_os,
-                                              'primaryDNS': primary_dns,
-                                              'secondaryDNS': secondary_dns,
-                                              'networkId': network_id,
-                                              'ipAddress': ip_address,
-                                              'password': password,
-                                              'sourceServerPassword': source_server_password,
-                                              'cpu': cpu,
-                                              'cpuAutoscalePolicyId': cpu_autoscale_policy_id,
-                                              'memoryGB': memory,
-                                              'type': type,
-                                              'storageType': storage_type,
-                                              'antiAffinityPolicyId': anti_affinity_policy_id,
-                                              'customFields': custom_fields,
-                                              'additionalDisks': additional_disks,
-                                              'ttl': ttl,
-                                              'packages': packages}))
-
-    result = clc.v2.Requests(res)
-
-    #
-    # Interrupt the method and monkey patch the Request object so it returns a valid server
-    #
-    # The CLC Python SDK is broken.  We shouldn't have to do this.
-    #
-
-    # Find the server's UUID from the API response
-    server_uuid = [obj['id']
-                   for obj in res['links'] if obj['rel'] == 'self'][0]
-
-    # Change the request server method to a find_server_by_uuid closure so
-    # that it will work
-    result.requests[0].Server = lambda: find_server_by_uuid(
-        clc,
-        server_uuid,
-        alias)
-
-    return result
-
-#
-#  This is the function that gets patched to the Request.server object using a lamda closure
-#
-
-
-def find_server_by_uuid(clc, svr_uuid, alias=None):
-    if not alias:
-        alias = clc.v2.Account.GetAlias()
-
-    attempts = 5
-    backout = 2
-
-    while True:
-        attempts -= 1
+    @staticmethod
+    def _find_datacenter(module, clc):
+        location = module.params['location']
         try:
-            server_obj = clc.v2.API.Call(
-                'GET', 'servers/%s/%s?uuid=true' %
-                (alias, svr_uuid))
-            server_id = server_obj['id']
-            server = clc.v2.Server(
-                id=server_id,
-                alias=alias,
-                server_obj=server_obj)
-            return server
+            datacenter = clc.v2.Datacenter(location)
+        except:
+            module.fail_json(msg=str("Unable to find location: " + location))
+            sys.exit(1)
+        return datacenter
 
-        except clc.APIFailedResponse as e:
-            if e.response_status_code != 404:
-                raise e
-            if attempts == 0:
-                raise e
+    @staticmethod
+    def _find_template_id(module, datacenter):
+        lookup_template = module.params['template']
+        result = None
+        try:
+            result = datacenter.Templates().Search(lookup_template)[0]
+        except:
+            module.fail_json(
+                msg=str(
+                    "Unable to find a template: " +
+                    lookup_template +
+                    " in location: " +
+                    datacenter.id))
+            return result
+        return result.id
 
-            sleep(backout)
-            backout = backout * 2
+    @staticmethod
+    def _find_default_network_id(module, datacenter):
+        result = None
+        try:
+            result = datacenter.Networks().networks[0]
+        except:
+            module.fail_json(
+                msg=str(
+                    "Unable to find a network in location: " +
+                    datacenter.id))
+            return result
 
+        return result.id
 
-def modify_clc_server(clc, acct_alias, server_id, cpu, memory):
-    if not acct_alias:
-        acct_alias = clc.v2.Account.GetAlias()
-    if not server_id:
-        raise clc
-    # Fetch the existing server information
-    server = clc.v2.Server(server_id)
+    @staticmethod
+    def _validate_name(module):
+        name = module.params['name']
+        if len(name) < 1 or len(name) > 6:
+            module.fail_json(msg=str(
+                "name must be a string with a minimum length of 1 and a maximum length of 6"))
 
-    current_memory = server.memory
-    current_cpu = server.cpu
-    if memory != current_memory or cpu != current_cpu:
-        job_obj = clc.v2.API.Call('PATCH',
-                                  'servers/%s/%s' % (acct_alias,
-                                                     server_id),
-                                  json.dumps([{"op": "set",
-                                               "member": "memory",
-                                               "value": memory},
-                                              {"op": "set",
-                                               "member": "cpu",
-                                               "value": cpu}]))
-        result = clc.v2.Requests(job_obj)
+        return name
+
+    @staticmethod
+    def _create_clc_server2(clc, server_params):
+        return clc.v2.Server.Create(**server_params)
+
+    #
+    #  This is a hack.  The clc-python-sdk has a defect in its Server.Create function.  It submits a server create request
+    #  and returns a Request object, but that Request is broken and unable to reference the server that is being created.
+    #
+    #  To work around it, we copied the Server.Create function here from the sdk, and then monkey patch the Request object
+    #  with a working Server() function before it's returned.  We'll submit a PR to the
+    #  clc-sdk team then remove this code.
+    #
+
+    @staticmethod
+    def _create_clc_server(
+            clc,
+            name,
+            template,
+            group_id,
+            network_id,
+            cpu=None,
+            memory=None,
+            alias=None,
+            password=None,
+            ip_address=None,
+            storage_type="standard",
+            type="standard",
+            primary_dns=None,
+            secondary_dns=None,
+            additional_disks=[],
+            custom_fields=[],
+            ttl=None,
+            managed_os=False,
+            description=None,
+            source_server_password=None,
+            cpu_autoscale_policy_id=None,
+            anti_affinity_policy_id=None,
+            packages=[]):
+        """Creates a new server.
+
+        https://t3n.zendesk.com/entries/59565550-Create-Server
+
+        cpu and memory are optional and if not provided we pull from the default server size values associated with
+        the provided group_id.
+
+        Set ttl as number of seconds before server is to be terminated.  Must be >3600
+
+        >>> d = clc.v2.Datacenter()
+        >>> clc.v2.Server.Create(name="api2",cpu=1,memory=1,group_id="wa1-4416",
+                                 template=d.Templates().Search("centos-6-64")[0].id,
+                                 network_id=d.Networks().networks[0].id).WaitUntilComplete()
+        0
+
+        """
+
+        if not alias:
+            alias = clc.v2.Account.GetAlias()
+
+        if not cpu or not memory:
+            group = clc.v2.Group(id=group_id, alias=alias)
+            if not cpu and group.Defaults("cpu"):
+                cpu = group.Defaults("cpu")
+            elif not cpu:
+                raise clc
+
+            if not memory and group.Defaults("memory"):
+                memory = group.Defaults("memory")
+            elif not memory:
+                raise clc
+        if not description:
+            description = name
+        if type.lower() not in ("standard", "hyperscale"):
+            raise clc
+        if type.lower() == "standard" and storage_type.lower() not in (
+                "standard",
+                "premium"):
+            raise clc
+        if type.lower() == "hyperscale" and storage_type.lower() != "hyperscale":
+            raise clc
+        if ttl and ttl <= 3600:
+            raise clc
+        if ttl:
+            ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time()) + ttl)
+        # TODO - validate custom_fields as a list of dicts with an id and a value key
+        # TODO - validate template exists
+        # TODO - validate additional_disks as a list of dicts with a path, sizeGB, and type (partitioned,raw) keys
+        # TODO - validate addition_disks path not in template reserved paths
+        # TODO - validate antiaffinity policy id set only with type=hyperscale
+
+        res = clc.v2.API.Call(method='POST',
+                              url='servers/%s' % (alias),
+                              payload=json.dumps({'name': name,
+                                                  'description': description,
+                                                  'groupId': group_id,
+                                                  'sourceServerId': template,
+                                                  'isManagedOS': managed_os,
+                                                  'primaryDNS': primary_dns,
+                                                  'secondaryDNS': secondary_dns,
+                                                  'networkId': network_id,
+                                                  'ipAddress': ip_address,
+                                                  'password': password,
+                                                  'sourceServerPassword': source_server_password,
+                                                  'cpu': cpu,
+                                                  'cpuAutoscalePolicyId': cpu_autoscale_policy_id,
+                                                  'memoryGB': memory,
+                                                  'type': type,
+                                                  'storageType': storage_type,
+                                                  'antiAffinityPolicyId': anti_affinity_policy_id,
+                                                  'customFields': custom_fields,
+                                                  'additionalDisks': additional_disks,
+                                                  'ttl': ttl,
+                                                  'packages': packages}))
+
+        result = clc.v2.Requests(res)
+
+        #
+        # Interrupt the method and monkey patch the Request object so it returns a valid server
+        #
+        # The CLC Python SDK is broken.  We shouldn't have to do this.
+        #
+
+        # Find the server's UUID from the API response
+        server_uuid = [obj['id']
+                       for obj in res['links'] if obj['rel'] == 'self'][0]
+
+        # Change the request server method to a find_server_by_uuid closure so
+        # that it will work
+        result.requests[0].Server = lambda: ClcServer._find_server_by_uuid(
+            clc,
+            server_uuid,
+            alias)
+
         return result
+
+    #
+    #  This is the function that gets patched to the Request.server object using a lamda closure
+    #
+
+    @staticmethod
+    def _find_server_by_uuid(clc, svr_uuid, alias=None):
+        if not alias:
+            alias = clc.v2.Account.GetAlias()
+
+        attempts = 5
+        backout = 2
+
+        while True:
+            attempts -= 1
+            try:
+                server_obj = clc.v2.API.Call(
+                    'GET', 'servers/%s/%s?uuid=true' %
+                    (alias, svr_uuid))
+                server_id = server_obj['id']
+                server = clc.v2.Server(
+                    id=server_id,
+                    alias=alias,
+                    server_obj=server_obj)
+                return server
+
+            except clc.APIFailedResponse as e:
+                if e.response_status_code != 404:
+                    raise e
+                if attempts == 0:
+                    raise e
+
+                sleep(backout)
+                backout = backout * 2
+
+    @staticmethod
+    def _modify_clc_server(clc, acct_alias, server_id, cpu, memory):
+        if not acct_alias:
+            acct_alias = clc.v2.Account.GetAlias()
+        if not server_id:
+            raise clc
+        # Fetch the existing server information
+        server = clc.v2.Server(server_id)
+
+        current_memory = server.memory
+        current_cpu = server.cpu
+        if memory != current_memory or cpu != current_cpu:
+            job_obj = clc.v2.API.Call('PATCH',
+                                      'servers/%s/%s' % (acct_alias,
+                                                         server_id),
+                                      json.dumps([{"op": "set",
+                                                   "member": "memory",
+                                                   "value": memory},
+                                                  {"op": "set",
+                                                   "member": "cpu",
+                                                   "value": cpu}]))
+            result = clc.v2.Requests(job_obj)
+            return result
 
 
 def main():

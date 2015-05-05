@@ -57,8 +57,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertTrue('argument_spec' in result)
         self.assertTrue('mutually_exclusive' in result)
 
-    @patch.object(clc_server, '_find_group')
-    def test_find_running_servers_by_group(self, mock_find_group):
+    def test_find_running_servers_by_group(self):
         # Setup
         mock_group = create_autospec(clc_sdk.v2.Group)
 
@@ -71,21 +70,25 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_stopped_server.powerState = 'stopped'
 
         mock_group.Servers().Servers.return_value = [mock_running_server, mock_stopped_server]
-        mock_find_group.return_value = mock_group
+
+        self.datacenter.Groups().Get.return_value = mock_group
 
         # Function Under Test
-        result_servers, result_runningservers = clc_server._find_running_servers_by_group(self.module, self.clc, self.datacenter, "MyCoolGroup")
+        result_servers, result_runningservers = ClcServer._find_running_servers_by_group(self.module,
+                                                                                         self.datacenter,
+                                                                                         "MyCoolGroup")
 
         # Results
-        mock_find_group.assert_called_once_with(module=self.module, clc=self.clc, datacenter=self.datacenter, lookup_group="MyCoolGroup")
         self.assertEqual(len(result_servers), 2)
-        self.assertEqual(len(result_runningservers),1)
+        self.assertEqual(len(result_runningservers), 1)
 
         self.assertIn(mock_running_server, result_runningservers)
         self.assertNotIn(mock_stopped_server, result_runningservers)
 
         self.assertIn(mock_running_server, result_servers)
         self.assertIn(mock_stopped_server, result_servers)
+
+        self.datacenter.reset_mock()
 
     def test_find_datacenter(self):
         # Setup Mocks
@@ -94,7 +97,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params.__getitem__.side_effect = getitem
 
         # Function Under Test
-        clc_server._find_datacenter(module=self.module, clc=self.clc)
+        ClcServer._find_datacenter(module=self.module, clc=self.clc)
 
         # assert result
         self.clc.v2.Datacenter.assert_called_once_with("MyMockGroup")
@@ -104,7 +107,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.datacenter.Groups().Get = mock.MagicMock()
 
         # Function Under Test
-        result_group = clc_server._find_group(self.module, self.clc, self.datacenter, "MyCoolGroup")
+        result_group = ClcServer._find_group(self.module, self.datacenter, "MyCoolGroup")
 
         # Assert Result
         self.datacenter.Groups().Get.assert_called_once_with("MyCoolGroup")
@@ -116,27 +119,17 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = {'group': "DefaultGroupFromModuleParamsLookup"}
 
         # Function Under Test
-        result_group = clc_server._find_group(self.module, self.clc, self.datacenter)
+        result_group = ClcServer._find_group(self.module, self.datacenter)
 
         # Assert Result
         self.datacenter.Groups().Get.assert_called_once_with("DefaultGroupFromModuleParamsLookup")
-
-    def test_find_group_w_group_not_found(self):
-        # Setup
-        self.datacenter.Groups().Get = mock.Mock(side_effect=clc_sdk.CLCException("Group not found"))
-
-        # Function Under Test
-        result_group = clc_server._find_group(self.module, self.clc, self.datacenter)
-
-        # Assert Result
-        self.assertEqual(self.module.fail_json.called, True)
 
     def test_find_template(self):
         self.module.params = {"template": "MyCoolTemplate"}
         self.datacenter.Templates().Search = mock.MagicMock()
 
         # Function Under Test
-        result_template = clc_server._find_template_id(module=self.module, clc=self.clc, datacenter=self.datacenter)
+        result_template = ClcServer._find_template_id(module=self.module, datacenter=self.datacenter)
 
         # Assert Result
         self.datacenter.Templates().Search.assert_called_once_with("MyCoolTemplate")
@@ -147,7 +140,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.datacenter.Templates().Search = mock.MagicMock(side_effect=clc_sdk.CLCException("Template not found"))
 
         # Function Under Test
-        result_template = clc_server._find_template_id(module=self.module, clc=self.clc, datacenter=self.datacenter)
+        result_template = ClcServer._find_template_id(module=self.module, datacenter=self.datacenter)
 
         # Assert Result
         self.datacenter.Templates().Search.assert_called_once_with("MyCoolTemplateNotFound")
@@ -161,7 +154,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.datacenter.Networks().networks = [mock_network]
 
         # Function Under Test
-        result = clc_server._find_default_network_id(self.module, self.clc, self.datacenter)
+        result = ClcServer._find_default_network_id(self.module, self.datacenter)
 
         # Assert Result
         self.assertEqual(result, mock_network.id)
@@ -172,7 +165,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.datacenter.Networks = mock.MagicMock(side_effect=clc_sdk.CLCException("Network not found"))
 
         # Function Under Test
-        result = clc_server._find_default_network_id(self.module, self.clc, self.datacenter)
+        result = ClcServer._find_default_network_id(self.module, self.datacenter)
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)
@@ -182,7 +175,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = {"name": "MyName"}  # Name is 6 Characters - Pass
 
         # Function Under Test
-        result = clc_server._validate_name(self.module)
+        result = ClcServer._validate_name(self.module)
 
         # Assert Result
         self.assertEqual(result, "MyName")
@@ -193,7 +186,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = {"name": "MyNameIsTooLong"}  # Name is >6 Characters - Fail
 
         # Function Under Test
-        result = clc_server._validate_name(self.module)
+        result = ClcServer._validate_name(self.module)
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)
@@ -203,7 +196,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = {"name": ""}  # Name is <1 Characters - Fail
 
         # Function Under Test
-        result = clc_server._validate_name(self.module)
+        result = ClcServer._validate_name(self.module)
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)
