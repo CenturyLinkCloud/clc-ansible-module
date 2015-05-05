@@ -125,7 +125,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.datacenter.Groups().Get.assert_called_once_with("DefaultGroupFromModuleParamsLookup")
 
     def test_find_template(self):
-        self.module.params = {"template": "MyCoolTemplate"}
+        self.module.params = {"template": "MyCoolTemplate", "state": "present"}
         self.datacenter.Templates().Search = mock.MagicMock()
 
         # Function Under Test
@@ -136,7 +136,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(self.module.fail_json.called, False)
 
     def test_find_template_not_found(self):
-        self.module.params = {"template": "MyCoolTemplateNotFound"}
+        self.module.params = {"template": "MyCoolTemplateNotFound", "state": "present"}
         self.datacenter.Templates().Search = mock.MagicMock(side_effect=clc_sdk.CLCException("Template not found"))
 
         # Function Under Test
@@ -174,7 +174,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
     def test_validate_name(self):
         # Setup
-        self.module.params = {"name": "MyName"}  # Name is 6 Characters - Pass
+        self.module.params = {"name": "MyName", "state": "present"}  # Name is 6 Characters - Pass
 
         # Function Under Test
         ClcServer._validate_name(self.module)
@@ -184,7 +184,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
     def test_validate_name_too_long(self):
         # Setup
-        self.module.params = {"name": "MyNameIsTooLong"}  # Name is >6 Characters - Fail
+        self.module.params = {"name": "MyNameIsTooLong", "state": "present"}  # Name is >6 Characters - Fail
 
         # Function Under Test
         result = ClcServer._validate_name(self.module)
@@ -194,7 +194,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
     def test_validate_name_too_short(self):
         # Setup
-        self.module.params = {"name": ""}  # Name is <1 Characters - Fail
+        self.module.params = {"name": "", "state": "present"}  # Name is <1 Characters - Fail
 
         # Function Under Test
         result = ClcServer._validate_name(self.module)
