@@ -207,7 +207,38 @@ options:
 '''
 
 EXAMPLES = '''
+# Note - You must set the CLC_V2_API_USERNAME And CLC_V2_API_PASSWD Environment variables before running these examples
 
+- name: Provision a single Ubuntu Server
+  clc_server:
+    name: test
+    template: ubuntu-14-64
+    count: 1
+    group: 'Default Group'
+    state: present
+
+- name: Ensure 'Default Group' has exactly 5 servers
+  clc_server:
+    name: test
+    template: ubuntu-14-64
+    exact_count: 5
+    count_group: 'Default Group'
+    group: 'Default Group'
+
+- name: Stop a Server
+  clc_server:
+    server_ids: ['UC1ACCTTEST01']
+    state: stopped
+
+- name: Start a Server
+  clc_server:
+    server_ids: ['UC1ACCTTEST01']
+    state: started
+
+- name: Delete a Server
+  clc_server:
+    server_ids: ['UC1ACCTTEST01']
+    state: absent
 '''
 import sys
 import os
