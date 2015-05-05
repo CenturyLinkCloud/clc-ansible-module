@@ -66,7 +66,7 @@ class ClcServer():
             self.module.fail_json(
                 msg='clc-python-sdk required for this module')
 
-        self.set_clc_credentials_from_env()
+        self._set_clc_credentials_from_env()
 
         #
         #  Handle each different state
@@ -121,7 +121,7 @@ class ClcServer():
             servers=server_dict_array)
 
     @staticmethod
-    def define_argument_spec():
+    def _define_module_argument_spec():
         """
         Define the argument spec for the ansible module
         :return: argument spec dictionary
@@ -166,7 +166,7 @@ class ClcServer():
         return {"argument_spec": argument_spec,
                 "mutually_exclusive": mutually_exclusive}
 
-    def set_clc_credentials_from_env(self):
+    def _set_clc_credentials_from_env(self):
         """
         Set the CLC Credentials on the sdk by reading environment variables
         :return: none
@@ -286,7 +286,6 @@ class ClcServer():
         network_id = p['network_id'] if p['network_id'] else ClcServer._find_default_network_id(module, datacenter)
 
         params = {
-            'clc': clc,
             'name': ClcServer._validate_name(module),
             'template': ClcServer._find_template_id(module, datacenter),
             'group_id': ClcServer._find_group(module, datacenter).id,
@@ -317,7 +316,7 @@ class ClcServer():
 
         if changed:
             for i in range(0, count):
-                req = create_clc_server(**params)
+                req = ClcServer._create_clc_server(clc, params)
                 server = req.requests[0].Server()
                 requests.append(req)
                 servers.append(server)
@@ -582,137 +581,59 @@ class ClcServer():
 
         return name
 
-    @staticmethod
-    def _create_clc_server2(clc, server_params):
-        return clc.v2.Server.Create(**server_params)
-
-    #
-    #  This is a hack.  The clc-python-sdk has a defect in its Server.Create function.  It submits a server create request
-    #  and returns a Request object, but that Request is broken and unable to reference the server that is being created.
-    #
-    #  To work around it, we copied the Server.Create function here from the sdk, and then monkey patch the Request object
-    #  with a working Server() function before it's returned.  We'll submit a PR to the
-    #  clc-sdk team then remove this code.
-    #
 
     @staticmethod
     def _create_clc_server(
             clc,
-            name,
-            template,
-            group_id,
-            network_id,
-            cpu=None,
-            memory=None,
-            alias=None,
-            password=None,
-            ip_address=None,
-            storage_type="standard",
-            type="standard",
-            primary_dns=None,
-            secondary_dns=None,
-            additional_disks=[],
-            custom_fields=[],
-            ttl=None,
-            managed_os=False,
-            description=None,
-            source_server_password=None,
-            cpu_autoscale_policy_id=None,
-            anti_affinity_policy_id=None,
-            packages=[]):
-        """Creates a new server.
-
-        https://t3n.zendesk.com/entries/59565550-Create-Server
-
-        cpu and memory are optional and if not provided we pull from the default server size values associated with
-        the provided group_id.
-
-        Set ttl as number of seconds before server is to be terminated.  Must be >3600
-
-        >>> d = clc.v2.Datacenter()
-        >>> clc.v2.Server.Create(name="api2",cpu=1,memory=1,group_id="wa1-4416",
-                                 template=d.Templates().Search("centos-6-64")[0].id,
-                                 network_id=d.Networks().networks[0].id).WaitUntilComplete()
-        0
-
+            server_params):
+        """
+        Call the CLC Rest API to Create a Server
+        :param clc: the clc-python-sdk instance to use
+        :param server_params: a dictionary of params to use to create the servers
+        :return: clc-sdk.Request object linked to the queued server request
         """
 
-        if not alias:
-            alias = clc.v2.Account.GetAlias()
-
-        if not cpu or not memory:
-            group = clc.v2.Group(id=group_id, alias=alias)
-            if not cpu and group.Defaults("cpu"):
-                cpu = group.Defaults("cpu")
-            elif not cpu:
-                raise clc
-
-            if not memory and group.Defaults("memory"):
-                memory = group.Defaults("memory")
-            elif not memory:
-                raise clc
-        if not description:
-            description = name
-        if type.lower() not in ("standard", "hyperscale"):
-            raise clc
-        if type.lower() == "standard" and storage_type.lower() not in (
-                "standard",
-                "premium"):
-            raise clc
-        if type.lower() == "hyperscale" and storage_type.lower() != "hyperscale":
-            raise clc
-        if ttl and ttl <= 3600:
-            raise clc
-        if ttl:
-            ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time()) + ttl)
-        # TODO - validate custom_fields as a list of dicts with an id and a value key
-        # TODO - validate template exists
-        # TODO - validate additional_disks as a list of dicts with a path, sizeGB, and type (partitioned,raw) keys
-        # TODO - validate addition_disks path not in template reserved paths
-        # TODO - validate antiaffinity policy id set only with type=hyperscale
+        server_params = ClcServer._validate_server_params(clc, server_params)
 
         res = clc.v2.API.Call(method='POST',
-                              url='servers/%s' % (alias),
-                              payload=json.dumps({'name': name,
-                                                  'description': description,
-                                                  'groupId': group_id,
-                                                  'sourceServerId': template,
-                                                  'isManagedOS': managed_os,
-                                                  'primaryDNS': primary_dns,
-                                                  'secondaryDNS': secondary_dns,
-                                                  'networkId': network_id,
-                                                  'ipAddress': ip_address,
-                                                  'password': password,
-                                                  'sourceServerPassword': source_server_password,
-                                                  'cpu': cpu,
-                                                  'cpuAutoscalePolicyId': cpu_autoscale_policy_id,
-                                                  'memoryGB': memory,
-                                                  'type': type,
-                                                  'storageType': storage_type,
-                                                  'antiAffinityPolicyId': anti_affinity_policy_id,
-                                                  'customFields': custom_fields,
-                                                  'additionalDisks': additional_disks,
-                                                  'ttl': ttl,
-                                                  'packages': packages}))
+                              url='servers/%s' % (server_params.get('alias')),
+                              payload=json.dumps({'name': server_params.get('name'),
+                                                  'description': server_params.get('description'),
+                                                  'groupId': server_params.get('group_id'),
+                                                  'sourceServerId': server_params.get('template'),
+                                                  'isManagedOS': server_params.get('managed_os'),
+                                                  'primaryDNS': server_params.get('primary_dns'),
+                                                  'secondaryDNS': server_params.get('secondary_dns'),
+                                                  'networkId': server_params.get('network_id'),
+                                                  'ipAddress': server_params.get('ip_address'),
+                                                  'password': server_params.get('password'),
+                                                  'sourceServerPassword': server_params.get('source_server_password'),
+                                                  'cpu': server_params.get('cpu'),
+                                                  'cpuAutoscalePolicyId': server_params.get('cpu_autoscale_policy_id'),
+                                                  'memoryGB': server_params.get('memory'),
+                                                  'type': server_params.get('type'),
+                                                  'storageType': server_params.get('storage_type'),
+                                                  'antiAffinityPolicyId': server_params.get('anti_affinity_policy_id'),
+                                                  'customFields': server_params.get('custom_fields'),
+                                                  'additionalDisks': server_params.get('additional_disks'),
+                                                  'ttl': server_params.get('ttl'),
+                                                  'packages': server_params.get('packages')}))
 
         result = clc.v2.Requests(res)
 
         #
-        # Interrupt the method and monkey patch the Request object so it returns a valid server
-        #
-        # The CLC Python SDK is broken.  We shouldn't have to do this.
-        #
+        # Patch the Request object so that it returns a valid server
 
         # Find the server's UUID from the API response
         server_uuid = [obj['id']
                        for obj in res['links'] if obj['rel'] == 'self'][0]
 
-        # Change the request server method to a find_server_by_uuid closure so
+        # Change the request server method to a _find_server_by_uuid closure so
         # that it will work
         result.requests[0].Server = lambda: ClcServer._find_server_by_uuid(
             clc,
             server_uuid,
-            alias)
+            server_params.get('alias'))
 
         return result
 
@@ -728,6 +649,7 @@ class ClcServer():
         attempts = 5
         backout = 2
 
+        # Wait and retry if the api returns a 404
         while True:
             attempts -= 1
             try:
@@ -749,6 +671,87 @@ class ClcServer():
 
                 sleep(backout)
                 backout = backout * 2
+
+    @staticmethod
+    def _validate_server_params(clc, server_params):
+
+        server_params['alias']          = ClcServer._find_alias(clc, server_params)
+        server_params['cpu']            = ClcServer._find_cpu(clc, server_params)
+        server_params['memory']         = ClcServer._find_memory(clc, server_params)
+        server_params['description']    = ClcServer._find_description(clc, server_params)
+        server_params['ttl']            = ClcServer._find_ttl(clc, server_params)
+
+        ClcServer._validate_types(clc, server_params)
+
+        return server_params
+
+    @staticmethod
+    def _find_alias(clc, server_params):
+        alias  = server_params.get('alias')
+        if not alias:
+            alias = clc.v2.Account.GetAlias()
+        return alias
+
+    @staticmethod
+    def _find_cpu(clc, server_params):
+        cpu = server_params.get('cpu')
+        group_id = server_params.get('group_id')
+        alias = server_params.get('alias')
+
+        if not cpu:
+            group = clc.v2.Group(id=group_id,
+                                 alias=alias)
+            if group.Defaults("cpu"):
+                cpu = group.Defaults("cpu")
+            else:
+                raise clc
+        return cpu
+
+    @staticmethod
+    def _find_memory(clc, server_params):
+        memory = server_params.get('memory')
+        group_id = server_params.get('group_id')
+        alias = server_params.get('alias')
+
+        if not memory:
+            group = clc.v2.Group(id=group_id,
+                                 alias=alias)
+            if group.Defaults("memory"):
+                memory = group.Defaults("memory")
+            else:
+                raise clc
+        return memory
+
+    @staticmethod
+    def _find_description(clc, server_params):
+        description = server_params.get('description')
+        if not description:
+            description = server_params.get('name')
+        return description
+
+    @staticmethod
+    def _validate_types(clc, server_params):
+        if server_params.get('type').lower() not in ("standard", "hyperscale"):
+            raise clc
+        if server_params.get('type').lower() == "standard" \
+                and server_params.get('storage_type').lower() not in (
+                        "standard",
+                        "premium"):
+            raise clc
+        if server_params.get('type').lower() == "hyperscale" \
+                and server_params.get('storage_type').lower() != "hyperscale":
+            raise clc
+
+    @staticmethod
+    def _find_ttl(clc, server_params):
+        ttl = server_params.get('ttl')
+
+        if ttl:
+            if ttl <= 3600:
+                raise clc
+            else:
+                ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time()) + server_params.get('ttl'))
+        return ttl
 
     @staticmethod
     def _modify_clc_server(clc, acct_alias, server_id, cpu, memory):
@@ -776,7 +779,7 @@ class ClcServer():
 
 
 def main():
-    argument_dict = ClcServer.define_argument_spec()
+    argument_dict = ClcServer._define_module_argument_spec()
     module = AnsibleModule(**argument_dict)
 
     clc_server = ClcServer(module)
