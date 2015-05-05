@@ -37,6 +37,7 @@ class ClcLoadBalancer():
         """
         self.clc = clc_sdk
         self.module = module
+        self.lb_dict = {}
 
         if not CLC_FOUND:
             self.module.fail_json(
@@ -57,6 +58,8 @@ class ClcLoadBalancer():
 
         self.set_clc_credentials_from_env()
 
+        self.lb_dict = self._get_loadbalancer_list(alias=loadbalancer_alias, location=loadbalancer_location)
+
         if state == 'present':
             changed, result_lb = self.ensure_loadbalancer_present(name=loadbalancer_name,
                                                                   alias=loadbalancer_alias,
@@ -69,17 +72,34 @@ class ClcLoadBalancer():
     #  Functions to define the Ansible module and its arguments
     #
     def ensure_loadbalancer_present(self,name,alias,location,description,status):
-        changed = True
-        result = self.create_loadbalancer(name=name,
+        changed = False
+
+        lb_exists = self._loadbalancer_exists(name=name)
+
+        if lb_exists:
+            result = name
+            changed = False
+        else:
+            result = self.create_loadbalancer(name=name,
                                           alias=alias,
                                           location=location,
                                           description=description,
                                           status=status)
+            changed = True
 
         return changed, result
 
     def create_loadbalancer(self,name,alias,location,description,status):
         result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (alias, location), json.dumps({"name":name,"description":description,"status":status}))
+        return result
+
+    def _get_loadbalancer_list(self, alias, location):
+        return self.clc.v2.API.Call('GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
+
+    def _loadbalancer_exists(self, name):
+        result = False
+        if name in [lb.get('name') for lb in self.lb_dict]:
+            result = True
         return result
 
     @staticmethod
