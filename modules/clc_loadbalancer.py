@@ -69,8 +69,9 @@ class ClcLoadBalancer():
             self.module.exit_json(changed=changed, loadbalancer=result_lb)
 
         elif state == 'absent':
-            changed, result_lb = self.ensure_loadbalancer_absent(alias=loadbalancer_alias,
-                                                          location=loadbalancer_location)
+            changed, result_lb = self.ensure_loadbalancer_absent(name=loadbalancer_name,
+                                                                 alias=loadbalancer_alias,
+                                                                 location=loadbalancer_location)
             self.module.exit_json(changed=changed, loadbalancer=result_lb)
     #
     #  Functions to define the Ansible module and its arguments
@@ -97,26 +98,26 @@ class ClcLoadBalancer():
         lb_exists = self._loadbalancer_exists(name=name)
         if lb_exists:
             result = self.delete_loadbalancer(alias=alias,
-                                              location=location)
+                                              location=location,
+                                              name=name)
             changed = True
         else:
             result = name
             changed = False
-
-
+        return changed, result
 
     def create_loadbalancer(self,name,alias,location,description,status):
         result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (alias, location), json.dumps({"name":name,"description":description,"status":status}))
         return result
 
-    def delete_loadbalancer(self,alias,location):
-        lb_id = self._get_loadbalancer_id(loadbalancer=loadbalancer)
+    def delete_loadbalancer(self,alias,location,name):
+        lb_id = self._get_loadbalancer_id(name=name)
         result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, lb_id))
         return result
 
-    def _get_loadbalancer_id(self, loadbalancer):
+    def _get_loadbalancer_id(self, name):
         for lb in self.lb_dict:
-            if lb.get('name') == loadbalancer:
+            if lb.get('name') == name:
                 id = lb.get('id')
         return id
 
