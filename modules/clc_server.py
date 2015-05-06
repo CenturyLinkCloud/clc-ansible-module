@@ -240,6 +240,10 @@ EXAMPLES = '''
     server_ids: ['UC1ACCTTEST01']
     state: absent
 '''
+
+# TODO: Handle clc.APIExceptions
+# TODO: Replace all raise statements with calls to module.fail_json
+
 import sys
 import os
 import datetime
@@ -258,10 +262,6 @@ except ImportError:
     clc_sdk = None
 else:
     CLC_FOUND = True
-
-#
-#  Functions to define the Ansible module and its arguments
-#
 
 
 class ClcServer():
