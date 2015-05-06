@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-"""
+'''
 CenturyLink Cloud Server Package Installation
 =============================================
 This is an Ansible module which executes a set of packages
@@ -11,14 +11,13 @@ with control portal credentials in the format of:
     export CLC_V2_API_USERNAME=<your Control Portal Username>
     export CLC_V2_API_PASSWD=<your Control Portal Password>
 These credentials are required to use the CLC API and must be provided.
-"""
+'''
 
 #
 #  @author: Siva Popuri
 #
 
 import json
-from ansible.module_utils.basic import *
 #
 #  Requires the clc-python-sdk.
 #  sudo pip install clc-sdk
@@ -44,10 +43,10 @@ class ClcPackage():
                 msg='clc-python-sdk required for this module')
 
     def process_request(self):
-        """
+        '''
         The root function which handles the Ansible module execution
         :return: TODO:
-        """
+        '''
         p = self.module.params
 
         if not CLC_FOUND:
@@ -67,11 +66,11 @@ class ClcPackage():
 
     @staticmethod
     def define_argument_spec():
-        """
+        '''
         This function defnines the dictionary object required for
         package module
         :return: the package dictionary object
-        """
+        '''
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
             package_id=dict(required=True),
@@ -84,37 +83,43 @@ class ClcPackage():
     #
 
     def clc_install_packages(self, server_list, package_id, package_params):
-        """
+        '''
         Read all servers from CLC and executes each package from package_list
         :param server_list: The target list of servers where the packages needs to be installed
         :param package_list: The list of packages to be installed
         :return: the list of affected servers
-        """
-        #TODO : Add more meaningful return information
+        '''
 
         servers = self._get_servers_from_clc(server_list, 'Failed to get servers from CLC')
         try:
             for server in servers:
                 server.ExecutePackage(package_id=package_id,  parameters=package_params)
+                '''
+                self.clc.v2.API.Call(method='POST',
+                                     url='/v2/operations/%s/servers/executePackage' %(alias),
+                                     payload=json.dumps({'servers':server_list,
+                                                         'package':{'packageId':package_id,
+                                                                    'parameters':package_params}}) )
+                                                                    '''
         except CLCException as ex:
             self.module.fail_json(msg='Failed while installing package : %s with Error : %s' %(package_id,ex))
         return servers
 
     def _get_servers_from_clc(self, server_list, message):
-        """
+        '''
         Internal function to fetch list of CLC server objects from a list of server ids
         :param the list server ids
         :return the list of CLC server objects
-        """
+        '''
         try:
             return self.clc.v2.Servers(server_list).servers
         except CLCException as ex:
             self.module.fail_json(msg=message + ': %s' %ex)
 
     def _set_clc_creds_from_env(self):
-        """
+        '''
         Internal function to set the CLC credentials
-        """
+        '''
         env = os.environ
         v2_api_token = env.get('CLC_V2_API_TOKEN', False)
         v2_api_username = env.get('CLC_V2_API_USERNAME', False)
@@ -143,6 +148,6 @@ def main():
     clc_package = ClcPackage(module)
     clc_package.process_request()
 
-
+from ansible.module_utils.basic import *
 if __name__ == '__main__':
     main()
