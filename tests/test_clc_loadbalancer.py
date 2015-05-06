@@ -37,6 +37,22 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         self.module.exit_json.assert_called_once_with(changed=True, loadbalancer = [{'name': 'TEST_LB'}])
         self.assertFalse(self.module.fail_json.called)
 
+    def test_process_request_state_absent(self,
+                                          mock_set_clc_credentials,
+                                          mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'state': 'absent'
+        }
+        mock_loadbalancer_response = 204 #delete service returns 204 if successful
+        mock_clc_sdk.v2.API.Call.return.value = mock_loadbalancer_response
+
+        test = ClcLoadBalancer(self.module)
+        test.process.request()
+
+        #Assertions
+        self.module.exit_json.assert_called_once_with(changed=True)
+        self.assertFalse(self.module.fail_json.called)
 
     def test_clc_module_not_found(self):
         # Setup Mock Import Function
