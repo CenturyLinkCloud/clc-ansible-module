@@ -257,6 +257,7 @@ from time import sleep
 try:
     import clc as clc_sdk
     from clc import CLCException
+    from clc import APIFailedResponse
 except ImportError:
     CLC_FOUND = False
     clc_sdk = None
@@ -289,7 +290,7 @@ class ClcServer():
         self.module.params = ClcServer._validate_module_params(self.clc,
                                                                self.module)
         p = self.module.params
-        state = p['state']
+        state = p.get('state')
 
         #
         #  Handle each state
@@ -309,7 +310,7 @@ class ClcServer():
                                                          server_ids=server_ids)
 
         elif state in ('started', 'stopped'):
-            server_ids = p['server_ids']
+            server_ids = p.get('server_ids')
             if not isinstance(server_ids, list):
                 self.module.fail_json(
                     msg='server_ids needs to be a list of servers to run: %s' %
@@ -317,18 +318,15 @@ class ClcServer():
 
             (changed,
              server_dict_array,
-             new_server_ids) = ClcServer._startstop_servers(self.module,
-                                                            self.clc,
-                                                            server_ids,
-                                                            state)
+             new_server_ids) = ClcServer._startstop_servers(self.module, self.clc, server_ids)
 
         elif state == 'present':
             # Changed is always set to true when provisioning new instances
-            if not p['template']:
+            if not p.get('template'):
                 self.module.fail_json(
                     msg='template parameter is required for new instance')
 
-            if p['exact_count'] is None:
+            if p.get('exact_count') is None:
                 (server_dict_array,
                  new_server_ids,
                  changed) = ClcServer._create_servers(self.module,
@@ -444,7 +442,7 @@ class ClcServer():
         :param module: module to validate
         :return: clc-sdk.Datacenter instance
         """
-        location = module.params['location']
+        location = module.params.get('location')
         try:
             datacenter = clc.v2.Datacenter(location)
             return datacenter
@@ -528,8 +526,8 @@ class ClcServer():
         :return: none
         """
         state = module.params.get('state')
-        type = module.params.get('type').lower()
-        storage_type = module.params.get('storage_type').lower()
+        type = module.params.get('type').lower() if module.params.get('type') else None
+        storage_type = module.params.get('storage_type').lower() if module.params.get('storage_type') else None
 
         if state == "present":
             if type == "standard" and storage_type not in ("standard", "premium"):
@@ -632,9 +630,9 @@ class ClcServer():
         changed_server_ids = None
         changed = False
         checkmode = False
-        count_group = p['count_group']
+        count_group = p.get('count_group')
         datacenter = ClcServer._find_datacenter(clc, module)
-        exact_count = p['exact_count']
+        exact_count = p.get('exact_count')
         server_dict_array = []
 
         # fail here if the exact count was specified without filtering
@@ -739,7 +737,9 @@ class ClcServer():
 
         if changed:
             for i in range(0, count):
-                req = ClcServer._create_clc_server(clc, params)
+                req = ClcServer._create_clc_server(clc=clc,
+                                                   module=module,
+                                                   server_params=params)
                 server = req.requests[0].Server()
                 requests.append(req)
                 servers.append(server)
@@ -844,17 +844,17 @@ class ClcServer():
         return changed, server_dict_array, terminated_server_ids
 
     @staticmethod
-    def _startstop_servers(module, clc, server_ids, state):
+    def _startstop_servers(module, clc, server_ids):
         """
         Start or Stop the servers on the provided list
         :param module: the AnsibleModule object
         :param clc: the clc-sdk instance to use
         :param server_ids: list of servers to start or stop
-        :param state: the intended state ("started" or "stopped")
         :return: a list of dictionaries with server information about the servers that were started or stopped
         """
         p = module.params
-        wait = p['wait']
+        wait = p.get('wait')
+        state = p.get('state')
         changed = False
         changed_servers = []
         server_dict_array = []
@@ -982,6 +982,7 @@ class ClcServer():
     @staticmethod
     def _create_clc_server(
             clc,
+            module,
             server_params):
         """
         Call the CLC Rest API to Create a Server
@@ -1027,6 +1028,7 @@ class ClcServer():
         # that it will work
         result.requests[0].Server = lambda: ClcServer._find_server_by_uuid_w_retry(
             clc,
+            module,
             server_uuid,
             server_params.get('alias'))
 
@@ -1037,7 +1039,7 @@ class ClcServer():
     #
 
     @staticmethod
-    def _find_server_by_uuid_w_retry(clc, svr_uuid, alias=None):
+    def _find_server_by_uuid_w_retry(clc, module, svr_uuid, alias=None, retries=5, backout=2):
         """
         Find the clc server by the UUID returned from the provisioning request.  Retry the request if a 404 is returned.
         :param clc: the clc-sdk instance to use
@@ -1048,15 +1050,12 @@ class ClcServer():
         if not alias:
             alias = clc.v2.Account.GetAlias()
 
-        attempts = 5
-        backout = 2
-
         # Wait and retry if the api returns a 404
         while True:
-            attempts -= 1
+            retries -= 1
             try:
                 server_obj = clc.v2.API.Call(
-                    'GET', 'servers/%s/%s?uuid=true' %
+                    method='GET', url='servers/%s/%s?uuid=true' %
                     (alias, svr_uuid))
                 server_id = server_obj['id']
                 server = clc.v2.Server(
@@ -1065,11 +1064,15 @@ class ClcServer():
                     server_obj=server_obj)
                 return server
 
-            except clc.APIFailedResponse as e:
+            except APIFailedResponse as e:
                 if e.response_status_code != 404:
-                    raise e
-                if attempts == 0:
-                    raise e
+                    module.fail_json(msg='A failure response was received from CLC API when '
+                                         'attempting to get details for a server:  UUID=%s, Code=%i, Message=%s'
+                                         % (svr_uuid, e.response_status_code, e.message))
+                    return
+                if retries == 0:
+                    module.fail_json(msg='Unable to reach the CLC API after 5 attempts')
+                    return
 
                 sleep(backout)
                 backout = backout * 2
