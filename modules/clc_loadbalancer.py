@@ -92,16 +92,18 @@ class ClcLoadBalancer():
 
         return changed, result
 
-    def ensure_loadbalancer_absent(self,name,alias,location,description,status):
+    def ensure_loadbalancer_absent(self,name,alias,location):
         changed = False
-        lb_absent = self._loadbalancer_exists(name=name)
-        if lb_absent:
-            result = name
-            changed = False
-        else:
+        lb_exists = self._loadbalancer_exists(name=name)
+        if lb_exists:
             result = self.delete_loadbalancer(alias=alias,
                                               location=location)
             changed = True
+        else:
+            result = name
+            changed = False
+
+
 
     def create_loadbalancer(self,name,alias,location,description,status):
         result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (alias, location), json.dumps({"name":name,"description":description,"status":status}))
