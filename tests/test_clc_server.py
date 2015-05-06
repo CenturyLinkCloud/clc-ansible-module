@@ -35,6 +35,85 @@ class TestClcServerFunctions(unittest.TestCase):
         # Reset clc_group
         reload(clc_server)
 
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_process_request_state_absent(self,
+                                          mock_clc_sdk,
+                                          mock_set_clc_creds):
+        # Setup Test
+        self.module.params = {
+            'state': 'absent',
+            'server_ids': ['TEST_SERVER'],
+            'location': 'UC1',
+            'type': 'standard',
+            'storage_type': 'standard',
+            'wait': True
+        }
+
+        mock_server = mock.MagicMock()
+        mock_request = mock.MagicMock()
+        mock_server.id = 'TEST_SERVER'
+        mock_server.Delete.return_value = mock_request
+
+        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
+
+        # Test
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.module.exit_json.assert_called_once_with(changed=True, servers=[], server_ids=['TEST_SERVER'])
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch('clc_server.ClcServer._create_clc_server')
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_process_request_state_present_exact_count_create_1(self,
+                                          mock_clc_sdk,
+                                          mock_set_clc_creds,
+                                          mock_create_clc_server):
+        # Setup Test
+        self.module.params = {
+            'state': 'present',
+            'name': 'TEST',
+            'location': 'UC1',
+            'type': 'standard',
+            'storage_type': 'standard',
+            'wait': True,
+            'exact_count': 1,
+            'count_group': 'Default Group'
+        }
+
+        mock_server = mock.MagicMock()
+        mock_requests = mock.MagicMock()
+        mock_single_request = mock.MagicMock()
+        mock_group = mock.MagicMock()
+
+        mock_server.id = 'TEST_SERVER'
+        mock_server.data = {'name': 'TEST_SERVER'}
+        mock_server.details = {
+            'ipAddresses': [{'internal': '1.2.3.4'}]
+        }
+        mock_single_request.Server.return_value = mock_server
+
+        mock_requests.WaitUntilComplete.return_value = 0
+        mock_requests.requests = [mock_single_request]
+
+        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+        mock_create_clc_server.return_value = mock_requests
+        mock_clc_sdk.v2.Server.return_value = mock_server
+
+        # Test
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        mock_clc_sdk.v2.Server.assert_called_once_with('TEST_SERVER')
+        self.module.exit_json.assert_called_once_with(changed=True,
+                                                      servers=[{'ipaddress':'1.2.3.4', 'name': 'TEST_SERVER'}],
+                                                      server_ids=['TEST_SERVER'])
+        self.assertFalse(self.module.fail_json.called)
+
     def test_clc_set_credentials_w_creds(self):
         with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
             with patch.object(clc_server, 'clc_sdk') as mock_clc_sdk:

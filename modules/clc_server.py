@@ -284,12 +284,6 @@ class ClcServer():
         Process the request - Main Code Path
         :return: Returns with either an exit_json or fail_json
         """
-
-        global server_dict_array
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-
         self._set_clc_credentials_from_env()
 
         self.module.params = ClcServer._validate_module_params(self.clc,
@@ -305,7 +299,8 @@ class ClcServer():
             server_ids = p['server_ids']
             if not isinstance(server_ids, list):
                 self.module.fail_json(
-                    msg='termination_list needs to be a list of instances to terminate')
+                    msg='server_ids needs to be a list of instances to delete: %s' %
+                    server_ids)
 
             (changed,
              server_dict_array,
@@ -317,7 +312,7 @@ class ClcServer():
             server_ids = p['server_ids']
             if not isinstance(server_ids, list):
                 self.module.fail_json(
-                    msg='running list needs to be a list of servers to run: %s' %
+                    msg='server_ids needs to be a list of servers to run: %s' %
                     server_ids)
 
             (changed,
@@ -532,7 +527,7 @@ class ClcServer():
         :param module: the module to validate
         :return: none
         """
-        state = module.params['state']
+        state = module.params.get('state')
         type = module.params.get('type').lower()
         storage_type = module.params.get('storage_type').lower()
 
@@ -568,8 +563,8 @@ class ClcServer():
         :param datacenter: the datacenter to search for the template
         :return: a valid clc template id
         """
-        lookup_template = module.params['template']
-        state = module.params['state']
+        lookup_template = module.params.get('template')
+        state = module.params.get('state')
         result = None
 
         if state == 'present':
@@ -612,8 +607,8 @@ class ClcServer():
         :param module: the module to validate
         :return: none
         """
-        name = module.params['name']
-        state = module.params['state']
+        name = module.params.get('name')
+        state = module.params.get('state')
 
         if state == 'present' and (len(name) < 1 or len(name) > 6):
                 module.fail_json(msg=str(
@@ -708,37 +703,37 @@ class ClcServer():
         server_dict_array = []
         created_server_ids = []
 
-        add_public_ip = p['add_public_ip']
-        public_ip_protocol = p['public_ip_protocol']
-        public_ip_ports = p['public_ip_ports']
-        wait = p['wait']
+        add_public_ip = p.get('add_public_ip')
+        public_ip_protocol = p.get('public_ip_protocol')
+        public_ip_ports = p.get('public_ip_ports')
+        wait = p.get('wait')
 
         params = {
-            'name': p['name'],
-            'template': p['template'],
-            'group_id': p['group'],
-            'network_id': p['network_id'],
-            'cpu': p['cpu'],
-            'memory': p['memory'],
-            'alias': p['alias'],
-            'password': p['password'],
-            'ip_address': p['ip_address'],
-            'storage_type': p['storage_type'],
-            'type': p['type'],
-            'primary_dns': p['primary_dns'],
-            'secondary_dns': p['secondary_dns'],
-            'additional_disks': p['additional_disks'],
-            'custom_fields': p['custom_fields'],
-            'ttl': p['ttl'],
-            'managed_os': p['managed_os'],
-            'description': p['description'],
-            'source_server_password': p['source_server_password'],
-            'cpu_autoscale_policy_id': p['cpu_autoscale_policy_id'],
-            'anti_affinity_policy_id': p['anti_affinity_policy_id'],
-            'packages': p['packages']
+            'name': p.get('name'),
+            'template': p.get('template'),
+            'group_id': p.get('group'),
+            'network_id': p.get('network_id'),
+            'cpu': p.get('cpu'),
+            'memory': p.get('memory'),
+            'alias': p.get('alias'),
+            'password': p.get('password'),
+            'ip_address': p.get('ip_address'),
+            'storage_type': p.get('storage_type'),
+            'type': p.get('type'),
+            'primary_dns': p.get('primary_dns'),
+            'secondary_dns': p.get('secondary_dns'),
+            'additional_disks': p.get('additional_disks'),
+            'custom_fields': p.get('custom_fields'),
+            'ttl': p.get('ttl'),
+            'managed_os': p.get('managed_os'),
+            'description': p.get('description'),
+            'source_server_password': p.get('source_server_password'),
+            'cpu_autoscale_policy_id': p.get('cpu_autoscale_policy_id'),
+            'anti_affinity_policy_id': p.get('anti_affinity_policy_id'),
+            'packages': p.get('packages')
         }
 
-        count = override_count if override_count else p['count']
+        count = override_count if override_count else p.get('count')
 
         changed = False if count == 0 else True
 
@@ -831,8 +826,7 @@ class ClcServer():
         changed = False
         if not isinstance(server_ids, list) or len(server_ids) < 1:
             module.fail_json(
-            module.fail_json(
-                msg='server_ids should be a list of servers, aborting'))
+                msg='server_ids should be a list of servers, aborting')
 
         servers = clc.v2.Servers(server_ids).Servers()
         changed = True
@@ -943,7 +937,7 @@ class ClcServer():
         """
         result = None
         if not lookup_group:
-            lookup_group = module.params['group']
+            lookup_group = module.params.get('group')
         try:
             return datacenter.Groups().Get(lookup_group)
         except:
