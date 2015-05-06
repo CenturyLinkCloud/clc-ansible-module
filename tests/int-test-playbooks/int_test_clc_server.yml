@@ -4,61 +4,114 @@
   gather_facts: False
   connection: local
   tasks:
-    - name: Setup Test - Create Test Group
+    - name: Setup Test | Create Test Group
       clc_group:
         name: Integration_Test
         state: present
 
-    - name: Test Server Create
+    - name: Test | Server Create
       clc_server:
         name: inttst
         template: ubuntu-14-64
         count: 1 
         group: Integration_Test
-      register: clc
+      register: create_server
 
-    - name: Test Stop Server
+    - name: Assert | Server was created
+      assert:
+        that:
+          - "create_server.changed == True"
+          - "create_server.server_ids|length == 1"
+
+    - name: Test | Stop Server
       clc_server:
-        server_ids: "{{ clc.server_ids }}"
+        server_ids: "{{ create_server.server_ids }}"
         state: stopped
+      register: stop_server
 
-    - name: Test Stop Server (when already stopped)
+    - name: Assert | Server was stopped
+      assert:
+        that:
+          - "stop_server.changed == True"
+          - "stop_server.servers[0].details['powerState'] == 'stopped'"
+
+    - name: Test | Stop Server (when already stopped)
       clc_server:
-        server_ids: "{{ clc.server_ids }}"
+        server_ids: "{{ create_server.server_ids }}"
         state: stopped
+      register: stop_server_2
 
-    - name: Test Start Server
+    - name: Assert | Second Stop = No Change
+      assert:
+        that:
+          - "stop_server_2.changed == False"
+
+    - name: Test | Start Server
       clc_server:
-        server_ids: "{{ clc.server_ids }}"
+        server_ids: "{{ create_server.server_ids }}"
         state: started
+      register: start_server
 
-    - name: Test Start Server (when already started)
+    - name: Assert | Server was started
+      assert:
+        that:
+          - "start_server.changed == True"
+          - "start_server.servers[0].details['powerState'] == 'started'"
+
+    - name: Test | Start Server (when already started)
       clc_server:
-        server_ids: "{{ clc.server_ids }}"
+        server_ids: "{{ create_server.server_ids }}"
         state: started
+      register: start_server_2
 
-    - name: Test Server Delete
+    - name: Assert | Second Start = No Change
+      assert:
+        that:
+          - "start_server_2.changed == False"
+
+    - name: Test | Server Delete
       clc_server:
-        server_ids: "{{ clc.server_ids }}"
+        server_ids: "{{ create_server.server_ids }}"
         state: absent
+      register: delete_server
 
-    - name: Test Exact_Count (1 server in group)
+    - name: Assert | Server was deleted
+      assert:
+        that:
+          - "delete_server.changed == True"
+          - "delete_server.server_ids|length == 1"
+
+    - name: Test | Exact_Count (1 server in group)
       clc_server:
         name: inttst
         template: ubuntu-14-64
         exact_count: 1
         count_group: Integration_Test
         group: Integration_Test
+      register: exact_count_1
 
-    - name: Test Exact_Count (0 servers in group)
+    - name: Assert | Exact_Count 1 - Server Created
+      assert:
+        that:
+          - "exact_count_1.changed == True"
+          - "exact_count_1.server_ids|length == 1"
+
+    - name: Test | Exact_Count (0 servers in group)
       clc_server:
         name: inttst
         template: ubuntu-14-64
         exact_count: 0
         count_group: Integration_Test
         group: Integration_Test
+      register: exact_count_0
 
-    - name: Teardown Test - Delete Test Group
+    - name: Assert | Exact_Count 0 - Server Deleted
+      assert:
+        that:
+          - "exact_count_0.changed == True"
+          - "exact_count_0.server_ids|length == 1"
+
+    - name: Teardown Test | Delete Test Group
       clc_group:
         name: Integration_Test
         state: absent
