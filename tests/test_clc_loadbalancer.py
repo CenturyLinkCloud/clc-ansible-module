@@ -14,6 +14,30 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         self.module = mock.MagicMock()
         self.datacenter=mock.MagicMock()
 
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    @patch.object(ClcLoadBalancer, 'set_clc_credentials_from_env')
+    def test_process_request_state_present(self,
+                                           mock_set_clc_credentials,
+                                           mock_clc_sdk):
+
+        # Setup
+        self.module.params = {
+            'state': 'present'
+        }
+        mock_loadbalancer_response = [{'name': 'TEST_LB'}]
+
+        mock_clc_sdk.v2.API.Call.return_value = mock_loadbalancer_response
+        # TODO: Mock a response to API.Call('POST')
+
+        # Under Test
+        under_test = ClcLoadBalancer(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.module.exit_json.assert_called_once_with(changed=True, loadbalancer = [{'name': 'TEST_LB'}])
+        self.assertFalse(self.module.fail_json.called)
+
+
     def test_clc_module_not_found(self):
         # Setup Mock Import Function
         import __builtin__ as builtins
