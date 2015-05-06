@@ -1,12 +1,15 @@
 #!/usr/bin/python
 
-import clc_server
-from clc_server import ClcServer
+import unittest
+
+from uuid import UUID
 import clc as clc_sdk
 import mock
 from mock import patch, create_autospec
-import os
-import unittest
+
+import clc_server
+from clc_server import ClcServer
+
 
 class TestClcServerFunctions(unittest.TestCase):
 
@@ -32,11 +35,90 @@ class TestClcServerFunctions(unittest.TestCase):
         # Reset clc_group
         reload(clc_server)
 
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_process_request_state_absent(self,
+                                          mock_clc_sdk,
+                                          mock_set_clc_creds):
+        # Setup Test
+        self.module.params = {
+            'state': 'absent',
+            'server_ids': ['TEST_SERVER'],
+            'location': 'UC1',
+            'type': 'standard',
+            'storage_type': 'standard',
+            'wait': True
+        }
+
+        mock_server = mock.MagicMock()
+        mock_request = mock.MagicMock()
+        mock_server.id = 'TEST_SERVER'
+        mock_server.Delete.return_value = mock_request
+
+        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
+
+        # Test
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.module.exit_json.assert_called_once_with(changed=True, servers=[], server_ids=['TEST_SERVER'])
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch('clc_server.ClcServer._create_clc_server')
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_process_request_state_present_exact_count_create_1(self,
+                                          mock_clc_sdk,
+                                          mock_set_clc_creds,
+                                          mock_create_clc_server):
+        # Setup Test
+        self.module.params = {
+            'state': 'present',
+            'name': 'TEST',
+            'location': 'UC1',
+            'type': 'standard',
+            'storage_type': 'standard',
+            'wait': True,
+            'exact_count': 1,
+            'count_group': 'Default Group'
+        }
+
+        mock_server = mock.MagicMock()
+        mock_requests = mock.MagicMock()
+        mock_single_request = mock.MagicMock()
+        mock_group = mock.MagicMock()
+
+        mock_server.id = 'TEST_SERVER'
+        mock_server.data = {'name': 'TEST_SERVER'}
+        mock_server.details = {
+            'ipAddresses': [{'internal': '1.2.3.4'}]
+        }
+        mock_single_request.Server.return_value = mock_server
+
+        mock_requests.WaitUntilComplete.return_value = 0
+        mock_requests.requests = [mock_single_request]
+
+        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+        mock_create_clc_server.return_value = mock_requests
+        mock_clc_sdk.v2.Server.return_value = mock_server
+
+        # Test
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        mock_clc_sdk.v2.Server.assert_called_once_with('TEST_SERVER')
+        self.module.exit_json.assert_called_once_with(changed=True,
+                                                      servers=[{'ipaddress':'1.2.3.4', 'name': 'TEST_SERVER'}],
+                                                      server_ids=['TEST_SERVER'])
+        self.assertFalse(self.module.fail_json.called)
+
     def test_clc_set_credentials_w_creds(self):
         with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
             with patch.object(clc_server, 'clc_sdk') as mock_clc_sdk:
                 under_test = ClcServer(self.module)
-                under_test.set_clc_credentials_from_env()
+                under_test._set_clc_credentials_from_env()
 
         mock_clc_sdk.v2.SetCredentials.assert_called_once_with(api_username='hansolo', api_passwd='falcon')
 
@@ -44,18 +126,17 @@ class TestClcServerFunctions(unittest.TestCase):
     def test_clc_set_credentials_w_no_creds(self):
         with patch.dict('os.environ', {}, clear=True):
             under_test = ClcServer(self.module)
-            under_test.set_clc_credentials_from_env()
+            under_test._set_clc_credentials_from_env()
 
         self.assertEqual(self.module.fail_json.called, True)
 
     def test_define_argument_spec(self):
-        result = ClcServer.define_argument_spec()
+        result = ClcServer._define_module_argument_spec()
         self.assertIsInstance(result, dict)
         self.assertTrue('argument_spec' in result)
         self.assertTrue('mutually_exclusive' in result)
 
-    @patch.object(clc_server, '_find_group')
-    def test_find_running_servers_by_group_name(self, mock_find_group):
+    def test_find_running_servers_by_group(self):
         # Setup
         mock_group = create_autospec(clc_sdk.v2.Group)
 
@@ -68,21 +149,25 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_stopped_server.powerState = 'stopped'
 
         mock_group.Servers().Servers.return_value = [mock_running_server, mock_stopped_server]
-        mock_find_group.return_value = mock_group
+
+        self.datacenter.Groups().Get.return_value = mock_group
 
         # Function Under Test
-        result_servers, result_runningservers = clc_server._find_running_servers_by_group_name(self.module, self.clc, self.datacenter, "MyCoolGroup")
+        result_servers, result_runningservers = ClcServer._find_running_servers_by_group(self.module,
+                                                                                         self.datacenter,
+                                                                                         "MyCoolGroup")
 
         # Results
-        mock_find_group.assert_called_once_with(module=self.module, clc=self.clc, datacenter=self.datacenter, lookup_group="MyCoolGroup")
         self.assertEqual(len(result_servers), 2)
-        self.assertEqual(len(result_runningservers),1)
+        self.assertEqual(len(result_runningservers), 1)
 
         self.assertIn(mock_running_server, result_runningservers)
         self.assertNotIn(mock_stopped_server, result_runningservers)
 
         self.assertIn(mock_running_server, result_servers)
         self.assertIn(mock_stopped_server, result_servers)
+
+        self.datacenter.reset_mock()
 
     def test_find_datacenter(self):
         # Setup Mocks
@@ -91,7 +176,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params.__getitem__.side_effect = getitem
 
         # Function Under Test
-        clc_server._find_datacenter(module=self.module, clc=self.clc)
+        ClcServer._find_datacenter(module=self.module, clc=self.clc)
 
         # assert result
         self.clc.v2.Datacenter.assert_called_once_with("MyMockGroup")
@@ -101,7 +186,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.datacenter.Groups().Get = mock.MagicMock()
 
         # Function Under Test
-        result_group = clc_server._find_group(self.module, self.clc, self.datacenter, "MyCoolGroup")
+        result_group = ClcServer._find_group(self.module, self.datacenter, "MyCoolGroup")
 
         # Assert Result
         self.datacenter.Groups().Get.assert_called_once_with("MyCoolGroup")
@@ -113,91 +198,85 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = {'group': "DefaultGroupFromModuleParamsLookup"}
 
         # Function Under Test
-        result_group = clc_server._find_group(self.module, self.clc, self.datacenter)
+        result_group = ClcServer._find_group(self.module, self.datacenter)
 
         # Assert Result
         self.datacenter.Groups().Get.assert_called_once_with("DefaultGroupFromModuleParamsLookup")
 
-    def test_find_group_w_group_not_found(self):
-        # Setup
-        self.datacenter.Groups().Get = mock.Mock(side_effect=clc_sdk.CLCException("Group not found"))
-
-        # Function Under Test
-        result_group = clc_server._find_group(self.module, self.clc, self.datacenter)
-
-        # Assert Result
-        self.assertEqual(self.module.fail_json.called, True)
-
     def test_find_template(self):
-        self.module.params = {"template": "MyCoolTemplate"}
+        self.module.params = {"template": "MyCoolTemplate", "state": "present"}
         self.datacenter.Templates().Search = mock.MagicMock()
 
         # Function Under Test
-        result_template = clc_server._find_template(module=self.module, clc=self.clc, datacenter=self.datacenter)
+        result_template = ClcServer._find_template_id(module=self.module, datacenter=self.datacenter)
 
         # Assert Result
         self.datacenter.Templates().Search.assert_called_once_with("MyCoolTemplate")
         self.assertEqual(self.module.fail_json.called, False)
 
     def test_find_template_not_found(self):
-        self.module.params = {"template": "MyCoolTemplateNotFound"}
+        self.module.params = {"template": "MyCoolTemplateNotFound", "state": "present"}
         self.datacenter.Templates().Search = mock.MagicMock(side_effect=clc_sdk.CLCException("Template not found"))
 
         # Function Under Test
-        result_template = clc_server._find_template(module=self.module, clc=self.clc, datacenter=self.datacenter)
+        result_template = ClcServer._find_template_id(module=self.module, datacenter=self.datacenter)
 
         # Assert Result
         self.datacenter.Templates().Search.assert_called_once_with("MyCoolTemplateNotFound")
         self.assertEqual(self.module.fail_json.called, True)
 
-    def test_find_default_network(self):
+    def test_find_network_id_default(self):
         # Setup
-        self.datacenter.Networks().networks = ['TestReturnVlan']
+        mock_network = mock.MagicMock()
+        mock_network.name = 'TestReturnVlan'
+        mock_network.id = UUID('12345678123456781234567812345678')
+        self.datacenter.Networks().networks = [mock_network]
+        self.module.params = {}
 
         # Function Under Test
-        result = clc_server._find_default_network(self.module, self.clc, self.datacenter)
+        result = ClcServer._find_network_id(self.module, self.datacenter)
 
         # Assert Result
-        self.assertEqual(result, 'TestReturnVlan')
+        self.assertEqual(result, mock_network.id)
         self.assertEqual(self.module.fail_json.called, False)
 
-    def test_find_default_network_not_found(self):
+    def test_find_network_id_not_found(self):
         # Setup
         self.datacenter.Networks = mock.MagicMock(side_effect=clc_sdk.CLCException("Network not found"))
+        self.module.params = {}
 
         # Function Under Test
-        result = clc_server._find_default_network(self.module, self.clc, self.datacenter)
+        result = ClcServer._find_network_id(self.module, self.datacenter)
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)
 
     def test_validate_name(self):
         # Setup
-        self.module.params = {"name": "MyName"}  # Name is 6 Characters - Pass
+        self.module.params = {"name": "MyName", "state": "present"}  # Name is 6 Characters - Pass
 
         # Function Under Test
-        result = clc_server._validate_name(self.module)
+        ClcServer._validate_name(self.module)
 
         # Assert Result
-        self.assertEqual(result, "MyName")
         self.assertEqual(self.module.fail_json.called, False)
 
     def test_validate_name_too_long(self):
         # Setup
-        self.module.params = {"name": "MyNameIsTooLong"}  # Name is >6 Characters - Fail
+        self.module.params = {"name": "MyNameIsTooLong", "state": "present"}  # Name is >6 Characters - Fail
 
         # Function Under Test
-        result = clc_server._validate_name(self.module)
+        result = ClcServer._validate_name(self.module)
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)
 
     def test_validate_name_too_short(self):
         # Setup
-        self.module.params = {"name": ""}  # Name is <1 Characters - Fail
+        self.module.params = {"name": "", "state": "present"}  # Name is <1 Characters - Fail
 
         # Function Under Test
-        result = clc_server._validate_name(self.module)
+        result = ClcServer._validate_name(self.module)
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)

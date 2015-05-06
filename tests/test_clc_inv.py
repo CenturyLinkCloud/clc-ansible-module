@@ -16,12 +16,12 @@ class TestClcInvFunctions(unittest.TestCase):
         self.datacenter=mock.MagicMock()
 
     @patch('clc_inv.clc')
-    def test_find_hostvars_for_single_server(self, mock_clc_sdk):
+    def test_find_hostvars_single_server(self, mock_clc_sdk):
         server = mock.MagicMock()
         server.name = 'testServerWithNoDetails'
         server.data = {}
         mock_clc_sdk.v2.Server.return_value = server
-        result = clc_inv._find_hostvars_for_single_server('testServerWithNoDetails')
+        result = clc_inv._find_hostvars_single_server('testServerWithNoDetails')
         self.assertIsNone(result)
 
 if __name__ == '__main__':
