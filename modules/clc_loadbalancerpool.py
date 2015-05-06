@@ -69,6 +69,12 @@ class ClcLoadBalancerPool():
                                                                    persistence=loadbalancerpool_persistence,
                                                                    port=loadbalancerpool_port)
             self.module.exit_json(changed=changed, loadbalancerpool=result)
+        elif state == 'absent':
+            changed, result = self.ensure_loadbalancerpool_absent(alias=loadbalancerpool_alias,
+                                                                  location=loadbalancerpool_location,
+                                                                  loadbalancer=loadbalancerpool_loadbalancer,
+                                                                  port=loadbalancerpool_port)
+            self.module.exit_json(changed=changed, loadbalancerpool=result)
 
     #
     #  Functions to define the Ansible module and its arguments
@@ -80,17 +86,36 @@ class ClcLoadBalancerPool():
         lb_exists = self._loadbalancer_exists(loadbalancer=loadbalancer)
         if lb_exists:
             lb_id = self._get_loadbalancer_id(loadbalancer=loadbalancer)
-            pool_exists = self._loadbalancerpool_exists(alias=alias, location=location, port=port, id=lb_id)
-            if not pool_exists:
+            pool_id = self._loadbalancerpool_exists(alias=alias, location=location, port=port, lb_id=lb_id)
+            if not pool_id:
                 changed = True
-                result = self.create_loadbalancerpool(alias=alias, location=location, id=lb_id, method=method, persistence=persistence, port=port)
+                result = self.create_loadbalancerpool(alias=alias, location=location, lb_id=lb_id, method=method, persistence=persistence, port=port)
             else:
                 changed = False
                 result = port
             return changed, result
 
-    def create_loadbalancerpool(self, alias, location, id, method, persistence, port):
-        result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s/%s/pools' % (alias, location, id), json.dumps({"port":port, "method":method, "persistence":persistence}))
+    def ensure_loadbalancerpool_absent(self, alias, location, loadbalancer, port):
+        changed = False
+
+        lb_exists = self._loadbalancer_exists(loadbalancer=loadbalancer)
+        if lb_exists:
+            lb_id = self._get_loadbalancer_id(loadbalancer=loadbalancer)
+            pool_id = self._loadbalancerpool_exists(alias=alias, location=location, port=port, lb_id=lb_id)
+            if pool_id:
+                changed = True
+                result = self.delete_loadbalancerpool(alias=alias, location=location, lb_id=lb_id, pool_id=pool_id)
+            else:
+                changed = False
+                result = "Pool doesn't exist"
+            return changed, result
+
+    def create_loadbalancerpool(self, alias, location, lb_id, method, persistence, port):
+        result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s/%s/pools' % (alias, location, lb_id), json.dumps({"port":port, "method":method, "persistence":persistence}))
+        return result
+
+    def delete_loadbalancerpool(self, alias, location, lb_id, pool_id):
+        result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s' % (alias, location, lb_id, pool_id))
         return result
 
     def _get_loadbalancer_list(self, alias, location):
@@ -109,15 +134,15 @@ class ClcLoadBalancerPool():
                 id = lb.get('id')
         return id
 
-    def _loadbalancerpool_exists(self, alias, location, port, id):
+
+    def _loadbalancerpool_exists(self, alias, location, port, lb_id):
         result = False
-        pool_list = self.clc.v2.API.Call('GET', '/v2/sharedLoadBalancers/%s/%s/%s/pools' % (alias, location, id))
+        pool_id = False
+        pool_list = self.clc.v2.API.Call('GET', '/v2/sharedLoadBalancers/%s/%s/%s/pools' % (alias, location, lb_id))
         for pool in pool_list:
             if int(pool.get('port')) == int(port):
-                result = True
+                result = pool.get('id')
 
-        #if port in [pool.get('port') for pool in pool_list]:
-        #    result = True
         return result
 
     @staticmethod
