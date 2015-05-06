@@ -68,6 +68,10 @@ class ClcLoadBalancer():
                                                                   status=loadbalancer_status)
             self.module.exit_json(changed=changed, loadbalancer=result_lb)
 
+        elif state == 'absent':
+            changed, result_lb = self.ensure_loadbalancer_absent(alias=loadbalancer_alias,
+                                                          location=loadbalancer_location)
+            self.module.exit_json(changed=changed, loadbalancer=result_lb)
     #
     #  Functions to define the Ansible module and its arguments
     #
@@ -75,7 +79,6 @@ class ClcLoadBalancer():
         changed = False
 
         lb_exists = self._loadbalancer_exists(name=name)
-
         if lb_exists:
             result = name
             changed = False
@@ -89,9 +92,31 @@ class ClcLoadBalancer():
 
         return changed, result
 
+    def ensure_loadbalancer_absent(self,name,alias,location,description,status):
+        changed = False
+        lb_absent = self._loadbalancer_exists(name=name)
+        if lb_absent:
+            result = name
+            changed = False
+        else:
+            result = self.delete_loadbalancer(alias=alias,
+                                              location=location)
+            changed = True
+
     def create_loadbalancer(self,name,alias,location,description,status):
         result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (alias, location), json.dumps({"name":name,"description":description,"status":status}))
         return result
+
+    def delete_loadbalancer(self,alias,location):
+        lb_id = self._get_loadbalancer_id(loadbalancer=loadbalancer)
+        result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, lb_id))
+        return result
+
+    def _get_loadbalancer_id(self, loadbalancer):
+        for lb in self.lb_dict:
+            if lb.get('name') == loadbalancer:
+                id = lb.get('id')
+        return id
 
     def _get_loadbalancer_list(self, alias, location):
         return self.clc.v2.API.Call('GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
