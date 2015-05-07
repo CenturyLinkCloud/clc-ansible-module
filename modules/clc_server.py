@@ -242,7 +242,6 @@ EXAMPLES = '''
 '''
 
 # TODO: Handle clc.APIExceptions
-# TODO: Replace all raise statements with calls to module.fail_json
 
 import sys
 import os
@@ -1078,7 +1077,7 @@ class ClcServer():
                 backout = backout * 2
 
     @staticmethod
-    def _modify_clc_server(clc, acct_alias, server_id, cpu, memory):
+    def _modify_clc_server(clc, module, acct_alias, server_id, cpu, memory):
         """
         Modify the memory or CPU on a clc server.  This function is not yet implemented.
         :param clc: the clc-sdk instance to use
@@ -1091,7 +1090,9 @@ class ClcServer():
         if not acct_alias:
             acct_alias = clc.v2.Account.GetAlias()
         if not server_id:
-            raise clc
+            module.fail_json(msg='server_id must be provided to modify the server')
+            return
+
         # Fetch the existing server information
         server = clc.v2.Server(server_id)
 
