@@ -64,7 +64,7 @@ def print_inventory_json():
     result = groups
     result['_meta'] = hostvars
 
-    print(json.dumps(result))
+    print(json.dumps(result, indent=2, sort_keys=True))
 
 def _find_all_groups():
     '''
