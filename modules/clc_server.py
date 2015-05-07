@@ -817,7 +817,7 @@ class ClcServer():
         """
         # Whether to wait for termination to complete before returning
         p = module.params
-        wait = p['wait']
+        wait = p.get('wait')
         terminated_server_ids = []
         server_dict_array = []
         requests = []
