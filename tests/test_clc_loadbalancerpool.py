@@ -12,6 +12,60 @@ class TestClcLoadbalancerPoolFunctions(unittest.TestCase):
     def setUp(self):
         self.clc = mock.MagicMock()
         self.module = mock.MagicMock()
+        self.datacenter = mock.MagicMock()
+
+    @patch.object(clc_loadbalancerpool, 'clc_sdk')
+    @patch.object(ClcLoadBalancerPool, 'set_clc_credentials_from_env')
+    def test_process_request_state_present(self, mock_set_clc_credentials, mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'location': 'UC1',
+            'alias': 'WFAD',
+            'port': '80',
+            'loadbalancer': 'TEST',
+            'state': 'present'
+        }
+
+        mock_loadbalancer_response = [{'id': 'test', 'name': 'TEST'}]
+        mock_clc_sdk.v2.API.Call.side_effect = [
+            [{'id': 'test', 'name': 'TEST'}],
+            [],
+            [{'id': 'test', 'name': 'TEST'}]
+        ]
+
+        #Under Test
+        under_test = ClcLoadBalancerPool(self.module)
+        under_test.process_request()
+
+        #Assert
+        self.module.exit_json.assert_called_once_with(changed=True, loadbalancerpool = [{'id': 'test', 'name': 'TEST'}])
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_loadbalancerpool, 'clc_sdk')
+    @patch.object(ClcLoadBalancerPool, 'set_clc_credentials_from_env')
+    def test_process_request_state_absent(self, mock_set_clc_credentials, mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'location': 'UC1',
+            'alias': 'WFAD',
+            'port': '80',
+            'loadbalancer': 'TEST',
+            'state': 'absent'
+        }
+
+        mock_clc_sdk.v2.API.Call.side_effect = [
+            [{'id': 'test', 'name': 'TEST'}],
+            [{'port': '80', 'id':'test'}],
+            {}
+        ]
+
+        #Under Test
+        under_test = ClcLoadBalancerPool(self.module)
+        under_test.process_request()
+
+        #Assert
+        self.module.exit_json.assert_called_once_with(changed=True, loadbalancerpool = {})
+        self.assertFalse(self.module.fail_json.called)
 
     def test_clc_module_not_found(self):
         # Setup Mock Import Function
