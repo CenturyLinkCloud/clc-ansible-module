@@ -58,13 +58,13 @@ def print_inventory_json():
     groups         = _find_all_groups()
     servers        = _get_servers_from_groups(groups)
     hostvars       = _find_all_hostvars_for_servers(servers)
-    dynamic_groups = _build_dynamic_groups_from_hostvars(hostvars)
+    dynamic_groups = _build_hostvars_dynamic_groups(hostvars)
     groups.update(dynamic_groups)
 
     result = groups
     result['_meta'] = hostvars
 
-    print json.dumps(result)
+    print(json.dumps(result))
 
 def _find_all_groups():
     '''
@@ -110,7 +110,7 @@ def _find_all_hostvars_for_servers(servers):
     :return: dictionary of servers(k) and hostvars(v)
     '''
     p = Pool(HOSTVAR_POOL_CNT)
-    results = p.map(_find_hostvars_for_single_server, servers)
+    results = p.map(_find_hostvars_single_server, servers)
     p.close()
     p.join()
 
@@ -121,7 +121,7 @@ def _find_all_hostvars_for_servers(servers):
 
     return {'hostvars': hostvars}
 
-def _find_hostvars_for_single_server(server_id):
+def _find_hostvars_single_server(server_id):
     '''
     Return dictionary of hostvars for a single server
     :param server_id: the id of the server to query
@@ -141,7 +141,7 @@ def _find_hostvars_for_single_server(server_id):
 
     return result
 
-def _build_dynamic_groups_from_hostvars(hostvars):
+def _build_hostvars_dynamic_groups(hostvars):
     '''
     Build a dictionary of dynamically generated groups, parsed from
     the hostvars of each server.
@@ -235,7 +235,7 @@ def _set_clc_credentials_from_env():
             api_username=v2_api_username,
             api_passwd=v2_api_passwd)
     else:
-        print "You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables to use the CenturyLink Cloud dynamic inventory script."
+        print("You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables to use the CenturyLink Cloud dynamic inventory script.")
         sys.exit(1)
 
 if __name__ == '__main__':
