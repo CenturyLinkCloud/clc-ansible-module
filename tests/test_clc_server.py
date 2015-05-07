@@ -4,6 +4,7 @@ import unittest
 
 from uuid import UUID
 import clc as clc_sdk
+from clc import CLCException
 from clc import APIFailedResponse
 import mock
 from mock import patch, create_autospec
@@ -141,6 +142,50 @@ class TestClcServerFunctions(unittest.TestCase):
                                                       servers=[{'publicip': '5.6.7.8',
                                                                 'ipaddress': '1.2.3.4',
                                                                 'name': 'TEST_SERVER'}],
+                                                      server_ids=['TEST_SERVER'])
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_process_request_exact_count_delete_1_server(self,
+                                                         mock_clc_sdk,
+                                                         mock_set_clc_creds):
+        # Setup Fixture
+        self.module.params = {
+            'state': 'present',
+            'name': 'TEST',
+            'location': 'UC1',
+            'type': 'standard',
+            'template': 'TEST_TEMPLATE',
+            'storage_type': 'standard',
+            'wait': True,
+            'exact_count': 0,
+            'count_group': 'Default Group',
+        }
+
+        # Define Mock Objects
+        mock_server = mock.MagicMock()
+        mock_group = mock.MagicMock()
+
+        # Set Mock Server Return Values
+        mock_server.id = 'TEST_SERVER'
+        mock_server.status = 'active'
+        mock_server.powerState = 'started'
+
+        # Set Mock Group Values
+        mock_group.Servers().Servers.return_value = [mock_server]
+
+        # Setup Mock API Calls
+        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
+        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+
+        # Test
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.module.exit_json.assert_called_once_with(changed=True,
+                                                      servers=[],
                                                       server_ids=['TEST_SERVER'])
         self.assertFalse(self.module.fail_json.called)
 
@@ -372,6 +417,37 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Assert Result
         self.datacenter.Groups().Get.assert_called_once_with("DefaultGroupFromModuleParamsLookup")
+
+    @patch.object(clc_server, 'clc_sdk')
+    def test_find_group_w_recursive_lookup(self,
+                                           mock_clc_sdk):
+        # Setup
+        mock_datacenter = mock.MagicMock()
+        mock_group_to_find = mock.MagicMock()
+        mock_group = mock.MagicMock()
+        mock_subgroup = mock.MagicMock()
+        mock_subsubgroup = mock.MagicMock()
+
+        mock_group_to_find.name = "TEST_RECURSIVE_GRP"
+
+        mock_datacenter.Groups().Get.side_effect = CLCException()
+        mock_datacenter.Groups().groups = [mock_group]
+
+        mock_group.Subgroups().Get.side_effect = CLCException()
+        mock_group.Subgroups().groups = [mock_subgroup]
+
+        mock_subgroup.Subgroups().Get.side_effect = CLCException()
+        mock_subgroup.Subgroups().groups = [mock_subsubgroup]
+
+        mock_subsubgroup.Subgroups().Get.return_value = mock_group_to_find
+
+        # Test
+        under_test = ClcServer(self.module)
+        result = under_test._find_group(module=self.module,
+                                        datacenter=mock_datacenter,
+                                        lookup_group="TEST_RECURSIVE_GRP")
+        # Assert
+        self.assertEqual(mock_group_to_find, result)
 
     def test_find_template(self):
         self.module.params = {"template": "MyCoolTemplate", "state": "present"}
