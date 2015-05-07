@@ -93,7 +93,9 @@ class ClcLoadBalancerPool():
             else:
                 changed = False
                 result = port
-            return changed, result
+        else:
+            result = "LB Doesn't Exist"
+        return changed, result
 
     def ensure_loadbalancerpool_absent(self, alias, location, loadbalancer, port):
         changed = False
@@ -108,7 +110,9 @@ class ClcLoadBalancerPool():
             else:
                 changed = False
                 result = "Pool doesn't exist"
-            return changed, result
+        else:
+            result = "LB Doesn't Exist"
+        return changed, result
 
     def create_loadbalancerpool(self, alias, location, lb_id, method, persistence, port):
         result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s/%s/pools' % (alias, location, lb_id), json.dumps({"port":port, "method":method, "persistence":persistence}))
@@ -119,7 +123,7 @@ class ClcLoadBalancerPool():
         return result
 
     def _get_loadbalancer_list(self, alias, location):
-        return self.clc.v2.API.Call('GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
+        return self.clc.v2.API.Call(method='GET', url='/v2/sharedLoadBalancers/%s/%s' % (alias, location))
 
     def _loadbalancer_exists(self, loadbalancer):
         result = False
