@@ -77,6 +77,15 @@ class ClcLoadBalancer():
     #  Functions to define the Ansible module and its arguments
     #
     def ensure_loadbalancer_present(self,name,alias,location,description,status):
+        """
+        Check for loadbalancer presence (available)
+        :param name: Name of loadbalancer
+        :param alias: Alias of account
+        :param location: Datacenter
+        :param description: Description of loadbalancer
+        :param status: Enabled / Disabled
+        :return: True / False
+        """
         changed = False
 
         lb_exists = self._loadbalancer_exists(name=name)
@@ -94,6 +103,13 @@ class ClcLoadBalancer():
         return changed, result
 
     def ensure_loadbalancer_absent(self,name,alias,location):
+        """
+        Check for loadbalancer presence (not available)
+        :param name: Name of loadbalancer
+        :param alias: Alias of account
+        :param location: Datacenter
+        :return: True / False
+        """
         changed = False
         lb_exists = self._loadbalancer_exists(name=name)
         if lb_exists:
@@ -107,24 +123,56 @@ class ClcLoadBalancer():
         return changed, result
 
     def create_loadbalancer(self,name,alias,location,description,status):
+        """
+        Create a loadbalancer w/ params
+        :param name: Name of loadbalancer
+        :param alias: Alias of account
+        :param location: Datacenter
+        :param description: Description for loadbalancer to be created
+        :param status: Enabled / Disabled
+        :return: Success / Failure
+        """
         result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (alias, location), json.dumps({"name":name,"description":description,"status":status}))
         return result
 
     def delete_loadbalancer(self,alias,location,name):
+        """
+        Delete CLC loadbalancer
+        :param alias: Alias for account
+        :param location: Datacenter
+        :param name: Name of the loadbalancer to delete
+        :return: 204 if successful else failure
+        """
         lb_id = self._get_loadbalancer_id(name=name)
         result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, lb_id))
         return result
 
     def _get_loadbalancer_id(self, name):
+        """
+        Retrieve unique ID of loadbalancer
+        :param name: Name of loadbalancer
+        :return: Unique ID of loadbalancer
+        """
         for lb in self.lb_dict:
             if lb.get('name') == name:
                 id = lb.get('id')
         return id
 
     def _get_loadbalancer_list(self, alias, location):
+        """
+        Retrieve a list of loadbalancers
+        :param alias: Alias for account
+        :param location: Datacenter
+        :return: JSON data for all loadbalancers at datacenter
+        """
         return self.clc.v2.API.Call('GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
 
     def _loadbalancer_exists(self, name):
+        """
+        Verify a loadbalancer exists
+        :param name: Name of loadbalancer
+        :return: True / False
+        """
         result = False
         if name in [lb.get('name') for lb in self.lb_dict]:
             result = True
