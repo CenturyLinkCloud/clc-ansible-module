@@ -1,0 +1,13 @@
+- name: Create loadbalancer
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create Loadbalancer named Mustang
+      clc_loadbalancer:
+        name: Mustang
+        alias: FMC
+        location: UC1
+        description: Shared Loadbalancer for distributing data
+        state: present
+      register: clc
