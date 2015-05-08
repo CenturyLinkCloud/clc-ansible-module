@@ -1,11 +1,59 @@
 #!/usr/bin/python
 DOCUMENTATION = '''
-
+module:
+short_desciption: Create, Delete shared loadbalancers in CenturyLink Cloud.
+description:
+  - An Ansible module to Create, Delete shared loadbalancers in CenturyLink Cloud.
+options:
+  name:
+    description:
+    - Specify a name for the loadbalancer to be manipulated
+    default: None
+    required: False
+    aliases: []
+  location:
+    description:
+    - Specify a datacenter for loadbalancer
+    default:
+    required: False
+    aliases: []
+  alias:
+    description:
+    - Account alias for the provisioned loadbalancer
+    default:
+    - Default credentials for the API credentials
+    required: False
+    aliases: []
+  description:
+    description:
+    - Description to set for the loadbalancer
+    default: None
+    required: False
+    aliases: []
+  state:
+    description:
+    - State to ensure the resources are in
+    default: 'present'
+    required: False
+    choices: ['present', 'absent']
+    aliases: []
 '''
 
 EXAMPLES = '''
-
-
+# Note - You must set the CLC_V2_API_USERNAME And CLC_V2_API_PASSWD Environment variables before running these examples
+- name: Delete Loadbalancer named Mustang
+  clc_loadbalancer:
+    name: Mustang
+    alias: FMC
+    location: UC1
+    state: absent
+- name: Create Loadbalancer named Mustang
+  clc_loadbalancer:
+    name: Mustang
+    alias: FMC
+    location: UC1
+    description: Shared Loadbalancer for distributing data
+    state: present
 '''
 
 import sys

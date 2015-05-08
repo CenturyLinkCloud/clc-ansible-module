@@ -1,0 +1,12 @@
+- name: Delete loadbalancer
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete Loadbalancer named Mustang
+      clc_loadbalancer:
+        name: Mustang
+        alias: FMC
+        location: UC1
+        state: absent
+      register: clc
