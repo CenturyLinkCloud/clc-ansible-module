@@ -97,6 +97,7 @@ def _find_groups_for_datacenter(datacenter):
 
         if servers:
             result[group.name] = {'hosts': servers}
+            result[str(datacenter).upper() + '_' + group.name] = {'hosts': servers}
 
     if result:
         return result
@@ -188,7 +189,7 @@ def _get_servers_from_groups(groups):
     :param groups: dictionary of groups to parse
     :return: flat list of servers ['SERVER1','SERVER2', etc]
     '''
-    return _flatten_list([groups[group]['hosts'] for group in groups])
+    return set(_flatten_list([groups[group]['hosts'] for group in groups]))
 
 def _flatten_list(lst):
     '''
