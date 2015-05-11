@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-import clc_loadbalancerpool as clc_loadbalancerpool
-from clc_loadbalancerpool import ClcLoadBalancerPool
+import clc_ansible_module.clc_loadbalancerpool as clc_loadbalancerpool
+from clc_ansible_module.clc_loadbalancerpool import ClcLoadBalancerPool
 import clc as clc_sdk
 import mock
 from mock import patch
