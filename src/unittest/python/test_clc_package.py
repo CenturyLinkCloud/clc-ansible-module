@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-import clc_package as clc_package
-from clc_package import ClcPackage
+import clc_ansible_module.clc_package as clc_package
+from clc_ansible_module.clc_package import ClcPackage
 import clc as clc_sdk
 from clc import CLCException
 import mock

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-import clc_aa_policy as clc_aa_policy
-from clc_aa_policy import ClcAntiAffinityPolicy
+import clc_ansible_module.clc_aa_policy as clc_aa_policy
+from clc_ansible_module.clc_aa_policy import ClcAntiAffinityPolicy
 import clc as clc_sdk
 import mock
 from mock import patch, create_autospec

@@ -9,8 +9,8 @@ from clc import APIFailedResponse
 import mock
 from mock import patch, create_autospec
 
-import clc_server
-from clc_server import ClcServer
+import clc_ansible_module.clc_server as clc_server
+from clc_ansible_module.clc_server import ClcServer
 
 
 class TestClcServerFunctions(unittest.TestCase):

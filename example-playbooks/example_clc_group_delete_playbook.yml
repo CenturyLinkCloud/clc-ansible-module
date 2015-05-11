@@ -10,6 +10,3 @@
         parent: 'Default Group'
         state: absent
       register: clc
-
-    - name: debug
-      debug: var=clc

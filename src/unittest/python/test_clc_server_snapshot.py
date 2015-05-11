@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-import clc_server_snapshot as clc_server_snapshot
-from clc_server_snapshot import ClcSnapshot
+import clc_ansible_module.clc_server_snapshot as clc_server_snapshot
+from clc_ansible_module.clc_server_snapshot import ClcSnapshot
 import clc as clc_sdk
 from clc import CLCException
 import mock
