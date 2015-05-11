@@ -74,12 +74,24 @@ def _find_all_groups():
     :return: group dictionary
     '''
     p = Pool(GROUP_POOL_CNT)
-    datacenters = clc.v2.Datacenter().Datacenters()
+    datacenters = _filter_datacenters(clc.v2.Datacenter().Datacenters())
     results = p.map(_find_groups_for_datacenter, datacenters)
     p.close()
     p.join()
     results = [result for result in results if result]  # Filter out results with no values
     return _parse_groups_result_to_dict(results)
+
+def _filter_datacenters(datacenters):
+    '''
+    Return only datacenters that are listed in the CLC_FILTER_DATACENTERS env var
+    :param datacenters: a list of datacenters to filter
+    :return: a filtered list of datacenters
+    '''
+    include_datacenters = os.environ.get('CLC_FILTER_DATACENTERS').upper().split(',')
+    if include_datacenters:
+        return [datacenter for datacenter in datacenters if str(datacenter).upper() in include_datacenters]
+    else:
+        return datacenters
 
 def _find_groups_for_datacenter(datacenter):
     '''
@@ -225,7 +237,7 @@ def _set_clc_credentials_from_env():
     :return: None
     '''
     env = os.environ
-    v2_api_token = env.get('CLC_V2_API_TOKEN', False)
+    v2_api_token = env.get('Authorization', False)
     v2_api_username = env.get('CLC_V2_API_USERNAME', False)
     v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
 
