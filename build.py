@@ -42,7 +42,7 @@ def initialize( project ):
 	# execute some installation scripts
 	project.set_property('dir_source_main_scripts', 'src/main/python')
 	# ----------------
-        project.set_property('sonar.projectKey', name)
+        project.set_property('sonar.projectKey', 'com.ctlts:clc-ansible-module')
         project.set_property('sonar.projectName', name)
         project.set_property('sonar.projectVersion', version)
         project.set_property('sonar.sources','src/main/python/clc-ansible-module')
