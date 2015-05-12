@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-import clc_publicip as clc_publicip
-from clc_publicip import ClcPublicIp
+import clc_ansible_module.clc_publicip as clc_publicip
+from clc_ansible_module.clc_publicip import ClcPublicIp
 import clc as clc_sdk
 from clc import CLCException
 import mock

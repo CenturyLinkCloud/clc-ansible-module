@@ -4,3 +4,4 @@
 .idea/
 coverage.xml
 nosetests.xml
+target

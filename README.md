@@ -5,7 +5,29 @@
 
 These are additional, unofficial Ansible modules for managing CenturyLink Cloud.
 
-To use this, add this directory to to the ANSIBLE_LIBRARY environment variable, or symlink this directory to ./library underneath the directory containing the playbook that needs it.
+### Installation
+Download clc-ansible-module-x.x.x.tar.gz from the GitHub project page.
+<br>Once downloaded execute a pip install:
+```
+sudo pip install clc-ansible-module.0.0.n.gz
+```
+<br>To use this, add the python dist/site-packages directory to to the ***ANSIBLE_LIBRARY*** environment variable, or symlink this directory to ./library underneath the directory containing the playbook that needs it.
+
+The installation will install a dynamic inventory script to /usr/local/bin.  In order to use the script you will need to fully reference the clc\_inv.py script with each Ansible command.  You can avoid having to enter in this script for each command by creating a symlink in /etc/ansible to this script as such:<br>
+```
+ln -s /etc/ansible/hosts /usr/local/bin/clc_inv.py
+```
+
+####Validation
+Validate that the clc-ansible-module package has been installed and is functioning:
+```
+ansible all -i /usr/local/bin/clc_inv.py --list-hosts
+```
+<br>
+Validate that all packages are install and configured:
+```
+ansible-playbook -i /usr/local/bin/clc_inv.py my-playbook.yml
+```
 
 ####Dependencies
 This module has one dependency  The [clc-python-sdk](https://github.com/CenturyLinkCloud/clc-python-sdk).  You can install it with pip
@@ -361,8 +383,10 @@ Command Line:
 ```bash
 ansible all -i inventory/clc_inv.py -m ping
 ```
-Access the CLC hostvars from a play:
-```yaml
+
+Access the CLC hostvars from a play defined in yaml:
+
+```JSON
 ---
 - name: Read Hostvars for Servers 
   hosts: all
@@ -371,3 +395,15 @@ Access the CLC hostvars from a play:
     - name: Print PowerState returned by Dynamic Inventory / CLC API
       debug: msg="PowerState={{ hostvars[inventory_hostname]['clc_data']['details']['powerState'] }}"
 ```
+## Building the clc-ansible-module project
+The project leverages pybuilder to build the distributions.  There is a build.py file in the root of the project.
+Here are some common commands:
+####Clean the workspace
+```
+pyb clean
+```
+####Build the project
+```
+pyb -X -v
+```
+

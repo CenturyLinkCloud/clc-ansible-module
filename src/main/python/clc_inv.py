@@ -58,13 +58,13 @@ def print_inventory_json():
     groups         = _find_all_groups()
     servers        = _get_servers_from_groups(groups)
     hostvars       = _find_all_hostvars_for_servers(servers)
-    dynamic_groups = _build_dynamic_groups_from_hostvars(hostvars)
+    dynamic_groups = _build_hostvars_dynamic_groups(hostvars)
     groups.update(dynamic_groups)
 
     result = groups
     result['_meta'] = hostvars
 
-    print json.dumps(result)
+    print(json.dumps(result, indent=2, sort_keys=True))
 
 def _find_all_groups():
     '''
@@ -74,12 +74,24 @@ def _find_all_groups():
     :return: group dictionary
     '''
     p = Pool(GROUP_POOL_CNT)
-    datacenters = clc.v2.Datacenter().Datacenters()
+    datacenters = _filter_datacenters(clc.v2.Datacenter().Datacenters())
     results = p.map(_find_groups_for_datacenter, datacenters)
     p.close()
     p.join()
     results = [result for result in results if result]  # Filter out results with no values
     return _parse_groups_result_to_dict(results)
+
+def _filter_datacenters(datacenters):
+    '''
+    Return only datacenters that are listed in the CLC_FILTER_DATACENTERS env var
+    :param datacenters: a list of datacenters to filter
+    :return: a filtered list of datacenters
+    '''
+    include_datacenters = os.environ.get('CLC_FILTER_DATACENTERS').upper().split(',')
+    if include_datacenters:
+        return [datacenter for datacenter in datacenters if str(datacenter).upper() in include_datacenters]
+    else:
+        return datacenters
 
 def _find_groups_for_datacenter(datacenter):
     '''
@@ -97,6 +109,7 @@ def _find_groups_for_datacenter(datacenter):
 
         if servers:
             result[group.name] = {'hosts': servers}
+            result[str(datacenter).upper() + '_' + group.name] = {'hosts': servers}
 
     if result:
         return result
@@ -110,7 +123,7 @@ def _find_all_hostvars_for_servers(servers):
     :return: dictionary of servers(k) and hostvars(v)
     '''
     p = Pool(HOSTVAR_POOL_CNT)
-    results = p.map(_find_hostvars_for_single_server, servers)
+    results = p.map(_find_hostvars_single_server, servers)
     p.close()
     p.join()
 
@@ -121,7 +134,7 @@ def _find_all_hostvars_for_servers(servers):
 
     return {'hostvars': hostvars}
 
-def _find_hostvars_for_single_server(server_id):
+def _find_hostvars_single_server(server_id):
     '''
     Return dictionary of hostvars for a single server
     :param server_id: the id of the server to query
@@ -141,7 +154,7 @@ def _find_hostvars_for_single_server(server_id):
 
     return result
 
-def _build_dynamic_groups_from_hostvars(hostvars):
+def _build_hostvars_dynamic_groups(hostvars):
     '''
     Build a dictionary of dynamically generated groups, parsed from
     the hostvars of each server.
@@ -188,7 +201,7 @@ def _get_servers_from_groups(groups):
     :param groups: dictionary of groups to parse
     :return: flat list of servers ['SERVER1','SERVER2', etc]
     '''
-    return _flatten_list([groups[group]['hosts'] for group in groups])
+    return set(_flatten_list([groups[group]['hosts'] for group in groups]))
 
 def _flatten_list(lst):
     '''
@@ -224,7 +237,7 @@ def _set_clc_credentials_from_env():
     :return: None
     '''
     env = os.environ
-    v2_api_token = env.get('CLC_V2_API_TOKEN', False)
+    v2_api_token = env.get('Authorization', False)
     v2_api_username = env.get('CLC_V2_API_USERNAME', False)
     v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
 
@@ -235,7 +248,7 @@ def _set_clc_credentials_from_env():
             api_username=v2_api_username,
             api_passwd=v2_api_passwd)
     else:
-        print "You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables to use the CenturyLink Cloud dynamic inventory script."
+        print("You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables to use the CenturyLink Cloud dynamic inventory script.")
         sys.exit(1)
 
 if __name__ == '__main__':

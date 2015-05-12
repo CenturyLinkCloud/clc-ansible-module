@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-import clc_group as clc_group
-from clc_group import ClcGroup
+import clc_ansible_module.clc_group as clc_group
+from clc_ansible_module.clc_group import ClcGroup
 import clc as clc_sdk
 import mock
 from mock import patch
