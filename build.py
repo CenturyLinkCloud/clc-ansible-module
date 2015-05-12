@@ -9,6 +9,7 @@ use_plugin("filter_resources")
 use_plugin("copy_resources")
 use_plugin("source_distribution")
 use_plugin("python.sonarqube")
+use_plugin("exec")
 
 # define project level attributes:
 name = 'clc-ansible-module'
@@ -27,14 +28,15 @@ default_task="publish"
 @init
 def initialize( project ):
 	# define unit test preferences and behavours:
+	project.set_property("run_unit_tests_command", "nosetests -w %s --exe -v --with-xunit --xunit-file=target/reports/nosetests_results.xml" % project.expand_path("$dir_source_unittest_python"))
+	project.set_property("run_unit_tests_propagate_stdout", True)
+	project.set_property("run_unit_tests_propagate_stderr", True)
 	project.set_property('unittest_module_glob','test_*')
 	project.set_property('coverage_threshold_warn',0)
 	project.set_property('coverage_break_build', False)
 	# ----------------
 	# identify all the module source locations:
-	project.get_property('filter_resources_glob').append('**/inventory/__init__.py')
-	project.get_property('filter_resources_glob').append('**/modules/__init__.py')
-	project.get_property('filter_resources_glob').append('**/utils/__init__.py')
+	project.get_property('filter_resources_glob').append('**/clc_ansible_module/__init__.py')
 	# ----------------
 	# install clc-sdk during installation
 	project.depends_on("clc-sdk")
@@ -50,7 +52,7 @@ def initialize( project ):
         project.set_property('sonar.python.coverage.reportPath','target/reports/coverage.xml')
         project.set_property('sonar.python.coveragePlugin','cobertura')
 	# identify resource files which should be part of the distribution
-    # TODO:  would like to include the exampls in the distro but it is currently not working as expected.
+	# TODO:  would like to include the exampls in the distro but it is currently not working as expected.
 	# project.set_property('copy_resources_target', '$dir_target')
 	# project.get_property('copy_resources_glob').append('**/example-playbooks/__init__.py')
 	# project.include_file('clc-ansible-module-0.0.4','deploy-servers-to-maint-grp-size.yml')
