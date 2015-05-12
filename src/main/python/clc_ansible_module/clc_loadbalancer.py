@@ -101,6 +101,10 @@ class ClcLoadBalancer():
         loadbalancer_alias=self.module.params.get('alias')
         loadbalancer_location=self.module.params.get('location')
         loadbalancer_description=self.module.params.get('description')
+        loadbalancer_port=self.module.params.get('port')
+        loadbalancer_method=self.module.params.get('method')
+        loadbalancer_persistence=self.module.params.get('persistence')
+        loadbalancer_nodes=self.module.params.get('nodes')
         loadbalancer_status=self.module.params.get('status')
         state=self.module.params.get('state')
 
@@ -235,8 +239,12 @@ class ClcLoadBalancer():
         argument_spec = dict(
             name=dict(required=True),
             description=dict(default=None),
-            location=dict(default=None),
-            alias=dict(default=None),
+            location=dict(required=True, default=None),
+            alias=dict(required=True, default=None),
+            port=dict(choices=[80, 443]),
+            method=dict(choices=['leastConnection', 'roundRobin']),
+            persistence=dict(choices=['standard', 'sticky']),
+            nodes=dict(type='list', default=[]),
             status=dict(default='enabled', choices=['enabled', 'disabled']),
             state=dict(default='present', choices=['present', 'absent'])
         )
