@@ -11,6 +11,7 @@ use_plugin("source_distribution")
 use_plugin("python.sonarqube")
 
 # define project level attributes:
+name = 'clc-ansible-module'
 version = '0.0.4'
 summary = "Centurylink Cloud Ansible Modules"
 description = "Ansible extension modules which allow users to interact with Centurylink Cloud to define and manage cloud components."
@@ -41,6 +42,13 @@ def initialize( project ):
 	# execute some installation scripts
 	project.set_property('dir_source_main_scripts', 'src/main/python')
 	# ----------------
+        project.set_property('sonar.projectKey', name)
+        project.set_property('sonar.projectName', name)
+        project.set_property('sonar.projectVersion', version)
+        project.set_property('sonar.sources','src/main/python/clc-ansible-module')
+        project.set_property('sonar.tests','src/unittests')
+        project.set_property('sonar.python.coverage.reportPath','target/reports/coverage.xml')
+        project.set_property('sonar.python.coveragePlugin','cobertura')
 	# identify resource files which should be part of the distribution
     # TODO:  would like to include the exampls in the distro but it is currently not working as expected.
 	# project.set_property('copy_resources_target', '$dir_target')
