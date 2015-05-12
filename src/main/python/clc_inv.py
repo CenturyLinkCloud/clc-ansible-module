@@ -87,9 +87,9 @@ def _filter_datacenters(datacenters):
     :param datacenters: a list of datacenters to filter
     :return: a filtered list of datacenters
     '''
-    include_datacenters = os.environ.get('CLC_FILTER_DATACENTERS').upper().split(',')
+    include_datacenters = os.environ.get('CLC_FILTER_DATACENTERS')
     if include_datacenters:
-        return [datacenter for datacenter in datacenters if str(datacenter).upper() in include_datacenters]
+        return [datacenter for datacenter in datacenters if str(datacenter).upper() in include_datacenters.upper().split(',')]
     else:
         return datacenters
 
