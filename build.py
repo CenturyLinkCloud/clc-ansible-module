@@ -8,6 +8,7 @@ use_plugin("python.distutils")
 use_plugin("filter_resources")
 use_plugin("copy_resources")
 use_plugin("source_distribution")
+use_plugin("python.sonarqube")
 
 # define project level attributes:
 version = '0.0.4'
