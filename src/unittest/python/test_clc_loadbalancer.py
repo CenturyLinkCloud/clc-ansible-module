@@ -22,11 +22,20 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
 
         # Setup
         self.module.params = {
+            'name': 'test',
+            'port': 80,
+            'nodes':[{ 'ipAddress': '10.82.152.15', 'privatePort': 80 }],
             'state': 'present'
         }
         mock_loadbalancer_response = [{'name': 'TEST_LB'}]
 
-        mock_clc_sdk.v2.API.Call.return_value = mock_loadbalancer_response
+        mock_clc_sdk.v2.API.Call.side_effect = [
+            [{'name': 'test'}],
+            {'id': 'test', 'name': 'test'},
+            [],
+            {'id': 'test', 'name': 'test'},
+            []
+        ]
         # TODO: Mock a response to API.Call('POST')
 
         # Under Test
@@ -34,7 +43,7 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         under_test.process_request()
 
         # Assert
-        self.module.exit_json.assert_called_once_with(changed=True, loadbalancer = [{'name': 'TEST_LB'}])
+        self.module.exit_json.assert_called_once_with(changed=True, loadbalancer = {'id': 'test', 'name': 'test'})
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_loadbalancer, 'clc_sdk')
@@ -44,19 +53,43 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
                                           mock_clc_sdk):
         #Setup
         self.module.params = {
-            'state': 'absent',
-            'name': 'TEST_LB'
+            'name': 'test',
+            'state': 'absent'
         }
-        mock_loadbalancer_response = [{'name': 'TEST_LB'}]
+        mock_loadbalancer_response = [{'name': 'test', 'id': 'test'}]
         mock_clc_sdk.v2.API.Call.return_value = mock_loadbalancer_response
 
         test = ClcLoadBalancer(self.module)
         test.process_request()
 
         #Assertions
-        self.module.exit_json.assert_called_once_with(changed=True, loadbalancer=[{'name': 'TEST_LB'}])
+        self.module.exit_json.assert_called_once_with(changed=True, loadbalancer=[{'name': 'test', 'id': 'test'}])
         self.assertFalse(self.module.fail_json.called)
 
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    @patch.object(ClcLoadBalancer, 'set_clc_credentials_from_env')
+    def test_process_request_state_port_absent(self,
+                                          mock_set_clc_credentials,
+                                          mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'name': 'test',
+            'port': 80,
+            'state': 'port_absent'
+        }
+
+        mock_clc_sdk.v2.API.Call.side_effect = [
+            [{'id': 'test', 'name': 'test'}],
+            [{'port': '80', 'id':'test'}],
+            {}
+        ]
+
+        test = ClcLoadBalancer(self.module)
+        test.process_request()
+
+        #Assertions
+        self.module.exit_json.assert_called_once_with(changed=True, loadbalancer={})
+        self.assertFalse(self.module.fail_json.called)
     def test_clc_module_not_found(self):
         # Setup Mock Import Function
         import __builtin__ as builtins
