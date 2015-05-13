@@ -366,6 +366,57 @@ Executes a package on existing set of servers.
 | `package_params:` | N | {} |  | The arguments required for the package execution. These arguments needs to be in JSON format |
 
 
+## clc_loadbalancer Module
+Create/Delete a loadbalancer
+
+### Example Playbook
+```yaml
+---
+- name: Create Loadbalancer
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Create Loadbalancer
+      clc_loadbalancer:
+        name: test3
+        description: test3
+        alias: WFAD
+        location: WA1
+        port: 443
+        nodes:
+          - { 'ipAddress': '10.82.152.15', 'privatePort': 80 }
+          - { 'ipAddress': '10.82.152.16', 'privatePort': 80 }
+        state: present
+```
+```yaml
+---
+- name: Delete LoadbalancerPool
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Delete Loadbalancer Pool
+      clc_loadbalancer:
+        name: test3
+        description: test3
+        alias: WFAD
+        location: WA1
+        port: 443
+        state: port_absent
+```
+```yaml
+---
+- name: Delete Loadbalancer
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Delete Loadbalanacer
+      clc_loadbalancer:
+        name: test3
+        alias: WFAD
+        location: WA1
+        state: absent
+```
+
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script
 
 Scans all datacenters and returns an inventory of servers and server groups to Ansible.  This script returns all information about hosts in the inventory _meta dictionary.
