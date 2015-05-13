@@ -129,15 +129,25 @@ class ClcLoadBalancer():
 
                 if loadbalancer_nodes:
                     changed = True
-                    result_nodes = self.add_loadbalancernodes(alias=loadbalancer_alias, location=loadbalancer_location, lb_id=lb_id, pool_id=pool_id, nodes=loadbalancer_nodes)
+                    result_nodes = self.add_loadbalancernodes(alias=loadbalancer_alias,
+                                                              location=loadbalancer_location,
+                                                              lb_id=lb_id,
+                                                              pool_id=pool_id,
+                                                              nodes=loadbalancer_nodes)
 
-            self.module.exit_json(changed=changed, loadbalancer=result_lb)
 
         elif state == 'absent':
             changed, result_lb = self.ensure_loadbalancer_absent(name=loadbalancer_name,
                                                                  alias=loadbalancer_alias,
                                                                  location=loadbalancer_location)
-            self.module.exit_json(changed=changed, loadbalancer=result_lb)
+
+        elif state == 'port_absent':
+            changed, result_lb = self.ensure_loadbalancerpool_absent(alias=loadbalancer_alias,
+                                                                     location=loadbalancer_location,
+                                                                     name=loadbalancer_name,
+                                                                     port=loadbalancer_port)
+
+        self.module.exit_json(changed=changed, loadbalancer=result_lb)
     #
     #  Functions to define the Ansible module and its arguments
     #
@@ -215,7 +225,7 @@ class ClcLoadBalancer():
             changed = False
         return changed, result
 
-    def ensure_loadbalancerpool_absent(self, alias, location, loadbalancer, port):
+    def ensure_loadbalancerpool_absent(self, alias, location, name, port):
         """
         Checks to see if a load balancer pool exists and deletes it if it does
         :param alias: The account alias
@@ -228,9 +238,9 @@ class ClcLoadBalancer():
         """
         changed = False
 
-        lb_exists = self._loadbalancer_exists(loadbalancer=loadbalancer)
+        lb_exists = self._loadbalancer_exists(name=name)
         if lb_exists:
-            lb_id = self._get_loadbalancer_id(loadbalancer=loadbalancer)
+            lb_id = self._get_loadbalancer_id(name=name)
             pool_id = self._loadbalancerpool_exists(alias=alias, location=location, port=port, lb_id=lb_id)
             if pool_id:
                 changed = True
@@ -373,7 +383,7 @@ class ClcLoadBalancer():
             persistence=dict(choices=['standard', 'sticky']),
             nodes=dict(type='list', default=[]),
             status=dict(default='enabled', choices=['enabled', 'disabled']),
-            state=dict(default='present', choices=['present', 'absent'])
+            state=dict(default='present', choices=['present', 'absent', 'port_absent'])
         )
 
         return argument_spec
