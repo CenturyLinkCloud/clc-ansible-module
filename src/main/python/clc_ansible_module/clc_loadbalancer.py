@@ -5,55 +5,98 @@ short_desciption: Create, Delete shared loadbalancers in CenturyLink Cloud.
 description:
   - An Ansible module to Create, Delete shared loadbalancers in CenturyLink Cloud.
 options:
+options:
   name:
     description:
-    - Specify a name for the loadbalancer to be manipulated
-    default: None
-    required: False
-    aliases: []
-  location:
-    description:
-    - Specify a datacenter for loadbalancer
-    default:
-    required: False
-    aliases: []
-  alias:
-    description:
-    - Account alias for the provisioned loadbalancer
-    default:
-    - Default credentials for the API credentials
-    required: False
-    aliases: []
+      - The name of the loadbalancer
+    required: True
   description:
     description:
-    - Description to set for the loadbalancer
-    default: None
-    required: False
-    aliases: []
+      - A description for your loadbalancer
+  alias:
+    description:
+      - The alias of your CLC Account
+    required: True
+  location:
+    description:
+      - The location of the datacenter your load balancer resides in
+    required: True
+  method:
+    description:
+      -The balancing method for this pool
+    default: roundRobin
+    choices: ['sticky', 'roundRobin']
+  persistence:
+    description:
+      - The persistence method for this load balancer
+    default: standard
+    choices: ['standard', 'sticky']
+  port:
+    description:
+      - Port to configure on the public-facing side of the load balancer pool
+    choices: [80, 443]
+  nodes:
+    description:
+      - A list of nodes that you want added to your load balancer pool
+  status:
+    description:
+      - The status of your loadbalancer
+    default: enabled
+    choices: ['enabled', 'disabled']
   state:
     description:
-    - State to ensure the resources are in
-    default: 'present'
-    required: False
-    choices: ['present', 'absent']
-    aliases: []
+      - Whether to create or delete the load balancer pool
+    default: present
+    choices: ['present', 'absent', 'port_absent']
 '''
 
 EXAMPLES = '''
 # Note - You must set the CLC_V2_API_USERNAME And CLC_V2_API_PASSWD Environment variables before running these examples
-- name: Delete Loadbalancer named Mustang
-  clc_loadbalancer:
-    name: Mustang
-    alias: FMC
-    location: UC1
-    state: absent
-- name: Create Loadbalancer named Mustang
-  clc_loadbalancer:
-    name: Mustang
-    alias: FMC
-    location: UC1
-    description: Shared Loadbalancer for distributing data
-    state: present
+- name: Create Loadbalancer
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Actually Create things
+      clc_loadbalancer:
+        name: test
+        description: test
+        alias: TEST
+        location: WA1
+        port: 443
+        nodes:
+          - { 'ipAddress': '10.11.22.123', 'privatePort': 80 }
+        state: present
+
+- name: Delete LoadbalancerPool
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Actually Delete things
+      clc_loadbalancer:
+        name: test
+        description: test
+        alias: TEST
+        location: WA1
+        port: 443
+        nodes:
+          - { 'ipAddress': '10.11.22.123', 'privatePort': 80 }
+        state: port_absent
+
+- name: Delete Loadbalancer
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Actually Delete things
+      clc_loadbalancer:
+        name: test
+        description: test
+        alias: TEST
+        location: WA1
+        port: 443
+        nodes:
+          - { 'ipAddress': '10.11.22.123', 'privatePort': 80 }
+        state: absent
+
 '''
 
 import sys
@@ -187,9 +230,10 @@ class ClcLoadBalancer():
         :param method: the load balancing method
         :param persistence: the load balancing persistence type
         :param port: the port that the load balancer will listen on
-        :return: (changed, group) -
+        :return: (changed, group, pool_id) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
+            pool_id: The string id of the pool
         """
         changed = False
 
@@ -211,7 +255,9 @@ class ClcLoadBalancer():
         :param name: Name of loadbalancer
         :param alias: Alias of account
         :param location: Datacenter
-        :return: True / False
+        :return: (changed, result)
+            changed: Boolean whether a change was made
+            result: The result from the CLC API Call
         """
         changed = False
         lb_exists = self._loadbalancer_exists(name=name)
