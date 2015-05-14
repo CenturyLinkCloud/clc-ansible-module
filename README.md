@@ -417,6 +417,21 @@ Create/Delete a loadbalancer
         state: absent
 ```
 
+### Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `name:` | Y |  |  | The name of the loadbalancer |
+| `description` | N |  |  | A description for the loadbalancer |
+| `alias` | Y |  |  | Your CLC Account Alias |
+| `location` | Y |  |  | The datacenter your loadbalancer resides in |
+| `port` | N |  | 80, 443 | The port for your loadbalancer pool |
+| `method` | N | roundRobin | roundRobin, sticky | The loadbalancing method you want to use |
+| `persistence` | N | standard | standard, sticky | The loadbalancing persistence you want to use |
+| `nodes` | N |  |  | A list of nodes you want your loadbalancer to send traffic to |
+| `status` | N | enabled | enabled, disabled | The status of your loadbalancer |
+| `state` | N | present | present, absent, port_absent | Determine whether to create or delete your loadbalancer. If `present` module will not create another loadbalancer with the same name. If `absent` module will delete the entire loadbalancer. If `port_absent` module will delete the loadbalancer port and associated nodes only. |
+
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script
 
 Scans all datacenters and returns an inventory of servers and server groups to Ansible.  This script returns all information about hosts in the inventory _meta dictionary.
