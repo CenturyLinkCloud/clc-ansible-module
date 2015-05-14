@@ -152,6 +152,9 @@ class ClcLoadBalancer():
         loadbalancer_status=self.module.params.get('status')
         state=self.module.params.get('state')
 
+	if loadbalancer_description == None:
+		loadbalancer_description = loadbalancer_name
+
         self.set_clc_credentials_from_env()
 
         self.lb_dict = self._get_loadbalancer_list(alias=loadbalancer_alias, location=loadbalancer_location)
