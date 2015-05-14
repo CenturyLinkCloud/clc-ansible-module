@@ -248,7 +248,7 @@ def _set_clc_credentials_from_env():
             api_username=v2_api_username,
             api_passwd=v2_api_passwd)
     else:
-        print("You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables to use the CenturyLink Cloud dynamic inventory script.")
+        sys.stderr.write("\n\nYou must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables to use the CenturyLink Cloud dynamic inventory script.\n")
         sys.exit(1)
 
 if __name__ == '__main__':
