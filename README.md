@@ -15,7 +15,7 @@ sudo pip install clc-ansible-module.0.0.n.gz
 
 The installation will install a dynamic inventory script to /usr/local/bin.  In order to use the script you will need to fully reference the clc\_inv.py script with each Ansible command.  You can avoid having to enter in this script for each command by creating a symlink in /etc/ansible to this script as such:<br>
 ```
-ln -s /etc/ansible/hosts /usr/local/bin/clc_inv.py
+ln -s /usr/local/bin/clc_inv.py /etc/ansible/hosts
 ```
 
 ####Validation
