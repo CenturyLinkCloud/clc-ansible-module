@@ -366,6 +366,72 @@ Executes a package on existing set of servers.
 | `package_params:` | N | {} |  | The arguments required for the package execution. These arguments needs to be in JSON format |
 
 
+## clc_loadbalancer Module
+Create/Delete a loadbalancer
+
+### Example Playbook
+```yaml
+---
+- name: Create Loadbalancer
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Create Loadbalancer
+      clc_loadbalancer:
+        name: test3
+        description: test3
+        alias: WFAD
+        location: WA1
+        port: 443
+        nodes:
+          - { 'ipAddress': '10.82.152.15', 'privatePort': 80 }
+          - { 'ipAddress': '10.82.152.16', 'privatePort': 80 }
+        state: present
+```
+```yaml
+---
+- name: Delete LoadbalancerPool
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Delete Loadbalancer Pool
+      clc_loadbalancer:
+        name: test3
+        description: test3
+        alias: WFAD
+        location: WA1
+        port: 443
+        state: port_absent
+```
+```yaml
+---
+- name: Delete Loadbalancer
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Delete Loadbalanacer
+      clc_loadbalancer:
+        name: test3
+        alias: WFAD
+        location: WA1
+        state: absent
+```
+
+### Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `name:` | Y |  |  | The name of the loadbalancer |
+| `description` | N |  |  | A description for the loadbalancer |
+| `alias` | Y |  |  | Your CLC Account Alias |
+| `location` | Y |  |  | The datacenter your loadbalancer resides in |
+| `port` | N |  | 80, 443 | The port for your loadbalancer pool |
+| `method` | N | roundRobin | roundRobin, sticky | The loadbalancing method you want to use |
+| `persistence` | N | standard | standard, sticky | The loadbalancing persistence you want to use |
+| `nodes` | N |  |  | A list of nodes you want your loadbalancer to send traffic to |
+| `status` | N | enabled | enabled, disabled | The status of your loadbalancer |
+| `state` | N | present | present, absent, port_absent | Determine whether to create or delete your loadbalancer. If `present` module will not create another loadbalancer with the same name. If `absent` module will delete the entire loadbalancer. If `port_absent` module will delete the loadbalancer port and associated nodes only. |
+
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script
 
 Scans all datacenters and returns an inventory of servers and server groups to Ansible.  This script returns all information about hosts in the inventory _meta dictionary.
