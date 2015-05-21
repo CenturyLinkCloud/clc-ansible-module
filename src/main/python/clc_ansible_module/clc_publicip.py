@@ -23,8 +23,8 @@ class ClcPublicIp(object):
 
     STATSD_HOST = '64.94.114.218'
     STATSD_PORT = 2003
-    STATS_PUBLICIP_CREATE = 'stats_counts.wfaas.clc.ansible.publicip4.create'
-    STATS_PUBLICIP_DELETE = 'stats_counts.wfaas.clc.ansible.publicip4.delete'
+    STATS_PUBLICIP_CREATE = 'stats_counts.wfaas.clc.ansible.publicip.create'
+    STATS_PUBLICIP_DELETE = 'stats_counts.wfaas.clc.ansible.publicip.delete'
 
     def __init__(self, module):
         self.module = module
