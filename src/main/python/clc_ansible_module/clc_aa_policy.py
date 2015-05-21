@@ -4,6 +4,8 @@ import sys
 import os
 import datetime
 import json
+import socket
+import time
 from ansible.module_utils.basic import *
 
 #
@@ -20,6 +22,11 @@ else:
     clc_found = True
 
 class ClcAntiAffinityPolicy():
+
+    STATSD_HOST = '64.94.114.218'
+    STATSD_PORT = 2003
+    STATS_AAPOLICY_CREATE = 'stats_counts.wfaas.clc.ansible.aapolicy.create'
+    STATS_AAPOLICY_DELETE = 'stats_counts.wfaas.clc.ansible.aapolicy.delete'
 
     def __init__(self, module):
         self.module = module
@@ -82,11 +89,13 @@ class ClcAntiAffinityPolicy():
         return response
 
     def _create_policy(self, p):
+        ClcAntiAffinityPolicy._push_metric(ClcAntiAffinityPolicy.STATS_AAPOLICY_CREATE, 1)
         return self.clc.v2.AntiAffinity.Create(name=p['name'], location=p['location'])
 
     def _delete_policy(self, p):
         policy = self.policy_dict[p['name']]
         policy.Delete()
+        ClcAntiAffinityPolicy._push_metric(ClcAntiAffinityPolicy.STATS_AAPOLICY_DELETE, 1)
 
     def _policy_exists(self, policy_name):
         if policy_name in self.policy_dict:
@@ -112,6 +121,20 @@ class ClcAntiAffinityPolicy():
             changed = True
 
         return changed, policy
+
+    @staticmethod
+    def _push_metric(path, count):
+        try:
+            sock = socket.socket()
+            sock.connect((ClcAntiAffinityPolicy.STATSD_HOST, ClcAntiAffinityPolicy.STATSD_PORT))
+            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.close()
+        except socket.gaierror:
+            # do nothing, ignore and move forward
+            error = ''
+        except socket.error:
+            #nothing, ignore and move forward
+            error = ''
 
 def main():
     module = AnsibleModule(argument_spec=ClcAntiAffinityPolicy.define_argument_spec()   )

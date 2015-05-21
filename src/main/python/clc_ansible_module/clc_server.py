@@ -247,6 +247,7 @@ import sys
 import os
 import datetime
 import json
+import socket
 from time import sleep
 
 #
@@ -263,9 +264,14 @@ except ImportError:
 else:
     CLC_FOUND = True
 
-
 class ClcServer():
     clc = clc_sdk
+
+    STATSD_HOST = '64.94.114.218'
+    STATSD_PORT = 2003
+    STATS_SERVER_CREATE = 'stats_counts.wfaas.clc.ansible.server.create'
+    STATS_SERVER_DELETE = 'stats_counts.wfaas.clc.ansible.server.delete'
+    STATS_SERVER_MODIFY = 'stats_counts.wfaas.clc.ansible.server.modify'
 
     def __init__(self, module):
         """
@@ -598,6 +604,84 @@ class ClcServer():
         return network_id
 
     @staticmethod
+    def _create_servers(module, clc, override_count=None):
+        """
+        Create New Servers
+        :param module: the AnsibleModule object
+        :param clc: the clc-sdk instance to use
+        :return: a list of dictionaries with server information about the servers that were created
+        """
+        p = module.params
+        requests = []
+        servers = []
+        server_dict_array = []
+        created_server_ids = []
+
+        add_public_ip = p.get('add_public_ip')
+        public_ip_protocol = p.get('public_ip_protocol')
+        public_ip_ports = p.get('public_ip_ports')
+        wait = p.get('wait')
+
+        params = {
+            'name': p.get('name'),
+            'template': p.get('template'),
+            'group_id': p.get('group'),
+            'network_id': p.get('network_id'),
+            'cpu': p.get('cpu'),
+            'memory': p.get('memory'),
+            'alias': p.get('alias'),
+            'password': p.get('password'),
+            'ip_address': p.get('ip_address'),
+            'storage_type': p.get('storage_type'),
+            'type': p.get('type'),
+            'primary_dns': p.get('primary_dns'),
+            'secondary_dns': p.get('secondary_dns'),
+            'additional_disks': p.get('additional_disks'),
+            'custom_fields': p.get('custom_fields'),
+            'ttl': p.get('ttl'),
+            'managed_os': p.get('managed_os'),
+            'description': p.get('description'),
+            'source_server_password': p.get('source_server_password'),
+            'cpu_autoscale_policy_id': p.get('cpu_autoscale_policy_id'),
+            'anti_affinity_policy_id': p.get('anti_affinity_policy_id'),
+            'packages': p.get('packages')
+        }
+
+        count = override_count if override_count else p.get('count')
+
+        changed = False if count == 0 else True
+
+        if changed:
+            for i in range(0, count):
+                req = ClcServer._create_clc_server(clc=clc,
+                                                   module=module,
+                                                   server_params=params)
+                server = req.requests[0].Server()
+                requests.append(req)
+                servers.append(server)
+
+            ClcServer._wait_for_requests(clc, requests, servers, wait)
+
+            ClcServer._add_public_ip_to_servers(
+                should_add_public_ip=add_public_ip,
+                servers=servers,
+                public_ip_protocol=public_ip_protocol,
+                public_ip_ports=public_ip_ports,
+                wait=wait)
+
+            for server in servers:
+                # reload server details so public IP shows up
+                server = clc.v2.Server(server.id)
+                if len(server.PublicIPs().public_ips) > 0:
+                    server.data['publicip'] = str(server.PublicIPs().public_ips[0])
+                server.data['ipaddress'] = server.details[
+                    'ipAddresses'][0]['internal']
+                server_dict_array.append(server.data)
+                created_server_ids.append(server.id)
+
+        return server_dict_array, created_server_ids, changed
+
+    @staticmethod
     def _validate_name(module):
         """
         Validate that name is the correct length if provided, fail if it's not
@@ -686,84 +770,6 @@ class ClcServer():
             else:
                 ClcServer._refresh_servers(servers)
 
-    @staticmethod
-    def _create_servers(module, clc, override_count=None):
-        """
-        Create New Servers
-        :param module: the AnsibleModule object
-        :param clc: the clc-sdk instance to use
-        :return: a list of dictionaries with server information about the servers that were created
-        """
-        p = module.params
-        requests = []
-        servers = []
-        server_dict_array = []
-        created_server_ids = []
-
-        add_public_ip = p.get('add_public_ip')
-        public_ip_protocol = p.get('public_ip_protocol')
-        public_ip_ports = p.get('public_ip_ports')
-        wait = p.get('wait')
-
-        params = {
-            'name': p.get('name'),
-            'template': p.get('template'),
-            'group_id': p.get('group'),
-            'network_id': p.get('network_id'),
-            'cpu': p.get('cpu'),
-            'memory': p.get('memory'),
-            'alias': p.get('alias'),
-            'password': p.get('password'),
-            'ip_address': p.get('ip_address'),
-            'storage_type': p.get('storage_type'),
-            'type': p.get('type'),
-            'primary_dns': p.get('primary_dns'),
-            'secondary_dns': p.get('secondary_dns'),
-            'additional_disks': p.get('additional_disks'),
-            'custom_fields': p.get('custom_fields'),
-            'ttl': p.get('ttl'),
-            'managed_os': p.get('managed_os'),
-            'description': p.get('description'),
-            'source_server_password': p.get('source_server_password'),
-            'cpu_autoscale_policy_id': p.get('cpu_autoscale_policy_id'),
-            'anti_affinity_policy_id': p.get('anti_affinity_policy_id'),
-            'packages': p.get('packages')
-        }
-
-        count = override_count if override_count else p.get('count')
-
-        changed = False if count == 0 else True
-
-        if changed:
-            for i in range(0, count):
-                req = ClcServer._create_clc_server(clc=clc,
-                                                   module=module,
-                                                   server_params=params)
-                server = req.requests[0].Server()
-                requests.append(req)
-                servers.append(server)
-
-            ClcServer._wait_for_requests(clc, requests, servers, wait)
-
-            ClcServer._add_public_ip_to_servers(
-                should_add_public_ip=add_public_ip,
-                servers=servers,
-                public_ip_protocol=public_ip_protocol,
-                public_ip_ports=public_ip_ports,
-                wait=wait)
-
-            for server in servers:
-                # reload server details so public IP shows up
-                server = clc.v2.Server(server.id)
-                if len(server.PublicIPs().public_ips) > 0:
-                    server.data['publicip'] = str(server.PublicIPs().public_ips[0])
-                server.data['ipaddress'] = server.details[
-                    'ipAddresses'][0]['internal']
-                server_dict_array.append(server.data)
-                created_server_ids.append(server.id)
-
-        return server_dict_array, created_server_ids, changed
-
 
     @staticmethod
     def _refresh_servers(servers):
@@ -839,6 +845,9 @@ class ClcServer():
 
         for server in servers:
             terminated_server_ids.append(server.id)
+
+        # Push the server delete count metric to statsd
+        ClcServer._push_metric(ClcServer.STATS_SERVER_DELETE, len(servers))
 
         return changed, server_dict_array, terminated_server_ids
 
@@ -1016,6 +1025,10 @@ class ClcServer():
 
         result = clc.v2.Requests(res)
 
+        # Push the server create count metric to statsd
+        ClcServer._push_metric(ClcServer.STATS_SERVER_CREATE, 1)
+
+
         #
         # Patch the Request object so that it returns a valid server
 
@@ -1109,8 +1122,23 @@ class ClcServer():
                                                    "member": "cpu",
                                                    "value": cpu}]))
             result = clc.v2.Requests(job_obj)
+            # Push the server modify count metric to statsd
+            ClcServer._push_metric(ClcServer.STATS_SERVER_MODIFY, 1)
             return result
 
+    @staticmethod
+    def _push_metric(path, count):
+        try:
+            sock = socket.socket()
+            sock.connect((ClcServer.STATSD_HOST, ClcServer.STATSD_PORT))
+            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.close()
+        except socket.gaierror:
+            # do nothing, ignore and move forward
+            error = ''
+        except socket.error:
+            #nothing, ignore and move forward
+            error = ''
 
 def main():
     """

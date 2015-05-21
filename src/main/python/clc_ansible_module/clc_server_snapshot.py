@@ -22,6 +22,8 @@ These credentials are required to use the CLC API and must be provided.
 #
 
 import json
+import socket
+import time
 from ansible.module_utils.basic import *
 #
 #  Requires the clc-python-sdk.
@@ -40,6 +42,12 @@ class ClcSnapshot():
 
     clc = clc_sdk
     module = None
+
+    STATSD_HOST = '64.94.114.218'
+    STATSD_PORT = 2003
+    STATS_SNAPSHOT_CREATE = 'stats_counts.wfaas.clc.ansible.snapshot.create'
+    STATS_SNAPSHOT_DELETE = 'stats_counts.wfaas.clc.ansible.snapshot.delete'
+    STATS_SNAPSHOT_RESTORE = 'stats_counts.wfaas.clc.ansible.snapshot.restore'
 
     def __init__(self, module):
         self.module = module
@@ -160,6 +168,7 @@ class ClcSnapshot():
             servers_to_change = [
                 server for server in servers if len(
                     server.GetSnapshots()) == 0]
+            ClcSnapshot._push_metric(ClcSnapshot.STATS_SNAPSHOT_CREATE, len(servers_to_change))
             return [server.CreateSnapshot(delete_existing=True, expiration_days=expiration_days)
                     for server in servers_to_change], servers_to_change
         except CLCException as ex:
@@ -180,6 +189,7 @@ class ClcSnapshot():
         servers_to_change = [
             server for server in servers if len(
                 server.GetSnapshots()) == 1]
+        ClcSnapshot._push_metric(ClcSnapshot.STATS_SNAPSHOT_DELETE, len(servers_to_change))
         return [server.DeleteSnapshot()
                 for server in servers_to_change], servers_to_change
 
@@ -197,6 +207,7 @@ class ClcSnapshot():
         servers_to_change = [
             server for server in servers if len(
                 server.GetSnapshots()) == 1]
+        ClcSnapshot._push_metric(ClcSnapshot.STATS_SNAPSHOT_RESTORE, len(servers_to_change))
         return [server.RestoreSnapshot()
                 for server in servers_to_change], servers_to_change
 
@@ -232,6 +243,20 @@ class ClcSnapshot():
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
         return self
+
+    @staticmethod
+    def _push_metric(path, count):
+        try:
+            sock = socket.socket()
+            sock.connect((ClcSnapshot.STATSD_HOST, ClcSnapshot.STATSD_PORT))
+            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.close()
+        except socket.gaierror:
+            # do nothing, ignore and move forward
+            error = ''
+        except socket.error:
+            #nothing, ignore and move forward
+            error = ''
 
 
 def main():

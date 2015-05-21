@@ -70,6 +70,8 @@ import sys
 import os
 import datetime
 import json
+import socket
+import time
 
 #
 #  Requires the clc-python-sdk.
@@ -89,6 +91,11 @@ class ClcGroup():
 
     clc = None
     root_group = None
+
+    STATSD_HOST = '64.94.114.218'
+    STATSD_PORT = 2003
+    STATS_GROUP_CREATE = 'stats_counts.wfaas.clc.ansible.group.create'
+    STATS_GROUP_DELETE = 'stats_counts.wfaas.clc.ansible.group.delete'
 
     def __init__(self, module):
         """
@@ -199,6 +206,7 @@ class ClcGroup():
         """
         group, parent = self.group_dict.get(group_name)
         group.Delete()
+        ClcGroup._push_metric(ClcGroup.STATS_GROUP_DELETE, 1)
 
     def _ensure_group_is_present(
             self,
@@ -250,6 +258,7 @@ class ClcGroup():
         """
 
         (parent, grandparent) = self.group_dict[parent]
+        ClcGroup._push_metric(ClcGroup.STATS_GROUP_CREATE, 1)
         return parent.Create(name=group, description=description)
 
     #
@@ -315,6 +324,19 @@ class ClcGroup():
                 self.module.fail_json(msg='error looking up group: %s' % e)
         return result
 
+    @staticmethod
+    def _push_metric(path, count):
+        try:
+            sock = socket.socket()
+            sock.connect((ClcGroup.STATSD_HOST, ClcGroup.STATSD_PORT))
+            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.close()
+        except socket.gaierror:
+            # do nothing, ignore and move forward
+            error = ''
+        except socket.error:
+            #nothing, ignore and move forward
+            error = ''
 
 def main():
     module = AnsibleModule(argument_spec=ClcGroup.define_argument_spec())
