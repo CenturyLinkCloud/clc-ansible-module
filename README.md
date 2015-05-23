@@ -112,7 +112,7 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 | `name:` | Y | | | A 1 - 6 character identifier to use for the server.
 | `network_id:` | N | The first vlan in the datacenter under that account | | The text vlan identifier on which to create the servers.  Defaults if not provided.
 | `packages:` | N | | | Blueprints to run on the created server.|
-| `password:` | N | Generated if not provided | | Password for the administrator user.
+| `password:` | N | Generated if not provided | | Password for the administrator user.  This password must be at least 3 of the 4 standard items.  Upper case, Lower Case, Numbers, and Special Characters (Some special characters may have issues.  This needs to be tested.)
 | `primary_dns:` | N | Provided by the platform if not included. | | Primary DNS used by the server. |
 | `secondary_dns:` | N | Provided by the platform if not included. | | Secondary DNS used by the server. |
 | `server_ids:` | Y (for some states)|  |  | Required for `started`, `stopped`, and `absent` states.   A list of server Ids to insure are started, stopped, or absent. 
