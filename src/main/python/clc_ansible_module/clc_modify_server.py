@@ -184,8 +184,6 @@ class ClcModifyServer():
         """
         params = module.params
 
-        ClcModifyServer._validate_types(module)
-
         params['cpu']            = ClcModifyServer._find_cpu(clc, module)
         params['memory']         = ClcModifyServer._find_memory(clc, module)
 
@@ -202,7 +200,7 @@ class ClcModifyServer():
         cpu = module.params.get('cpu')
         state = module.params.get('state')
 
-        if not cpu and state == 'present':
+        if not cpu and state == 'update':
             module.fail_json(msg=str("Cannot determine a default cpu value. Please provide a value for cpu."))
         return cpu
 
@@ -217,27 +215,9 @@ class ClcModifyServer():
         memory = module.params.get('memory')
         state = module.params.get('state')
 
-        if not memory and state == 'present':
+        if not memory and state == 'update':
             module.fail_json(msg=str("Cannot determine a default memory value. Please provide a value for memory."))
         return memory
-
-    @staticmethod
-    def _validate_types(module):
-        """
-        Validate that type and storage_type are set appropriately, and fail if not
-        :param module: the module to validate
-        :return: none
-        """
-        state = module.params.get('state')
-        type = module.params.get('type').lower() if module.params.get('type') else None
-        storage_type = module.params.get('storage_type').lower() if module.params.get('storage_type') else None
-
-        if state == "present":
-            if type == "standard" and storage_type not in ("standard", "premium"):
-                module.fail_json(msg=str("Standard VMs must have storage_type = 'standard' or 'premium'"))
-
-            if type == "hyperscale" and storage_type != "hyperscale":
-                module.fail_json(msg=str("Hyperscale VMs must have storage_type = 'hyperscale'"))
 
     @staticmethod
     def _wait_for_requests(clc, requests, servers, wait):

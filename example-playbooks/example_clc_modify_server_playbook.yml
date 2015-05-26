@@ -10,7 +10,7 @@
             - UC1WFADTEST24
             - UC1WFADTEST25
         cpu: 1
-        memory: 2
+        memory: 4
         wait: True
         state: update
       register: clc
