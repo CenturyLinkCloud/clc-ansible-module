@@ -39,7 +39,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
     @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
     @patch.object(clc_modify_server, 'clc_sdk')
-    def test_process_request_state_update(self,
+    def test_process_request_state_update_cpu_memory(self,
                                           mock_clc_sdk,
                                           mock_set_clc_creds):
         # Setup Test
@@ -65,6 +65,94 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         # Assert
         self.assertTrue(self.module.exit_json.called)
         self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_process_request_state_update_cpu(self,
+                                          mock_clc_sdk,
+                                          mock_set_clc_creds):
+        # Setup Test
+        self.module.params = {
+            'state': 'update',
+            'server_ids': ['TEST_SERVER'],
+            'cpu': 2,
+            'wait': True
+        }
+
+        mock_server = mock.MagicMock()
+        mock_server.id = 'TEST_SERVER'
+        mock_server.cpu = 2
+        mock_server.memory= 4
+
+        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
+
+        # Test
+        under_test = ClcModifyServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.assertTrue(self.module.exit_json.called)
+        self.assertTrue(self.module.fail_json.called)
+
+    @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_process_request_state_update_memory(self,
+                                          mock_clc_sdk,
+                                          mock_set_clc_creds):
+        # Setup Test
+        self.module.params = {
+            'state': 'update',
+            'server_ids': ['TEST_SERVER'],
+            'memory': 2,
+            'wait': True
+        }
+
+        mock_server = mock.MagicMock()
+        mock_server.id = 'TEST_SERVER'
+        mock_server.cpu = 2
+        mock_server.memory= 4
+
+        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
+
+        # Test
+        under_test = ClcModifyServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.assertTrue(self.module.exit_json.called)
+        self.assertTrue(self.module.fail_json.called)
+
+    @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_process_request_state_update_empty_server_list(self,
+                                          mock_clc_sdk,
+                                          mock_set_clc_creds):
+        # Setup Test
+        self.module.params = {
+            'state': 'update',
+            'server_ids': None,
+            'cpu': 2,
+            'memory': 4,
+            'wait': True
+        }
+
+        mock_server = mock.MagicMock()
+        mock_server.id = 'TEST_SERVER'
+        mock_server.cpu = 2
+        mock_server.memory= 2
+
+        #mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
+
+        # Test
+        under_test = ClcModifyServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.assertFalse(self.module.exit_json.called)
+        self.assertTrue(self.module.fail_json.called)
+        self.module.fail_json.assert_called_once_with(
+            msg='server_ids needs to be a list of instances to modify: None'
+        )
 
     @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
     @patch.object(clc_modify_server, 'clc_sdk')

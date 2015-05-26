@@ -123,7 +123,7 @@ class ClcModifyServer():
             cpu = p['cpu']
             memory = p['memory']
             if not isinstance(server_ids, list):
-                self.module.fail_json(
+                return self.module.fail_json(
                     msg='server_ids needs to be a list of instances to modify: %s' %
                     server_ids)
 
@@ -269,7 +269,7 @@ class ClcModifyServer():
         requests = []
 
         if not isinstance(server_ids, list) or len(server_ids) < 1:
-            module.fail_json(
+            return module.fail_json(
                 msg='server_ids should be a list of servers, aborting')
 
         servers = clc.v2.Servers(server_ids).Servers()
@@ -309,8 +309,7 @@ class ClcModifyServer():
         if not acct_alias:
             acct_alias = clc.v2.Account.GetAlias()
         if not server_id:
-            module.fail_json(msg='server_id must be provided to modify the server')
-            return
+            return module.fail_json(msg='server_id must be provided to modify the server')
 
         # Fetch the existing server information
         server = clc.v2.Server(server_id)
