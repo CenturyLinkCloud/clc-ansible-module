@@ -144,17 +144,14 @@ class ClcModifyServer():
         Define the argument spec for the ansible module
         :return: argument spec dictionary
         """
-        argument_spec = dict(server_ids=dict(type='list'),
-                             state=dict(default='present', choices=['update']),
-                             cpu=dict(),
-                             memory=dict(),
-                             wait=dict(type='bool', default=True))
-
-        mutually_exclusive = [
-                                ['cpu', 'memory']
-                             ]
-        return {"argument_spec": argument_spec,
-                "mutually_exclusive": mutually_exclusive}
+        argument_spec = dict(
+            server_ids=dict(type='list'),
+            state=dict(default='update', choices=['update']),
+            cpu=dict(),
+            memory=dict(),
+            wait=dict(type='bool', default=True)
+        )
+        return argument_spec
 
     def _set_clc_credentials_from_env(self):
         """
@@ -186,43 +183,13 @@ class ClcModifyServer():
         :return: dictionary of validated params
         """
         params = module.params
-        datacenter = ClcModifyServer._find_datacenter(clc, module)
 
         ClcModifyServer._validate_types(module)
-        ClcModifyServer._validate_name(module)
 
         params['cpu']            = ClcModifyServer._find_cpu(clc, module)
         params['memory']         = ClcModifyServer._find_memory(clc, module)
 
         return params
-
-    @staticmethod
-    def _find_datacenter(clc, module):
-        """
-        Find the datacenter by calling the CLC API.
-        :param clc: clc-sdk instance to use
-        :param module: module to validate
-        :return: clc-sdk.Datacenter instance
-        """
-        location = module.params.get('location')
-        try:
-            datacenter = clc.v2.Datacenter(location)
-            return datacenter
-        except CLCException:
-            module.fail_json(msg=str("Unable to find location: " + location))
-
-    @staticmethod
-    def _find_alias(clc, module):
-        """
-        Find or Validate the Account Alias by calling the CLC API
-        :param clc: clc-sdk instance to use
-        :param module: module to validate
-        :return: clc-sdk.Account instance
-        """
-        alias  = module.params.get('alias')
-        if not alias:
-            alias = clc.v2.Account.GetAlias()
-        return alias
 
     @staticmethod
     def _find_cpu(clc, module):
@@ -313,7 +280,6 @@ class ClcModifyServer():
         """
         p = module.params
         wait = p.get('wait')
-        state = p.get('state')
         cpu = p.get('cpu')
         memory = p.get('memory')
         changed = False
@@ -328,9 +294,13 @@ class ClcModifyServer():
 
         servers = clc.v2.Servers(server_ids).Servers()
         for server in servers:
+            if not cpu:
+                cpu = server.cpu
+            if not memory:
+                memory = server.memory
             if memory != server.memory or cpu != server.cpu:
                 changed_servers.append(server)
-                requests.append(ClcModifyServer._modify_clc_server(module, server.id, cpu, memory))
+                requests.append(ClcModifyServer._modify_clc_server(clc, module, None, server.id, cpu, memory))
                 changed = True
 
         if wait:
@@ -397,9 +367,9 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    argument_dict = ClcModifyServer._define_module_argument_spec()
-    module = AnsibleModule(**argument_dict)
-
+    module = AnsibleModule(
+            argument_spec=ClcModifyServer._define_module_argument_spec()
+        )
     clc_modify_server = ClcModifyServer(module)
     clc_modify_server.process_request()
 
