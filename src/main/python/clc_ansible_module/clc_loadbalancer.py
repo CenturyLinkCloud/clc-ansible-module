@@ -132,6 +132,7 @@ class ClcLoadBalancer():
     STATS_LBPOOL_CREATE = 'stats_counts.wfaas.clc.ansible.loadbalancer.pool.create'
     STATS_LBPOOL_DELETE = 'stats_counts.wfaas.clc.ansible.loadbalancer.pool.delete'
     STATS_LBPOOL_MODIFY = 'stats_counts.wfaas.clc.ansible.loadbalancer.pool.modify'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         """
@@ -481,6 +482,7 @@ class ClcLoadBalancer():
     def _push_metric(path, count):
         try:
             sock = socket.socket()
+            sock.settimeout(ClcLoadBalancer.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcLoadBalancer.STATSD_HOST, ClcLoadBalancer.STATSD_PORT))
             sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
             sock.close()

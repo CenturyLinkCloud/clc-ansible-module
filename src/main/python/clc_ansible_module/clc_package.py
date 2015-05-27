@@ -41,6 +41,7 @@ class ClcPackage():
     STATSD_HOST = '64.94.114.218'
     STATSD_PORT = 2003
     STATS_PACKAGE_DEPLOY = 'stats_counts.wfaas.clc.ansible.package.deploy'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         self.module = module
@@ -148,6 +149,7 @@ class ClcPackage():
     def _push_metric(path, count):
         try:
             sock = socket.socket()
+            sock.settimeout(ClcPackage.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcPackage.STATSD_HOST, ClcPackage.STATSD_PORT))
             sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
             sock.close()

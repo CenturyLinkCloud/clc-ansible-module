@@ -89,6 +89,7 @@ class ClcModifyServer():
     STATSD_HOST = '64.94.114.218'
     STATSD_PORT = 2003
     STATS_SERVER_MODIFY = 'stats_counts.wfaas.clc.ansible.server.modify'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         """
@@ -331,6 +332,7 @@ class ClcModifyServer():
     def _push_metric(path, count):
         try:
             sock = socket.socket()
+            sock.settimeout(ClcModifyServer.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcModifyServer.STATSD_HOST, ClcModifyServer.STATSD_PORT))
             sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
             sock.close()

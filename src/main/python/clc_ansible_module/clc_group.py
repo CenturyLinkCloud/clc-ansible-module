@@ -96,6 +96,7 @@ class ClcGroup():
     STATSD_PORT = 2003
     STATS_GROUP_CREATE = 'stats_counts.wfaas.clc.ansible.group.create'
     STATS_GROUP_DELETE = 'stats_counts.wfaas.clc.ansible.group.delete'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         """
@@ -328,6 +329,7 @@ class ClcGroup():
     def _push_metric(path, count):
         try:
             sock = socket.socket()
+            sock.settimeout(ClcGroup.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcGroup.STATSD_HOST, ClcGroup.STATSD_PORT))
             sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
             sock.close()

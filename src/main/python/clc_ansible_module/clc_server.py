@@ -271,6 +271,7 @@ class ClcServer():
     STATSD_PORT = 2003
     STATS_SERVER_CREATE = 'stats_counts.wfaas.clc.ansible.server.create'
     STATS_SERVER_DELETE = 'stats_counts.wfaas.clc.ansible.server.delete'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         """
@@ -1092,6 +1093,7 @@ class ClcServer():
     def _push_metric(path, count):
         try:
             sock = socket.socket()
+            sock.settimeout(ClcServer.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcServer.STATSD_HOST, ClcServer.STATSD_PORT))
             sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
             sock.close()
