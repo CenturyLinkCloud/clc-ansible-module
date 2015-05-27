@@ -25,6 +25,7 @@ class ClcPublicIp(object):
     STATSD_PORT = 2003
     STATS_PUBLICIP_CREATE = 'stats_counts.wfaas.clc.ansible.publicip.create'
     STATS_PUBLICIP_DELETE = 'stats_counts.wfaas.clc.ansible.publicip.delete'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         self.module = module
@@ -177,6 +178,7 @@ class ClcPublicIp(object):
     def _push_metric(path, count):
         try:
             sock = socket.socket()
+            sock.settimeout(ClcPublicIp.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcPublicIp.STATSD_HOST, ClcPublicIp.STATSD_PORT))
             sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
             sock.close()

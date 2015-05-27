@@ -48,6 +48,7 @@ class ClcSnapshot():
     STATS_SNAPSHOT_CREATE = 'stats_counts.wfaas.clc.ansible.snapshot.create'
     STATS_SNAPSHOT_DELETE = 'stats_counts.wfaas.clc.ansible.snapshot.delete'
     STATS_SNAPSHOT_RESTORE = 'stats_counts.wfaas.clc.ansible.snapshot.restore'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         self.module = module
@@ -248,6 +249,7 @@ class ClcSnapshot():
     def _push_metric(path, count):
         try:
             sock = socket.socket()
+            sock.settimeout(ClcSnapshot.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcSnapshot.STATSD_HOST, ClcSnapshot.STATSD_PORT))
             sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
             sock.close()

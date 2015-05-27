@@ -271,7 +271,7 @@ class ClcServer():
     STATSD_PORT = 2003
     STATS_SERVER_CREATE = 'stats_counts.wfaas.clc.ansible.server.create'
     STATS_SERVER_DELETE = 'stats_counts.wfaas.clc.ansible.server.delete'
-    STATS_SERVER_MODIFY = 'stats_counts.wfaas.clc.ansible.server.modify'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         """
@@ -1090,46 +1090,10 @@ class ClcServer():
                 backout = backout * 2
 
     @staticmethod
-    def _modify_clc_server(clc, module, acct_alias, server_id, cpu, memory):
-        """
-        Modify the memory or CPU on a clc server.  This function is not yet implemented.
-        :param clc: the clc-sdk instance to use
-        :param acct_alias: the clc account alias to look up the server
-        :param server_id: id of the server to modify
-        :param cpu: the new cpu value
-        :param memory: the new memory value
-        :return: clc-sdk.Request instance pointing to the queued provisioning request
-        """
-        if not acct_alias:
-            acct_alias = clc.v2.Account.GetAlias()
-        if not server_id:
-            module.fail_json(msg='server_id must be provided to modify the server')
-            return
-
-        # Fetch the existing server information
-        server = clc.v2.Server(server_id)
-
-        current_memory = server.memory
-        current_cpu = server.cpu
-        if memory != current_memory or cpu != current_cpu:
-            job_obj = clc.v2.API.Call('PATCH',
-                                      'servers/%s/%s' % (acct_alias,
-                                                         server_id),
-                                      json.dumps([{"op": "set",
-                                                   "member": "memory",
-                                                   "value": memory},
-                                                  {"op": "set",
-                                                   "member": "cpu",
-                                                   "value": cpu}]))
-            result = clc.v2.Requests(job_obj)
-            # Push the server modify count metric to statsd
-            ClcServer._push_metric(ClcServer.STATS_SERVER_MODIFY, 1)
-            return result
-
-    @staticmethod
     def _push_metric(path, count):
         try:
             sock = socket.socket()
+            sock.settimeout(ClcServer.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcServer.STATSD_HOST, ClcServer.STATSD_PORT))
             sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
             sock.close()

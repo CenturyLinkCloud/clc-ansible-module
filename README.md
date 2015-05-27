@@ -126,6 +126,62 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
 
+## clc_modify_server Module
+
+This module can be used to modify server configuration in CLC.
+
+###Example Playbook
+```yaml
+---
+- name: modify clc server example
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Modify CPU and Memory of two servers at CLC
+      clc_modify_server:
+        server_ids:
+            - UC1ACCTSRVR01
+            - UC1ACCTSRVR02
+        cpu: 2
+        memory: 4
+        wait: True
+        state: update
+      register: clc
+    - name: debug
+      debug: var=clc.server_ids
+
+```yaml
+---
+- name: modify clc server example
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Modify Memory of a server at CLC
+      clc_modify_server:
+        server_ids:
+            - UC1ACCTSRVR01
+        memory: 8
+        wait: True
+        state: update
+      register: clc
+    - name: debug
+      debug: var=clc.server_ids
+```
+
+###Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `server_ids:` | Y |  |  | The lis of servers to be modified.
+| `cpu:` | N |  | valid int value | How many CPUs to set on the server.
+| `memory:` | N |  | valid int value | Memory in GB.
+| `state:` | Y | `update` | `update` | The state to insure that the provided resources are in( Note: more states are on the way).
+| `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
+| `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
+| `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
+
 ## clc_group Module
 
 Create or deletes Server Groups at CenturyLink Cloud.
