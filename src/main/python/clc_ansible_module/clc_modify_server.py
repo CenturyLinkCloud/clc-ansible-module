@@ -281,8 +281,10 @@ class ClcModifyServer():
                 memory = server.memory
             if memory != server.memory or cpu != server.cpu:
                 changed_servers.append(server)
-                requests.append(ClcModifyServer._modify_clc_server(clc, module, None, server.id, cpu, memory))
-                changed = True
+                result = ClcModifyServer._modify_clc_server(clc, module, None, server.id, cpu, memory)
+                if result:
+                    requests.append(result)
+                    changed = True
 
         if wait:
             for r in requests:
@@ -312,20 +314,24 @@ class ClcModifyServer():
         if not server_id:
             return module.fail_json(msg='server_id must be provided to modify the server')
 
-        # Fetch the existing server information
-        server = clc.v2.Server(server_id)
-        job_obj = clc.v2.API.Call('PATCH',
-                                  'servers/%s/%s' % (acct_alias,
-                                                     server_id),
-                                  json.dumps([{"op": "set",
-                                               "member": "memory",
-                                               "value": memory},
-                                              {"op": "set",
-                                               "member": "cpu",
-                                               "value": cpu}]))
-        result = clc.v2.Requests(job_obj)
-        # Push the server modify count metric to statsd
-        ClcModifyServer._push_metric(ClcModifyServer.STATS_SERVER_MODIFY, 1)
+        result = None
+
+        if not module.check_mode:
+            # Fetch the existing server information
+            server = clc.v2.Server(server_id)
+            # Update the server configuation
+            job_obj = clc.v2.API.Call('PATCH',
+                                      'servers/%s/%s' % (acct_alias,
+                                                         server_id),
+                                      json.dumps([{"op": "set",
+                                                   "member": "memory",
+                                                   "value": memory},
+                                                  {"op": "set",
+                                                   "member": "cpu",
+                                                   "value": cpu}]))
+            result = clc.v2.Requests(job_obj)
+            # Push the server modify count metric to statsd
+            ClcModifyServer._push_metric(ClcModifyServer.STATS_SERVER_MODIFY, 1)
         return result
 
     @staticmethod
@@ -349,7 +355,8 @@ def main():
     :return: none
     """
     module = AnsibleModule(
-            argument_spec=ClcModifyServer._define_module_argument_spec()
+            argument_spec=ClcModifyServer._define_module_argument_spec(),
+            supports_check_mode=True
         )
     clc_modify_server = ClcModifyServer(module)
     clc_modify_server.process_request()
