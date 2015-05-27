@@ -257,7 +257,7 @@ class ClcModifyServer():
         :param module: the AnsibleModule object
         :param clc: the clc-sdk instance to use
         :param server_ids: list of servers to modify
-        :return: a list of dictionaries with server information about the servers that were started or stopped
+        :return: a list of dictionaries with server information about the servers that were modified
         """
         p = module.params
         wait = p.get('wait')
