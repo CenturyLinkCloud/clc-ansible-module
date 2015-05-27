@@ -317,8 +317,6 @@ class ClcModifyServer():
         result = None
 
         if not module.check_mode:
-            # Fetch the existing server information
-            server = clc.v2.Server(server_id)
             # Update the server configuation
             job_obj = clc.v2.API.Call('PATCH',
                                       'servers/%s/%s' % (acct_alias,
