@@ -257,7 +257,7 @@ class ClcModifyServer():
         :param module: the AnsibleModule object
         :param clc: the clc-sdk instance to use
         :param server_ids: list of servers to modify
-        :return: a list of dictionaries with server information about the servers that were started or stopped
+        :return: a list of dictionaries with server information about the servers that were modified
         """
         p = module.params
         wait = p.get('wait')
@@ -317,8 +317,6 @@ class ClcModifyServer():
         result = None
 
         if not module.check_mode:
-            # Fetch the existing server information
-            server = clc.v2.Server(server_id)
             # Update the server configuation
             job_obj = clc.v2.API.Call('PATCH',
                                       'servers/%s/%s' % (acct_alias,

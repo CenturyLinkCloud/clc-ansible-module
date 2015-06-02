@@ -6,6 +6,7 @@ from uuid import UUID
 import clc as clc_sdk
 from clc import CLCException
 from clc import APIFailedResponse
+import socket
 import mock
 from mock import patch, create_autospec
 
@@ -216,6 +217,49 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
         mock_ClcModifyServer.assert_called_once_with(mock_AnsibleModule_instance)
         mock_ClcModifyServer_instance.process_request.assert_called_once
+
+    def test_push_metric(self):
+        ClcModifyServer.STATSD_HOST = '1.1.1.1'
+        ClcModifyServer._push_metric('dummy',0)
+        pass
+
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_modify_clc_server_with_empty_server_id(self, mock_clc_sdk):
+        # Test
+        under_test = ClcModifyServer(self.module)
+        under_test._modify_clc_server(self.clc, self.module, 'TEST', None, 1, 2)
+
+        # Assert
+        self.assertTrue(self.module.fail_json.called)
+        self.module.fail_json.assert_called_once_with(msg='server_id must be provided to modify the server')
+
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_modify_clc_server_mock_server(self,
+                                          mock_clc_sdk):
+        # Setup Test
+        self.module.params = {
+            'state': 'update',
+            'server_ids': ['TEST_SERVER'],
+            'cpu': 2,
+            'memory': 4,
+            'wait': True
+        }
+
+        mock_server = mock.MagicMock()
+        mock_server.id = 'TEST_SERVER'
+        mock_server.cpu = 2
+        mock_server.memory= 4
+
+        mock_clc_sdk.v2.Server = [mock_server]
+
+        # Test
+        self.module.check_mode = False;
+        under_test = ClcModifyServer(self.module)
+        result = under_test._modify_clc_server(self.clc, self.module, 'WFAD', 'TEST_SERVER', 2, 4)
+
+        # Assert
+        self.assertFalse(self.module.fail_json.called)
+        self.assertIsNotNone(result)
 
 if __name__ == '__main__':
     unittest.main()
