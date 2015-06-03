@@ -60,9 +60,9 @@
 		</plugins>
 	</build>
 	<scm>
-		<url>scm:git:https://github.com/CenturylinkTechnology/clc-ansible-module</url>
-		<connection>scm:git:https://github.com/CenturylinkTechnology/clc-ansible-module.git</connection>
-		<developerConnection>scm:git:https://github.com/CenturylinkTechnology/clc-ansible-module.git</developerConnection>
+		<url>scm:git:https://github.com/CenturyLinkCloud/wf-clc-ansible-module</url>
+		<connection>scm:git:https://github.com/CenturyLinkCloud/wf-clc-ansible-module.git</connection>
+		<developerConnection>scm:git:https://github.com/CenturyLinkCloud/wf-clc-ansible-module.git</developerConnection>
 	</scm>
 	<distributionManagement>
 		<repository>
