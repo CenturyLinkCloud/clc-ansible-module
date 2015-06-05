@@ -176,6 +176,7 @@ class ClcGroup():
 
         if v2_api_token:
             self.clc._LOGIN_TOKEN_V2 = v2_api_token
+            self.clc._V2_ENABLED = True
         elif v2_api_username and v2_api_passwd:
             self.clc.v2.SetCredentials(
                 api_username=v2_api_username,

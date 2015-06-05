@@ -399,12 +399,13 @@ class ClcServer():
         :return: none
         """
         env = os.environ
-        v2_api_token = env.get('Authorization', False)
+        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
         v2_api_username = env.get('CLC_V2_API_USERNAME', False)
         v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
 
         if v2_api_token:
             self.clc._LOGIN_TOKEN_V2 = v2_api_token
+            self.clc._V2_ENABLED = True
         elif v2_api_username and v2_api_passwd:
             self.clc.v2.SetCredentials(
                 api_username=v2_api_username,
