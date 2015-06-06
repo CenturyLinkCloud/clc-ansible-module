@@ -62,8 +62,14 @@ class ClcAntiAffinityPolicy():
             changed, policy = self._ensure_policy_is_present(p)
 
         if policy:
-            policy = policy.data
-
+            try:
+                policy = policy.data
+            except AttributeError:
+                try: 
+                    policy = policy.__dict__
+                except Exception:
+                    pass
+	
         self.module.exit_json(changed=changed, policy=policy)
 
     def _clc_set_credentials(self):
