@@ -461,6 +461,42 @@ Create/Delete a loadbalancer
 ```
 ```yaml
 ---
+- name: Add nodes to an existing loadbalancer pool
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Add nodes to pool
+      clc_loadbalancer:
+        name: test3
+        description: test3
+        alias: WFAD
+        location: WA1
+        port: 443
+        nodes:
+          - { 'ipAddress': '10.82.152.17', 'privatePort': 80 }
+          - { 'ipAddress': '10.82.152.18', 'privatePort': 80 }
+        state: nodes_present
+```
+```yaml
+---
+- name: Remove nodes from an existing loadbalancer pool
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Remove nodes from pool
+      clc_loadbalancer:
+        name: test3
+        description: test3
+        alias: WFAD
+        location: WA1
+        port: 443
+        nodes:
+          - { 'ipAddress': '10.82.152.17', 'privatePort': 80 }
+          - { 'ipAddress': '10.82.152.18', 'privatePort': 80 }
+        state: nodes_absent
+```
+```yaml
+---
 - name: Delete Loadbalancer
   hosts: localhost
   connection: local
@@ -486,7 +522,7 @@ Create/Delete a loadbalancer
 | `persistence` | N | standard | standard, sticky | The loadbalancing persistence you want to use |
 | `nodes` | N |  |  | A list of nodes you want your loadbalancer to send traffic to |
 | `status` | N | enabled | enabled, disabled | The status of your loadbalancer |
-| `state` | N | present | present, absent, port_absent | Determine whether to create or delete your loadbalancer. If `present` module will not create another loadbalancer with the same name. If `absent` module will delete the entire loadbalancer. If `port_absent` module will delete the loadbalancer port and associated nodes only. |
+| `state` | N | present | present, absent, port_absent, nodes_present, nodes_absent | Determine whether to create or delete your loadbalancer. If `present` module will not create another loadbalancer with the same name. If `absent` module will delete the entire loadbalancer. If `port_absent` module will delete the loadbalancer port and associated nodes only. If `nodes_present` module will ensure the provided nodes are added to the load balancer pool. If `nodes_absent` module will ensure the provided nodes are removed from the load balancer pool.|
 
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script
 
