@@ -1,0 +1,18 @@
+---
+- name: Manage load balancer on a data center
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Remove nodes from a load balancer pool
+      clc_loadbalancer:
+        alias: WFAD
+        location: UC1
+        name: testlb
+        description: testlb1
+        state:  nodes_absent
+        port: 80
+        nodes:
+          - {'ipAddress': '10.120.45.14', 'privatePort': 22}
+          - {'ipAddress': '10.120.45.15', 'privatePort': 33}
+      register: clc
