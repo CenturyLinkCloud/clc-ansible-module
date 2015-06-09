@@ -96,7 +96,8 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 |-----------|:--------:|:-------:|:-------:|-------------|
 | `additional_disks:` | N | | | Specify additional disks for the server
 | `alias:` | N | Username's Alias | | The account alias to provision the servers under.  If an alias is not provided, it will use the account alias of whatever api credentials are provided
-| `anti_affinity_policy_id:` | N | | | The anti-affinity policy to assign to the server
+| `anti_affinity_policy_id:` | N | | | The anti-affinity policy id to assign to the server (mutually exclusive with `anti_affinity_policy_name:`)
+| `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server (mutually exclusive with `anti_affinity_policy_id:`)
 | `count:` | N | | | The number of servers to build (mutually exclusive with `exact_count:`
 | `count_group:` | N | | | Required when `exact_count:` is specified.  The Server Group use to determine how many severs to deploy.
 | `cpu:` | N | 1 | | How many CPUs to provision on the server |
