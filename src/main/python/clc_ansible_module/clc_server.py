@@ -375,6 +375,7 @@ class ClcServer():
                              source_server_password=dict(default=None),
                              cpu_autoscale_policy_id=dict(default=None),
                              anti_affinity_policy_id=dict(default=None),
+                             anti_affinity_policy_name=dict(default=None),
                              packages=dict(type='list', default=[]),
                              state=dict(default='present', choices=['present', 'absent', 'started', 'stopped']),
                              count=dict(type='int', default='1'),
@@ -388,7 +389,8 @@ class ClcServer():
 
         mutually_exclusive = [
                                 ['exact_count', 'count'],
-                                ['exact_count', 'state']
+                                ['exact_count', 'state'],
+                                ['anti_affinity_policy_id', 'anti_affinity_policy_name'],
                              ]
         return {"argument_spec": argument_spec,
                 "mutually_exclusive": mutually_exclusive}
@@ -644,6 +646,7 @@ class ClcServer():
             'source_server_password': p.get('source_server_password'),
             'cpu_autoscale_policy_id': p.get('cpu_autoscale_policy_id'),
             'anti_affinity_policy_id': p.get('anti_affinity_policy_id'),
+            'anti_affinity_policy_name': p.get('anti_affinity_policy_name'),
             'packages': p.get('packages')
         }
 
@@ -999,6 +1002,14 @@ class ClcServer():
         :return: clc-sdk.Request object linked to the queued server request
         """
 
+        aa_policy_id = server_params.get('anti_affinity_policy_id')
+        aa_policy_name = server_params.get('anti_affinity_policy_name')
+        if not aa_policy_id and aa_policy_name:
+            aa_policy_id = ClcServer._get_anti_affinity_policy_id(clc,
+                                                                  module,
+                                                                  server_params.get('alias'),
+                                                                  aa_policy_name)
+
         res = clc.v2.API.Call(method='POST',
                               url='servers/%s' % (server_params.get('alias')),
                               payload=json.dumps({'name': server_params.get('name'),
@@ -1017,7 +1028,7 @@ class ClcServer():
                                                   'memoryGB': server_params.get('memory'),
                                                   'type': server_params.get('type'),
                                                   'storageType': server_params.get('storage_type'),
-                                                  'antiAffinityPolicyId': server_params.get('anti_affinity_policy_id'),
+                                                  'antiAffinityPolicyId': aa_policy_id,
                                                   'customFields': server_params.get('custom_fields'),
                                                   'additionalDisks': server_params.get('additional_disks'),
                                                   'ttl': server_params.get('ttl'),
@@ -1045,6 +1056,23 @@ class ClcServer():
             server_params.get('alias'))
 
         return result
+
+    @staticmethod
+    def _get_anti_affinity_policy_id(clc, module, alias, aa_policy_name):
+        aa_policy_id = None
+        aa_policies = clc.v2.API.Call(method='GET',
+                                           url='antiAffinityPolicies/%s' % (alias))
+        for aa_policy in aa_policies.get('items'):
+            if aa_policy.get('name') == aa_policy_name:
+                if not aa_policy_id:
+                    aa_policy_id = aa_policy.get('id')
+                else:
+                    return module.fail_json(
+                        msg='mutiple anti affinity policies were found with policy name : %s' %(aa_policy_name))
+        if not aa_policy_id:
+            return module.fail_json(
+                msg='No anti affinity policy was found with policy name : %s' %(aa_policy_name))
+        return aa_policy_id
 
     #
     #  This is the function that gets patched to the Request.server object using a lamda closure

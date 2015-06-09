@@ -61,8 +61,10 @@ class ClcAntiAffinityPolicy():
         else:
             changed, policy = self._ensure_policy_is_present(p)
 
-        if policy:
+        if hasattr(policy, 'data'):
             policy = policy.data
+        elif hasattr(policy, '__dict__'):
+            policy = policy.__dict__
 
         self.module.exit_json(changed=changed, policy=policy)
 
