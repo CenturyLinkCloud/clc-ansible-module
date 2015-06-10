@@ -1,0 +1,14 @@
+---
+- name: Playbook to set AA policy of an existing hyper scale server.
+  hosts: localhost
+  connection: local
+  tasks:
+  - name: modify server to set AA policy
+    clc_modify_server:
+      server_ids:
+        - UC1WFADAASVR19
+        - UC1WFADAASVR20
+      anti_affinity_policy_name: 'aa_policy'
+      state: update
+    register: clc_svr_var
+  - debug: var=clc_svr_var

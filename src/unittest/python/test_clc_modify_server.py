@@ -123,7 +123,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
         # Assert
         self.assertTrue(self.module.exit_json.called)
-        self.assertTrue(self.module.fail_json.called)
+        self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
     @patch.object(clc_modify_server, 'clc_sdk')
@@ -151,7 +151,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
         # Assert
         self.assertTrue(self.module.exit_json.called)
-        self.assertTrue(self.module.fail_json.called)
+        self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
     @patch.object(clc_modify_server, 'clc_sdk')
@@ -255,13 +255,9 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
     @patch.object(clc_modify_server, 'clc_sdk')
     def test_modify_clc_server_with_empty_server_id(self, mock_clc_sdk):
-        params = {
-            'cpu' : 1,
-            'memory': 2
-        }
         # Test
         under_test = ClcModifyServer(self.module)
-        under_test._modify_clc_server(self.clc, self.module, 'TEST', None, params)
+        under_test._modify_clc_server(self.clc, self.module, 'TEST', None, 1, 2)
 
         # Assert
         self.assertTrue(self.module.fail_json.called)
@@ -286,15 +282,10 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
         mock_clc_sdk.v2.Server = [mock_server]
 
-        params = {
-            'cpu' : 2,
-            'memory': 4
-        }
-
         # Test
         self.module.check_mode = False;
         under_test = ClcModifyServer(self.module)
-        result = under_test._modify_clc_server(self.clc, self.module, 'WFAD', 'TEST_SERVER', params)
+        result = under_test._modify_clc_server(self.clc, self.module, 'WFAD', 'TEST_SERVER', 2, 4)
 
         # Assert
         self.assertFalse(self.module.fail_json.called)

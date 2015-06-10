@@ -1059,6 +1059,14 @@ class ClcServer():
 
     @staticmethod
     def _get_anti_affinity_policy_id(clc, module, alias, aa_policy_name):
+        """
+        retrieves the anti affinity policy id of the server based on the name of the policy
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param alias: the CLC account alias
+        :param aa_policy_name: the anti affinity policy name
+        :return: aa_policy_id: The anti affinity policy id
+        """
         aa_policy_id = None
         aa_policies = clc.v2.API.Call(method='GET',
                                            url='antiAffinityPolicies/%s' % (alias))
