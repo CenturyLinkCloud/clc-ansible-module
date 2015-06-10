@@ -375,8 +375,7 @@ class ClcModifyServer():
         result = None
         if not acct_alias:
             acct_alias = clc.v2.Account.GetAlias()
-        if not server.id:
-            return module.fail_json(msg='server must be provided to modify the server')
+
         aa_policy_id = server_params.get('anti_affinity_policy_id')
         aa_policy_name = server_params.get('anti_affinity_policy_name')
         if not aa_policy_id and aa_policy_name:
