@@ -1,0 +1,19 @@
+---
+- name: modify clc server example
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Modify Servers at CLC
+      clc_modify_server:
+        server_ids:
+            - UC1WFADTEST24
+            - UC1WFADTEST25
+        cpu: 1
+        memory: 4
+        wait: True
+        state: update
+      register: clc
+
+    - name: debug
+      debug: var=clc.server_ids

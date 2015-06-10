@@ -47,7 +47,7 @@ options:
     description:
       - Whether to create or delete the load balancer pool
     default: present
-    choices: ['present', 'absent', 'port_absent']
+    choices: ['present', 'absent', 'port_absent', 'nodes_present', 'nodes_absent']
 '''
 
 EXAMPLES = '''
@@ -66,6 +66,36 @@ EXAMPLES = '''
         nodes:
           - { 'ipAddress': '10.11.22.123', 'privatePort': 80 }
         state: present
+
+- name: Add node to an existing loadbalancer pool
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Actually Create things
+      clc_loadbalancer:
+        name: test
+        description: test
+        alias: TEST
+        location: WA1
+        port: 443
+        nodes:
+          - { 'ipAddress': '10.11.22.234', 'privatePort': 80 }
+        state: nodes_present
+
+- name: Remove node from an existing loadbalancer pool
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Actually Create things
+      clc_loadbalancer:
+        name: test
+        description: test
+        alias: TEST
+        location: WA1
+        port: 443
+        nodes:
+          - { 'ipAddress': '10.11.22.234', 'privatePort': 80 }
+        state: nodes_absent
 
 - name: Delete LoadbalancerPool
   hosts: localhost
@@ -103,6 +133,8 @@ import sys
 import os
 import datetime
 import json
+import socket
+import time
 from time import sleep
 
 #
@@ -118,10 +150,19 @@ except ImportError:
 else:
     CLC_FOUND = True
 
-
 class ClcLoadBalancer():
 
     clc = None
+
+    STATSD_HOST = '64.94.114.218'
+    STATSD_PORT = 2003
+    STATS_LB_CREATE = 'stats_counts.wfaas.clc.ansible.loadbalancer.create'
+    STATS_LB_DELETE = 'stats_counts.wfaas.clc.ansible.loadbalancer.delete'
+    STATS_LB_MODIFY = 'stats_counts.wfaas.clc.ansible.loadbalancer.modify'
+    STATS_LBPOOL_CREATE = 'stats_counts.wfaas.clc.ansible.loadbalancer.pool.create'
+    STATS_LBPOOL_DELETE = 'stats_counts.wfaas.clc.ansible.loadbalancer.pool.delete'
+    STATS_LBPOOL_MODIFY = 'stats_counts.wfaas.clc.ansible.loadbalancer.pool.modify'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         """
@@ -175,7 +216,7 @@ class ClcLoadBalancer():
 
                 if loadbalancer_nodes:
                     changed = True
-                    result_nodes = self.add_loadbalancernodes(alias=loadbalancer_alias,
+                    result_nodes = self.set_loadbalancernodes(alias=loadbalancer_alias,
                                                               location=loadbalancer_location,
                                                               lb_id=lb_id,
                                                               pool_id=pool_id,
@@ -192,6 +233,20 @@ class ClcLoadBalancer():
                                                                      location=loadbalancer_location,
                                                                      name=loadbalancer_name,
                                                                      port=loadbalancer_port)
+
+        elif state == 'nodes_present':
+            changed, result_lb = self.ensure_lbpool_nodes_present(alias=loadbalancer_alias,
+                                                                  location=loadbalancer_location,
+                                                                  name=loadbalancer_name,
+                                                                  port=loadbalancer_port,
+                                                                  nodes=loadbalancer_nodes)
+
+        elif state == 'nodes_absent':
+            changed, result_lb = self.ensure_lbpool_nodes_absent(alias=loadbalancer_alias,
+                                                                 location=loadbalancer_location,
+                                                                 name=loadbalancer_name,
+                                                                 port=loadbalancer_port,
+                                                                 nodes=loadbalancer_nodes)
 
         self.module.exit_json(changed=changed, loadbalancer=result_lb)
     #
@@ -301,6 +356,62 @@ class ClcLoadBalancer():
             result = "LB Doesn't Exist"
         return changed, result
 
+    def ensure_lbpool_nodes_present(self, alias, location, name, port, nodes):
+        """
+        Checks to see if the provided list of nodes exist for the pool and add the missing nodes to the pool
+        :param alias: The account alias
+        :param location: the datacenter the load balancer resides in
+        :param loadbalancer: the name of the load balancer
+        :param port: the port that the load balancer will listen on
+        :return: (changed, group) -
+            changed: Boolean whether a change was made
+            result: The result from the CLC API call
+        """
+        changed = False
+        lb_exists = self._loadbalancer_exists(name=name)
+        if lb_exists:
+            lb_id = self._get_loadbalancer_id(name=name)
+            pool_id = self._loadbalancerpool_exists(alias=alias, location=location, port=port, lb_id=lb_id)
+            if pool_id:
+                changed, result = self.add_lbpool_nodes(alias=alias,
+                                               location=location,
+                                               lb_id=lb_id,
+                                               pool_id=pool_id,
+                                               nodes_to_add=nodes)
+            else:
+                result = "Pool doesn't exist"
+        else:
+            result = "Load balancer doesn't Exist"
+        return changed, result
+
+    def ensure_lbpool_nodes_absent(self, alias, location, name, port, nodes):
+        """
+        Remove the proivded list of nodes from the load balancer pool
+        :param alias: The account alias
+        :param location: the datacenter the load balancer resides in
+        :param loadbalancer: the name of the load balancer
+        :param port: the port that the load balancer will listen on
+        :return: (changed, group) -
+            changed: Boolean whether a change was made
+            result: The result from the CLC API call
+        """
+        changed = False
+        lb_exists = self._loadbalancer_exists(name=name)
+        if lb_exists:
+            lb_id = self._get_loadbalancer_id(name=name)
+            pool_id = self._loadbalancerpool_exists(alias=alias, location=location, port=port, lb_id=lb_id)
+            if pool_id:
+                changed, result = self.remove_lbpool_nodes(alias=alias,
+                                                           location=location,
+                                                           lb_id=lb_id,
+                                                           pool_id=pool_id,
+                                                           nodes_to_remove=nodes)
+            else:
+                result = "Pool doesn't exist"
+        else:
+            result = "Load balancer doesn't Exist"
+        return changed, result
+
     def create_loadbalancer(self,name,alias,location,description,status):
         """
         Create a loadbalancer w/ params
@@ -313,6 +424,7 @@ class ClcLoadBalancer():
         """
         result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (alias, location), json.dumps({"name":name,"description":description,"status":status}))
         sleep(1)
+        ClcLoadBalancer._push_metric(ClcLoadBalancer.STATS_LB_CREATE, 1);
         return result
 
     def create_loadbalancerpool(self, alias, location, lb_id, method, persistence, port):
@@ -327,6 +439,7 @@ class ClcLoadBalancer():
         :return: result: The result from the create API call
         """
         result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s/%s/pools' % (alias, location, lb_id), json.dumps({"port":port, "method":method, "persistence":persistence}))
+        ClcLoadBalancer._push_metric(ClcLoadBalancer.STATS_LBPOOL_CREATE, 1);
         return result
 
     def delete_loadbalancer(self,alias,location,name):
@@ -339,6 +452,7 @@ class ClcLoadBalancer():
         """
         lb_id = self._get_loadbalancer_id(name=name)
         result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, lb_id))
+        ClcLoadBalancer._push_metric(ClcLoadBalancer.STATS_LB_DELETE, 1);
         return result
 
     def delete_loadbalancerpool(self, alias, location, lb_id, pool_id):
@@ -351,6 +465,7 @@ class ClcLoadBalancer():
         :return: result: The result from the delete API call
         """
         result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s' % (alias, location, lb_id, pool_id))
+        ClcLoadBalancer._push_metric(ClcLoadBalancer.STATS_LBPOOL_DELETE, 1);
         return result
 
     def _get_loadbalancer_id(self, name):
@@ -403,17 +518,84 @@ class ClcLoadBalancer():
 
         return result
 
-    def add_loadbalancernodes(self, alias, location, lb_id, pool_id, nodes):
+    def set_loadbalancernodes(self, alias, location, lb_id, pool_id, nodes):
         """
-        Adds nodes to the provided pool
+        Updates nodes to the provided pool
+        :param alias: the account alias
+        :param location: the datacenter the load balancer resides in
+        :param lb_id: the id string of the load balancer
+        :param pool_id: the id string of the pool
+        :param nodes: a list of dictionaries containing the nodes to set
+        :return: result: The result from the API call
+        """
+        result = self.clc.v2.API.Call('PUT',
+                                      '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s/nodes'
+                                      % (alias, location, lb_id, pool_id), json.dumps(nodes))
+        ClcLoadBalancer._push_metric(ClcLoadBalancer.STATS_LBPOOL_MODIFY, 1)
+        return result
+
+    def add_lbpool_nodes(self, alias, location, lb_id, pool_id, nodes_to_add):
+        """
+        Add nodes to the provided pool
         :param alias: the account alias
         :param location: the datacenter the load balancer resides in
         :param lb_id: the id string of the load balancer
         :param pool_id: the id string of the pool
         :param nodes: a list of dictionaries containing the nodes to add
-        :return: result: The result from the API call
+        :return: (changed, group) -
+            changed: Boolean whether a change was made
+            result: The result from the CLC API call
         """
-        result = self.clc.v2.API.Call('PUT', '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s/nodes' % (alias, location, lb_id, pool_id), json.dumps(nodes))
+        changed = False
+        result = {}
+        nodes = self._get_lbpool_nodes(alias, location, lb_id, pool_id)
+        for node in nodes_to_add:
+            if not node.get('status'):
+                node['status'] = 'enabled'
+            if not node in nodes:
+                changed = True
+                nodes.append(node)
+        if changed == True:
+            result = self.set_loadbalancernodes(alias, location, lb_id, pool_id, nodes)
+        return changed, result
+
+    def remove_lbpool_nodes(self, alias, location, lb_id, pool_id, nodes_to_remove):
+        """
+        Removes nodes from the provided pool
+        :param alias: the account alias
+        :param location: the datacenter the load balancer resides in
+        :param lb_id: the id string of the load balancer
+        :param pool_id: the id string of the pool
+        :param nodes: a list of dictionaries containing the nodes to remove
+        :return: (changed, group) -
+            changed: Boolean whether a change was made
+            result: The result from the CLC API call
+        """
+        changed = False
+        result = {}
+        nodes = self._get_lbpool_nodes(alias, location, lb_id, pool_id)
+        for node in nodes_to_remove:
+            if not node.get('status'):
+                node['status'] = 'enabled'
+            if node in nodes:
+                changed = True
+                nodes.remove(node)
+        if changed == True:
+            result = self.set_loadbalancernodes(alias, location, lb_id, pool_id, nodes)
+        return changed, result
+
+    def _get_lbpool_nodes(self, alias, location, lb_id, pool_id):
+        """
+        Return the list of nodes available to the provided load balancer pool
+        :param alias: the account alias
+        :param location: the datacenter the load balancer resides in
+        :param lb_id: the id string of the load balancer
+        :param pool_id: the id string of the pool
+        :return: result: The list of nodes
+        """
+        result = self.clc.v2.API.Call('GET',
+                                      '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s/nodes'
+                                      % (alias, location, lb_id, pool_id))
         return result
 
     @staticmethod
@@ -432,7 +614,7 @@ class ClcLoadBalancer():
             persistence=dict(choices=['standard', 'sticky']),
             nodes=dict(type='list', default=[]),
             status=dict(default='enabled', choices=['enabled', 'disabled']),
-            state=dict(default='present', choices=['present', 'absent', 'port_absent'])
+            state=dict(default='present', choices=['present', 'absent', 'port_absent', 'nodes_present', 'nodes_absent'])
         )
 
         return argument_spec
@@ -461,6 +643,21 @@ class ClcLoadBalancer():
             return self.module.fail_json(
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
+
+    @staticmethod
+    def _push_metric(path, count):
+        try:
+            sock = socket.socket()
+            sock.settimeout(ClcLoadBalancer.SOCKET_CONNECTION_TIMEOUT)
+            sock.connect((ClcLoadBalancer.STATSD_HOST, ClcLoadBalancer.STATSD_PORT))
+            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.close()
+        except socket.gaierror:
+            # do nothing, ignore and move forward
+            error = ''
+        except socket.error:
+            #nothing, ignore and move forward
+            error = ''
 
 def main():
     module = AnsibleModule(argument_spec=ClcLoadBalancer.define_argument_spec())

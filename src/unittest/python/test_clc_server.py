@@ -527,6 +527,39 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)
 
+    @patch.object(clc_server, 'clc_sdk')
+    def test_get_anti_affinity_policy_id_singe_match(self, mock_clc_sdk):
+        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
+                                                [{'name' : 'test1', 'id' : '111'},
+                                                 {'name' : 'test2', 'id' : '222'}]}]
+
+        policy_id = ClcServer._get_anti_affinity_policy_id(mock_clc_sdk, None, 'alias', 'test1')
+        self.assertEqual('111', policy_id)
+
+    @patch.object(clc_server, 'AnsibleModule')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_get_anti_affinity_policy_id_no_match(self, mock_clc_sdk, mock_ansible_module):
+        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
+                                                [{'name' : 'test1', 'id' : '111'},
+                                                 {'name' : 'test2', 'id' : '222'}]}]
+
+        policy_id = ClcServer._get_anti_affinity_policy_id(mock_clc_sdk, mock_ansible_module, 'alias', 'testnone')
+        mock_ansible_module.fail_json.assert_called_with(
+            msg='No anti affinity policy was found with policy name : testnone')
+
+    @patch.object(clc_server, 'AnsibleModule')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_get_anti_affinity_policy_id_duplicate_match(self, mock_clc_sdk, mock_ansible_module):
+        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
+                                                [{'name' : 'test1', 'id' : '111'},
+                                                 {'name' : 'test2', 'id' : '222'},
+                                                 {'name' : 'test1', 'id' : '111'}]}]
+
+        policy_id = ClcServer._get_anti_affinity_policy_id(mock_clc_sdk, mock_ansible_module, 'alias', 'test1')
+        mock_ansible_module.fail_json.assert_called_with(
+            msg='mutiple anti affinity policies were found with policy name : test1')
+
+
     @patch.object(clc_server, 'AnsibleModule')
     @patch.object(clc_server, 'ClcServer')
     def test_main(self, mock_ClcServer, mock_AnsibleModule):

@@ -90,6 +90,201 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         #Assertions
         self.module.exit_json.assert_called_once_with(changed=True, loadbalancer={})
         self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    @patch.object(ClcLoadBalancer, 'set_clc_credentials_from_env')
+    def test_process_request_state_nodes_present(self,
+                                          mock_set_clc_credentials,
+                                          mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'name': 'test',
+            'port': 80,
+            'nodes':[{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }],
+            'state': 'nodes_present'
+        }
+
+        mock_clc_sdk.v2.API.Call.side_effect = [
+            [{'id': 'test', 'name': 'test'}],
+            [{'port': '80', 'id':'test'}],
+            [{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }]
+        ]
+
+        test = ClcLoadBalancer(self.module)
+        test.process_request()
+
+        #Assertions
+        self.module.exit_json.assert_called_once_with(changed=False, loadbalancer={})
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    @patch.object(ClcLoadBalancer, 'set_clc_credentials_from_env')
+    def test_process_request_state_nodes_present_no_lb(self,
+                                          mock_set_clc_credentials,
+                                          mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'name': 'test',
+            'port': 80,
+            'nodes':[{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }],
+            'state': 'nodes_present'
+        }
+
+        mock_clc_sdk.v2.API.Call.side_effect = [
+            [{'id': 'test1', 'name': 'test1'}],
+            [{'port': '80', 'id':'test'}],
+            [{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }]
+        ]
+
+        test = ClcLoadBalancer(self.module)
+        test.process_request()
+
+        #Assertions
+        self.module.exit_json.assert_called_once_with(changed=False, loadbalancer='Load balancer doesn\'t Exist')
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    @patch.object(ClcLoadBalancer, 'set_clc_credentials_from_env')
+    def test_process_request_state_nodes_present_no_pool(self,
+                                          mock_set_clc_credentials,
+                                          mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'name': 'test',
+            'port': 80,
+            'nodes':[{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }],
+            'state': 'nodes_present'
+        }
+
+        mock_clc_sdk.v2.API.Call.side_effect = [
+            [{'id': 'test', 'name': 'test'}],
+            [{'port': '81', 'id':'test'}],
+            [{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }]
+        ]
+
+        test = ClcLoadBalancer(self.module)
+        test.process_request()
+
+        #Assertions
+        self.module.exit_json.assert_called_once_with(changed=False, loadbalancer='Pool doesn\'t exist')
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    @patch.object(ClcLoadBalancer, 'set_clc_credentials_from_env')
+    def test_process_request_state_nodes_absent_no_lb(self,
+                                          mock_set_clc_credentials,
+                                          mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'name': 'test',
+            'port': 80,
+            'nodes':[{ 'ipAddress': '10.82.152.15', 'privatePort': 80 }],
+            'state': 'nodes_absent'
+        }
+
+        mock_clc_sdk.v2.API.Call.side_effect = [
+            [{'id': 'test1', 'name': 'test1'}],
+            [{'port': '80', 'id':'test'}],
+            [{ 'ipAddress': '10.82.152.15', 'privatePort': 80}]
+        ]
+
+        test = ClcLoadBalancer(self.module)
+        test.process_request()
+
+        #Assertions
+        self.module.exit_json.assert_called_once_with(changed=False, loadbalancer='Load balancer doesn\'t Exist')
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    @patch.object(ClcLoadBalancer, 'set_clc_credentials_from_env')
+    def test_process_request_state_nodes_absent_no_pool(self,
+                                          mock_set_clc_credentials,
+                                          mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'name': 'test',
+            'port': 80,
+            'nodes':[{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }],
+            'state': 'nodes_absent'
+        }
+
+        mock_clc_sdk.v2.API.Call.side_effect = [
+            [{'id': 'test', 'name': 'test'}],
+            [{'port': '81', 'id':'test'}],
+            [{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }]
+        ]
+
+        test = ClcLoadBalancer(self.module)
+        test.process_request()
+
+        #Assertions
+        self.module.exit_json.assert_called_once_with(changed=False, loadbalancer='Pool doesn\'t exist')
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    @patch.object(ClcLoadBalancer, 'set_clc_credentials_from_env')
+    def test_process_request_state_nodes_absent(self,
+                                          mock_set_clc_credentials,
+                                          mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'name': 'test',
+            'port': 80,
+            'nodes':[{ 'ipAddress': '10.82.152.15', 'privatePort': 82, 'status': 'enabled' }],
+            'state': 'nodes_absent'
+        }
+
+        mock_clc_sdk.v2.API.Call.side_effect = [
+            [{'id': 'test', 'name': 'test'}],
+            [{'port': '80', 'id':'test'}],
+            [{ 'ipAddress': '10.82.152.15', 'privatePort': 81, 'status': 'enabled' }]
+        ]
+
+        test = ClcLoadBalancer(self.module)
+        test.process_request()
+
+        #Assertions
+        self.module.exit_json.assert_called_once_with(changed=False, loadbalancer={})
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    @patch.object(ClcLoadBalancer, '_get_lbpool_nodes')
+    @patch.object(ClcLoadBalancer, 'set_loadbalancernodes')
+    def test_add_lbpool_nodes(self, mock_set_pool_nodes, mock_get_pool_nodes, mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'name': 'test',
+            'port': 80,
+            'nodes':[{ 'ipAddress': '10.82.152.15', 'privatePort': 82, 'status': 'enabled' }],
+            'state': 'nodes_absent'
+        }
+        test = ClcLoadBalancer(self.module)
+        mock_get_pool_nodes.return_value = [{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }]
+        mock_set_pool_nodes.return_value = 'success'
+        result = test.add_lbpool_nodes('alias','location','lb_id','pool_id',
+                                       [{'ipAddress': '1.1.1.1', 'privatePort': 80}])
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(result, (True, 'success'))
+
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    @patch.object(ClcLoadBalancer, '_get_lbpool_nodes')
+    @patch.object(ClcLoadBalancer, 'set_loadbalancernodes')
+    def test_remove_lbpool_nodes(self, mock_set_pool_nodes, mock_get_pool_nodes, mock_clc_sdk):
+        #Setup
+        self.module.params = {
+            'name': 'test',
+            'port': 80,
+            'nodes':[{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }],
+            'state': 'nodes_absent'
+        }
+        test = ClcLoadBalancer(self.module)
+        mock_get_pool_nodes.return_value = [{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }]
+        mock_set_pool_nodes.return_value = 'success'
+        result = test.remove_lbpool_nodes('alias','location','lb_id','pool_id',
+                                       [{ 'ipAddress': '10.82.152.15', 'privatePort': 80}])
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(result, (True, 'success'))
+
     def test_clc_module_not_found(self):
         # Setup Mock Import Function
         import __builtin__ as builtins

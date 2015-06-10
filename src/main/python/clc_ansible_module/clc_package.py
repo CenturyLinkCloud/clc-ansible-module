@@ -18,6 +18,8 @@ These credentials are required to use the CLC API and must be provided.
 #
 
 import json
+import socket
+import time
 #
 #  Requires the clc-python-sdk.
 #  sudo pip install clc-sdk
@@ -35,6 +37,11 @@ class ClcPackage():
 
     clc = clc_sdk
     module = None
+
+    STATSD_HOST = '64.94.114.218'
+    STATSD_PORT = 2003
+    STATS_PACKAGE_DEPLOY = 'stats_counts.wfaas.clc.ansible.package.deploy'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         self.module = module
@@ -101,6 +108,7 @@ class ClcPackage():
                                                          'package':{'packageId':package_id,
                                                                     'parameters':package_params}}) )
                                                                     '''
+            ClcPackage._push_metric(ClcPackage.STATS_PACKAGE_DEPLOY, len(servers))
         except CLCException as ex:
             self.module.fail_json(msg='Failed while installing package : %s with Error : %s' %(package_id,ex))
         return servers
@@ -136,6 +144,21 @@ class ClcPackage():
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
         return self
+
+    @staticmethod
+    def _push_metric(path, count):
+        try:
+            sock = socket.socket()
+            sock.settimeout(ClcPackage.SOCKET_CONNECTION_TIMEOUT)
+            sock.connect((ClcPackage.STATSD_HOST, ClcPackage.STATSD_PORT))
+            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.close()
+        except socket.gaierror:
+            # do nothing, ignore and move forward
+            error = ''
+        except socket.error:
+            #nothing, ignore and move forward
+            error = ''
 
 def main():
     """

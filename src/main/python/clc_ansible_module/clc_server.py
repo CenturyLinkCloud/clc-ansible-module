@@ -247,6 +247,7 @@ import sys
 import os
 import datetime
 import json
+import socket
 from time import sleep
 
 #
@@ -263,9 +264,14 @@ except ImportError:
 else:
     CLC_FOUND = True
 
-
 class ClcServer():
     clc = clc_sdk
+
+    STATSD_HOST = '64.94.114.218'
+    STATSD_PORT = 2003
+    STATS_SERVER_CREATE = 'stats_counts.wfaas.clc.ansible.server.create'
+    STATS_SERVER_DELETE = 'stats_counts.wfaas.clc.ansible.server.delete'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         """
@@ -369,6 +375,7 @@ class ClcServer():
                              source_server_password=dict(default=None),
                              cpu_autoscale_policy_id=dict(default=None),
                              anti_affinity_policy_id=dict(default=None),
+                             anti_affinity_policy_name=dict(default=None),
                              packages=dict(type='list', default=[]),
                              state=dict(default='present', choices=['present', 'absent', 'started', 'stopped']),
                              count=dict(type='int', default='1'),
@@ -382,7 +389,8 @@ class ClcServer():
 
         mutually_exclusive = [
                                 ['exact_count', 'count'],
-                                ['exact_count', 'state']
+                                ['exact_count', 'state'],
+                                ['anti_affinity_policy_id', 'anti_affinity_policy_name'],
                              ]
         return {"argument_spec": argument_spec,
                 "mutually_exclusive": mutually_exclusive}
@@ -598,6 +606,85 @@ class ClcServer():
         return network_id
 
     @staticmethod
+    def _create_servers(module, clc, override_count=None):
+        """
+        Create New Servers
+        :param module: the AnsibleModule object
+        :param clc: the clc-sdk instance to use
+        :return: a list of dictionaries with server information about the servers that were created
+        """
+        p = module.params
+        requests = []
+        servers = []
+        server_dict_array = []
+        created_server_ids = []
+
+        add_public_ip = p.get('add_public_ip')
+        public_ip_protocol = p.get('public_ip_protocol')
+        public_ip_ports = p.get('public_ip_ports')
+        wait = p.get('wait')
+
+        params = {
+            'name': p.get('name'),
+            'template': p.get('template'),
+            'group_id': p.get('group'),
+            'network_id': p.get('network_id'),
+            'cpu': p.get('cpu'),
+            'memory': p.get('memory'),
+            'alias': p.get('alias'),
+            'password': p.get('password'),
+            'ip_address': p.get('ip_address'),
+            'storage_type': p.get('storage_type'),
+            'type': p.get('type'),
+            'primary_dns': p.get('primary_dns'),
+            'secondary_dns': p.get('secondary_dns'),
+            'additional_disks': p.get('additional_disks'),
+            'custom_fields': p.get('custom_fields'),
+            'ttl': p.get('ttl'),
+            'managed_os': p.get('managed_os'),
+            'description': p.get('description'),
+            'source_server_password': p.get('source_server_password'),
+            'cpu_autoscale_policy_id': p.get('cpu_autoscale_policy_id'),
+            'anti_affinity_policy_id': p.get('anti_affinity_policy_id'),
+            'anti_affinity_policy_name': p.get('anti_affinity_policy_name'),
+            'packages': p.get('packages')
+        }
+
+        count = override_count if override_count else p.get('count')
+
+        changed = False if count == 0 else True
+
+        if changed:
+            for i in range(0, count):
+                req = ClcServer._create_clc_server(clc=clc,
+                                                   module=module,
+                                                   server_params=params)
+                server = req.requests[0].Server()
+                requests.append(req)
+                servers.append(server)
+
+            ClcServer._wait_for_requests(clc, requests, servers, wait)
+
+            ClcServer._add_public_ip_to_servers(
+                should_add_public_ip=add_public_ip,
+                servers=servers,
+                public_ip_protocol=public_ip_protocol,
+                public_ip_ports=public_ip_ports,
+                wait=wait)
+
+            for server in servers:
+                # reload server details so public IP shows up
+                server = clc.v2.Server(server.id)
+                if len(server.PublicIPs().public_ips) > 0:
+                    server.data['publicip'] = str(server.PublicIPs().public_ips[0])
+                server.data['ipaddress'] = server.details[
+                    'ipAddresses'][0]['internal']
+                server_dict_array.append(server.data)
+                created_server_ids.append(server.id)
+
+        return server_dict_array, created_server_ids, changed
+
+    @staticmethod
     def _validate_name(module):
         """
         Validate that name is the correct length if provided, fail if it's not
@@ -686,84 +773,6 @@ class ClcServer():
             else:
                 ClcServer._refresh_servers(servers)
 
-    @staticmethod
-    def _create_servers(module, clc, override_count=None):
-        """
-        Create New Servers
-        :param module: the AnsibleModule object
-        :param clc: the clc-sdk instance to use
-        :return: a list of dictionaries with server information about the servers that were created
-        """
-        p = module.params
-        requests = []
-        servers = []
-        server_dict_array = []
-        created_server_ids = []
-
-        add_public_ip = p.get('add_public_ip')
-        public_ip_protocol = p.get('public_ip_protocol')
-        public_ip_ports = p.get('public_ip_ports')
-        wait = p.get('wait')
-
-        params = {
-            'name': p.get('name'),
-            'template': p.get('template'),
-            'group_id': p.get('group'),
-            'network_id': p.get('network_id'),
-            'cpu': p.get('cpu'),
-            'memory': p.get('memory'),
-            'alias': p.get('alias'),
-            'password': p.get('password'),
-            'ip_address': p.get('ip_address'),
-            'storage_type': p.get('storage_type'),
-            'type': p.get('type'),
-            'primary_dns': p.get('primary_dns'),
-            'secondary_dns': p.get('secondary_dns'),
-            'additional_disks': p.get('additional_disks'),
-            'custom_fields': p.get('custom_fields'),
-            'ttl': p.get('ttl'),
-            'managed_os': p.get('managed_os'),
-            'description': p.get('description'),
-            'source_server_password': p.get('source_server_password'),
-            'cpu_autoscale_policy_id': p.get('cpu_autoscale_policy_id'),
-            'anti_affinity_policy_id': p.get('anti_affinity_policy_id'),
-            'packages': p.get('packages')
-        }
-
-        count = override_count if override_count else p.get('count')
-
-        changed = False if count == 0 else True
-
-        if changed:
-            for i in range(0, count):
-                req = ClcServer._create_clc_server(clc=clc,
-                                                   module=module,
-                                                   server_params=params)
-                server = req.requests[0].Server()
-                requests.append(req)
-                servers.append(server)
-
-            ClcServer._wait_for_requests(clc, requests, servers, wait)
-
-            ClcServer._add_public_ip_to_servers(
-                should_add_public_ip=add_public_ip,
-                servers=servers,
-                public_ip_protocol=public_ip_protocol,
-                public_ip_ports=public_ip_ports,
-                wait=wait)
-
-            for server in servers:
-                # reload server details so public IP shows up
-                server = clc.v2.Server(server.id)
-                if len(server.PublicIPs().public_ips) > 0:
-                    server.data['publicip'] = str(server.PublicIPs().public_ips[0])
-                server.data['ipaddress'] = server.details[
-                    'ipAddresses'][0]['internal']
-                server_dict_array.append(server.data)
-                created_server_ids.append(server.id)
-
-        return server_dict_array, created_server_ids, changed
-
 
     @staticmethod
     def _refresh_servers(servers):
@@ -839,6 +848,9 @@ class ClcServer():
 
         for server in servers:
             terminated_server_ids.append(server.id)
+
+        # Push the server delete count metric to statsd
+        ClcServer._push_metric(ClcServer.STATS_SERVER_DELETE, len(servers))
 
         return changed, server_dict_array, terminated_server_ids
 
@@ -990,6 +1002,14 @@ class ClcServer():
         :return: clc-sdk.Request object linked to the queued server request
         """
 
+        aa_policy_id = server_params.get('anti_affinity_policy_id')
+        aa_policy_name = server_params.get('anti_affinity_policy_name')
+        if not aa_policy_id and aa_policy_name:
+            aa_policy_id = ClcServer._get_anti_affinity_policy_id(clc,
+                                                                  module,
+                                                                  server_params.get('alias'),
+                                                                  aa_policy_name)
+
         res = clc.v2.API.Call(method='POST',
                               url='servers/%s' % (server_params.get('alias')),
                               payload=json.dumps({'name': server_params.get('name'),
@@ -1008,13 +1028,17 @@ class ClcServer():
                                                   'memoryGB': server_params.get('memory'),
                                                   'type': server_params.get('type'),
                                                   'storageType': server_params.get('storage_type'),
-                                                  'antiAffinityPolicyId': server_params.get('anti_affinity_policy_id'),
+                                                  'antiAffinityPolicyId': aa_policy_id,
                                                   'customFields': server_params.get('custom_fields'),
                                                   'additionalDisks': server_params.get('additional_disks'),
                                                   'ttl': server_params.get('ttl'),
                                                   'packages': server_params.get('packages')}))
 
         result = clc.v2.Requests(res)
+
+        # Push the server create count metric to statsd
+        ClcServer._push_metric(ClcServer.STATS_SERVER_CREATE, 1)
+
 
         #
         # Patch the Request object so that it returns a valid server
@@ -1032,6 +1056,23 @@ class ClcServer():
             server_params.get('alias'))
 
         return result
+
+    @staticmethod
+    def _get_anti_affinity_policy_id(clc, module, alias, aa_policy_name):
+        aa_policy_id = None
+        aa_policies = clc.v2.API.Call(method='GET',
+                                           url='antiAffinityPolicies/%s' % (alias))
+        for aa_policy in aa_policies.get('items'):
+            if aa_policy.get('name') == aa_policy_name:
+                if not aa_policy_id:
+                    aa_policy_id = aa_policy.get('id')
+                else:
+                    return module.fail_json(
+                        msg='mutiple anti affinity policies were found with policy name : %s' %(aa_policy_name))
+        if not aa_policy_id:
+            return module.fail_json(
+                msg='No anti affinity policy was found with policy name : %s' %(aa_policy_name))
+        return aa_policy_id
 
     #
     #  This is the function that gets patched to the Request.server object using a lamda closure
@@ -1077,40 +1118,19 @@ class ClcServer():
                 backout = backout * 2
 
     @staticmethod
-    def _modify_clc_server(clc, module, acct_alias, server_id, cpu, memory):
-        """
-        Modify the memory or CPU on a clc server.  This function is not yet implemented.
-        :param clc: the clc-sdk instance to use
-        :param acct_alias: the clc account alias to look up the server
-        :param server_id: id of the server to modify
-        :param cpu: the new cpu value
-        :param memory: the new memory value
-        :return: clc-sdk.Request instance pointing to the queued provisioning request
-        """
-        if not acct_alias:
-            acct_alias = clc.v2.Account.GetAlias()
-        if not server_id:
-            module.fail_json(msg='server_id must be provided to modify the server')
-            return
-
-        # Fetch the existing server information
-        server = clc.v2.Server(server_id)
-
-        current_memory = server.memory
-        current_cpu = server.cpu
-        if memory != current_memory or cpu != current_cpu:
-            job_obj = clc.v2.API.Call('PATCH',
-                                      'servers/%s/%s' % (acct_alias,
-                                                         server_id),
-                                      json.dumps([{"op": "set",
-                                                   "member": "memory",
-                                                   "value": memory},
-                                                  {"op": "set",
-                                                   "member": "cpu",
-                                                   "value": cpu}]))
-            result = clc.v2.Requests(job_obj)
-            return result
-
+    def _push_metric(path, count):
+        try:
+            sock = socket.socket()
+            sock.settimeout(ClcServer.SOCKET_CONNECTION_TIMEOUT)
+            sock.connect((ClcServer.STATSD_HOST, ClcServer.STATSD_PORT))
+            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.close()
+        except socket.gaierror:
+            # do nothing, ignore and move forward
+            error = ''
+        except socket.error:
+            #nothing, ignore and move forward
+            error = ''
 
 def main():
     """

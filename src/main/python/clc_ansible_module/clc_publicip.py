@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+import socket
+import time
 from ansible.module_utils.basic import *  # pylint: disable=W0614
 #
 #  Requires the clc-python-sdk.
@@ -14,11 +16,16 @@ except ImportError:
 else:
     CLC_FOUND = True
 
-
 class ClcPublicIp(object):
     clc = clc_sdk
     module = None
     group_dict = {}
+
+    STATSD_HOST = '64.94.114.218'
+    STATSD_PORT = 2003
+    STATS_PUBLICIP_CREATE = 'stats_counts.wfaas.clc.ansible.publicip.create'
+    STATS_PUBLICIP_DELETE = 'stats_counts.wfaas.clc.ansible.publicip.delete'
+    SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
         self.module = module
@@ -78,6 +85,7 @@ class ClcPublicIp(object):
                 server.PublicIPs().public_ips) == 0]
         ports_to_expose = [{'protocol': protocol, 'port': port}
                            for port in ports]
+        ClcPublicIp._push_metric(ClcPublicIp.STATS_PUBLICIP_CREATE,len(servers_to_change))
         return [server.PublicIPs().Add(ports_to_expose)
                 for server in servers_to_change], servers_to_change
 
@@ -93,7 +101,7 @@ class ClcPublicIp(object):
         for server in servers_to_change:
             for ip_address in server.PublicIPs().public_ips:
                 ips_to_delete.append(ip_address)
-
+        ClcPublicIp._push_metric(ClcPublicIp.STATS_PUBLICIP_DELETE,len(servers_to_change))
         return [ip.Delete() for ip in ips_to_delete], servers_to_change
 
     def _wait_for_requests_to_complete(self, requests_lst, action='create'):
@@ -165,6 +173,21 @@ class ClcPublicIp(object):
             return self.module.fail_json(
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
+
+    @staticmethod
+    def _push_metric(path, count):
+        try:
+            sock = socket.socket()
+            sock.settimeout(ClcPublicIp.SOCKET_CONNECTION_TIMEOUT)
+            sock.connect((ClcPublicIp.STATSD_HOST, ClcPublicIp.STATSD_PORT))
+            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.close()
+        except socket.gaierror:
+            # do nothing, ignore and move forward
+            error = ''
+        except socket.error:
+            #nothing, ignore and move forward
+            error = ''
 
 
 def main():

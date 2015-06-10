@@ -96,7 +96,8 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 |-----------|:--------:|:-------:|:-------:|-------------|
 | `additional_disks:` | N | | | Specify additional disks for the server
 | `alias:` | N | Username's Alias | | The account alias to provision the servers under.  If an alias is not provided, it will use the account alias of whatever api credentials are provided
-| `anti_affinity_policy_id:` | N | | | The anti-affinity policy to assign to the server
+| `anti_affinity_policy_id:` | N | | | The anti-affinity policy id to assign to the server. This is mutually exclusive with `anti_affinity_policy_name:`
+| `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server. This is mutually exclusive with `anti_affinity_policy_id:`
 | `count:` | N | | | The number of servers to build (mutually exclusive with `exact_count:`
 | `count_group:` | N | | | Required when `exact_count:` is specified.  The Server Group use to determine how many severs to deploy.
 | `cpu:` | N | 1 | | How many CPUs to provision on the server |
@@ -122,6 +123,62 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 | `template:` | Y |  | any valid template | The template to user for server creation.  Will search for a template if a partial string is provided.  Example: `ubuntu-14-64` will build an Ubuntu 14.04 64bit server.
 | `ttl:` | N | | Any valid int > 3600 | The time to live for the server.  The server will be deleted when this expires. |
 | `type:` | N | `standard` | `standard`, `hyperscale`| The type of server to create.
+| `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
+| `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
+| `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
+
+## clc_modify_server Module
+
+This module can be used to modify server configuration in CLC.
+
+###Example Playbook
+```yaml
+---
+- name: modify clc server example
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Modify CPU and Memory of two servers at CLC
+      clc_modify_server:
+        server_ids:
+            - UC1ACCTSRVR01
+            - UC1ACCTSRVR02
+        cpu: 2
+        memory: 4
+        wait: True
+        state: update
+      register: clc
+    - name: debug
+      debug: var=clc.server_ids
+
+```yaml
+---
+- name: modify clc server example
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Modify Memory of a server at CLC
+      clc_modify_server:
+        server_ids:
+            - UC1ACCTSRVR01
+        memory: 8
+        wait: True
+        state: update
+      register: clc
+    - name: debug
+      debug: var=clc.server_ids
+```
+
+###Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `server_ids:` | Y |  |  | The lis of servers to be modified.
+| `cpu:` | N |  | valid int value | How many CPUs to set on the server.
+| `memory:` | N |  | valid int value | Memory in GB.
+| `state:` | Y | `update` | `update` | The state to insure that the provided resources are in( Note: more states are on the way).
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
@@ -405,6 +462,42 @@ Create/Delete a loadbalancer
 ```
 ```yaml
 ---
+- name: Add nodes to an existing loadbalancer pool
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Add nodes to pool
+      clc_loadbalancer:
+        name: test3
+        description: test3
+        alias: WFAD
+        location: WA1
+        port: 443
+        nodes:
+          - { 'ipAddress': '10.82.152.17', 'privatePort': 80 }
+          - { 'ipAddress': '10.82.152.18', 'privatePort': 80 }
+        state: nodes_present
+```
+```yaml
+---
+- name: Remove nodes from an existing loadbalancer pool
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Remove nodes from pool
+      clc_loadbalancer:
+        name: test3
+        description: test3
+        alias: WFAD
+        location: WA1
+        port: 443
+        nodes:
+          - { 'ipAddress': '10.82.152.17', 'privatePort': 80 }
+          - { 'ipAddress': '10.82.152.18', 'privatePort': 80 }
+        state: nodes_absent
+```
+```yaml
+---
 - name: Delete Loadbalancer
   hosts: localhost
   connection: local
@@ -430,7 +523,7 @@ Create/Delete a loadbalancer
 | `persistence` | N | standard | standard, sticky | The loadbalancing persistence you want to use |
 | `nodes` | N |  |  | A list of nodes you want your loadbalancer to send traffic to |
 | `status` | N | enabled | enabled, disabled | The status of your loadbalancer |
-| `state` | N | present | present, absent, port_absent | Determine whether to create or delete your loadbalancer. If `present` module will not create another loadbalancer with the same name. If `absent` module will delete the entire loadbalancer. If `port_absent` module will delete the loadbalancer port and associated nodes only. |
+| `state` | N | present | present, absent, port_absent, nodes_present, nodes_absent | Determine whether to create or delete your loadbalancer. If `present` module will not create another loadbalancer with the same name. If `absent` module will delete the entire loadbalancer. If `port_absent` module will delete the loadbalancer port and associated nodes only. If `nodes_present` module will ensure the provided nodes are added to the load balancer pool. If `nodes_absent` module will ensure the provided nodes are removed from the load balancer pool.|
 
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script
 
