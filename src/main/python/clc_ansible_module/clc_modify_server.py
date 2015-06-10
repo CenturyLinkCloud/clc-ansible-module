@@ -150,9 +150,15 @@ class ClcModifyServer():
             state=dict(default='update', choices=['update']),
             cpu=dict(),
             memory=dict(),
+            anti_affinity_policy_id=dict(),
+            anti_affinity_policy_name=dict(),
             wait=dict(type='bool', default=True)
         )
-        return argument_spec
+        mutually_exclusive = [
+                                ['anti_affinity_policy_id', 'anti_affinity_policy_name']
+                             ]
+        return {"argument_spec": argument_spec,
+                "mutually_exclusive": mutually_exclusive}
 
     def _set_clc_credentials_from_env(self):
         """
@@ -263,6 +269,14 @@ class ClcModifyServer():
         wait = p.get('wait')
         cpu = p.get('cpu')
         memory = p.get('memory')
+        aa_policy_id = p.get('anti_affinity_policy_id')
+        aa_policy_name = p.get('anti_affinity_policy_name')
+        server_params = {
+            'cpu': cpu,
+            'memory': memory,
+            'anti_affinity_policy_id': aa_policy_id,
+            'anti_affinity_policy_name': aa_policy_name
+        }
         changed = False
         changed_servers = []
         server_dict_array = []
@@ -275,16 +289,22 @@ class ClcModifyServer():
 
         servers = clc.v2.Servers(server_ids).Servers()
         for server in servers:
-            if not cpu:
-                cpu = server.cpu
-            if not memory:
-                memory = server.memory
-            if memory != server.memory or cpu != server.cpu:
-                changed_servers.append(server)
-                result = ClcModifyServer._modify_clc_server(clc, module, None, server.id, cpu, memory)
-                if result:
-                    requests.append(result)
-                    changed = True
+            server_changed, server_result = ClcModifyServer._ensure_server_config(clc,
+                                                                    module,
+                                                                    None,
+                                                                    server,
+                                                                    server_params,
+                                                                    changed_servers)
+            if server_result:
+                requests.append(server_result)
+            aa_changed, aa_result = ClcModifyServer._ensure_aa_policy(clc,
+                                                                      module,
+                                                                      None,
+                                                                      server,
+                                                                      server_params,
+                                                                      changed_servers)
+            if aa_changed or server_changed:
+                changed = True
 
         if wait:
             for r in requests:
@@ -299,7 +319,23 @@ class ClcModifyServer():
         return changed, server_dict_array, result_server_ids
 
     @staticmethod
-    def _modify_clc_server(clc, module, acct_alias, server_id, cpu, memory):
+    def _ensure_server_config(clc, module, alias, server, server_params, changed_servers):
+        cpu = server_params.get('cpu')
+        memory = server_params.get('memory')
+        changed = False
+        result = None
+        if not cpu:
+            cpu = server.cpu
+        if not memory:
+            memory = server.memory
+        if memory != server.memory or cpu != server.cpu:
+            changed_servers.append(server)
+            result = ClcModifyServer._modify_clc_server(clc, module, None, server.id, server_params)
+            changed = True
+        return changed, result
+
+    @staticmethod
+    def _modify_clc_server(clc, module, acct_alias, server_id, server_params):
         """
         Modify the memory or CPU on a clc server.  This function is not yet implemented.
         :param clc: the clc-sdk instance to use
@@ -317,20 +353,82 @@ class ClcModifyServer():
         result = None
 
         if not module.check_mode:
+
             # Update the server configuation
             job_obj = clc.v2.API.Call('PATCH',
                                       'servers/%s/%s' % (acct_alias,
                                                          server_id),
                                       json.dumps([{"op": "set",
                                                    "member": "memory",
-                                                   "value": memory},
+                                                   "value": server_params.get('memory')},
                                                   {"op": "set",
                                                    "member": "cpu",
-                                                   "value": cpu}]))
+                                                   "value": server_params.get('cpu')}]))
             result = clc.v2.Requests(job_obj)
             # Push the server modify count metric to statsd
             ClcModifyServer._push_metric(ClcModifyServer.STATS_SERVER_MODIFY, 1)
         return result
+
+    @staticmethod
+    def _ensure_aa_policy(clc, module, acct_alias, server, server_params, changed_servers):
+        changed = False
+        result = None
+        if not acct_alias:
+            acct_alias = clc.v2.Account.GetAlias()
+        if not server.id:
+            return module.fail_json(msg='server must be provided to modify the server')
+        aa_policy_id = server_params.get('anti_affinity_policy_id')
+        aa_policy_name = server_params.get('anti_affinity_policy_name')
+        if not aa_policy_id and aa_policy_name:
+            aa_policy_id = ClcModifyServer._get_anti_affinity_policy_id_by_name(clc, module, acct_alias, aa_policy_name)
+        current_aa_policy_id = ClcModifyServer._get_anti_affinity_policy_id_of_server(clc,
+                                                                                      module,
+                                                                                      acct_alias,
+                                                                                      server.id)
+
+        if aa_policy_id and aa_policy_id != current_aa_policy_id:
+            if server not in changed_servers:
+                changed_servers.append(server)
+            ClcModifyServer._modify_aa_policy(clc, module, acct_alias, server.id, aa_policy_id)
+            changed = True
+
+            # Push the server modify count metric to statsd
+            ClcModifyServer._push_metric(ClcModifyServer.STATS_SERVER_MODIFY, 1)
+        return changed, result
+
+    @staticmethod
+    def _modify_aa_policy(clc, module, acct_alias, server_id, aa_policy_id):
+        result = None
+        if not module.check_mode:
+            result = clc.v2.API.Call('PUT',
+                                     'servers/%s/%s/antiAffinityPolicy' % (acct_alias, server_id),
+                                     json.dumps({"id": aa_policy_id}))
+        return result
+
+
+    @staticmethod
+    def _get_anti_affinity_policy_id_by_name(clc, module, alias, aa_policy_name):
+        aa_policy_id = None
+        aa_policies = clc.v2.API.Call(method='GET',
+                                           url='antiAffinityPolicies/%s' % (alias))
+        for aa_policy in aa_policies.get('items'):
+            if aa_policy.get('name') == aa_policy_name:
+                if not aa_policy_id:
+                    aa_policy_id = aa_policy.get('id')
+                else:
+                    return module.fail_json(
+                        msg='mutiple anti affinity policies were found with policy name : %s' %(aa_policy_name))
+        if not aa_policy_id:
+            return module.fail_json(
+                msg='No anti affinity policy was found with policy name : %s' %(aa_policy_name))
+        return aa_policy_id
+
+    @staticmethod
+    def _get_anti_affinity_policy_id_of_server(clc, module, alias, server_id):
+        aa_policy_id = None
+        result = clc.v2.API.Call(method='GET',
+                                           url='servers/%s/%s/antiAffinityPolicy' % (alias, server_id))
+        return result.get('id')
 
     @staticmethod
     def _push_metric(path, count):
@@ -352,10 +450,9 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    module = AnsibleModule(
-            argument_spec=ClcModifyServer._define_module_argument_spec(),
-            supports_check_mode=True
-        )
+
+    argument_dict = ClcModifyServer._define_module_argument_spec()
+    module = AnsibleModule(supports_check_mode=True, **argument_dict)
     clc_modify_server = ClcModifyServer(module)
     clc_modify_server.process_request()
 
