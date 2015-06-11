@@ -50,7 +50,8 @@ class TestClcServerSnapshotFunctions(unittest.TestCase):
 
     @patch.object(ClcSnapshot, 'clc')
     def test_set_clc_creds_w_token(self, mock_clc_sdk):
-        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken'}):
+        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',
+                                       'CLC_ACCT_ALIAS': 'TEST'}):
             under_test = ClcSnapshot(self.module)
             under_test._set_clc_creds_from_env()
         self.assertEqual(under_test.clc._LOGIN_TOKEN_V2, 'dummyToken')

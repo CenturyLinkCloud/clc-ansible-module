@@ -107,7 +107,8 @@ class TestClcPublicIpFunctions(unittest.TestCase):
 
 
     def test_set_clc_credentials_w_token(self):
-        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'Token12345'}):
+        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'Token12345',
+                                       'CLC_ACCT_ALIAS': 'TEST' }):
             with patch.object(ClcPublicIp, 'clc') as mock_clc_sdk:
                 under_test = ClcPublicIp(self.module)
                 under_test.set_clc_credentials_from_env()
