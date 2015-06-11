@@ -243,15 +243,11 @@ class ClcModifyServer():
         """
         p = module.params
         wait = p.get('wait')
-        cpu = p.get('cpu')
-        memory = p.get('memory')
-        aa_policy_id = p.get('anti_affinity_policy_id')
-        aa_policy_name = p.get('anti_affinity_policy_name')
         server_params = {
-            'cpu': cpu,
-            'memory': memory,
-            'anti_affinity_policy_id': aa_policy_id,
-            'anti_affinity_policy_name': aa_policy_name
+            'cpu': p.get('cpu'),
+            'memory': p.get('memory'),
+            'anti_affinity_policy_id': p.get('anti_affinity_policy_id'),
+            'anti_affinity_policy_name': p.get('anti_affinity_policy_name')
         }
         changed = False
         changed_servers = []
@@ -457,7 +453,7 @@ class ClcModifyServer():
             aa_policy_id = result.get('id')
         except APIFailedResponse, e:
             if e.response_status_code != 404:
-                raise(e)
+                raise e
         return aa_policy_id
 
     @staticmethod
