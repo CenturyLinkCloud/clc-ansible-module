@@ -151,6 +151,7 @@ This module can be used to modify server configuration in CLC.
       register: clc
     - name: debug
       debug: var=clc.server_ids
+```
 
 ```yaml
 ---
@@ -171,6 +172,25 @@ This module can be used to modify server configuration in CLC.
       debug: var=clc.server_ids
 ```
 
+```yaml
+---
+- name: modify clc server example
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Modify anti affinity policy of a hyper scale server at CLC
+      clc_modify_server:
+        server_ids:
+            - UC1ACCTSRVR01
+        anti_affinity_policy_name: 'aa_policy'
+        wait: True
+        state: update
+      register: clc
+    - name: debug
+      debug: var=clc.server_ids
+```
+
 ###Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
@@ -178,6 +198,8 @@ This module can be used to modify server configuration in CLC.
 | `server_ids:` | Y |  |  | The lis of servers to be modified.
 | `cpu:` | N |  | valid int value | How many CPUs to set on the server.
 | `memory:` | N |  | valid int value | Memory in GB.
+| `anti_affinity_policy_id:` | N | | | The anti-affinity policy id to assign to the server. This is mutually exclusive with `anti_affinity_policy_name:`
+| `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server. This is mutually exclusive with `anti_affinity_policy_id:`
 | `state:` | Y | `update` | `update` | The state to insure that the provided resources are in( Note: more states are on the way).
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```

@@ -69,6 +69,36 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
     @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
     @patch.object(clc_modify_server, 'clc_sdk')
+    def test_process_request_state_update_cpu_memory_aapolicy(self,
+                                          mock_clc_sdk,
+                                          mock_set_clc_creds):
+        # Setup Test
+        self.module.params = {
+            'state': 'update',
+            'server_ids': ['TEST_SERVER'],
+            'cpu': 2,
+            'anti_affinity_policy_id': 123,
+            'memory': 4,
+            'wait': True
+        }
+
+        mock_server = mock.MagicMock()
+        mock_server.id = 'TEST_SERVER'
+        mock_server.cpu = 2
+        mock_server.memory= 2
+
+        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
+
+        # Test
+        under_test = ClcModifyServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.assertTrue(self.module.exit_json.called)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_modify_server, 'clc_sdk')
     def test_process_request_state_update_cpu(self,
                                           mock_clc_sdk,
                                           mock_set_clc_creds):
@@ -93,7 +123,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
         # Assert
         self.assertTrue(self.module.exit_json.called)
-        self.assertTrue(self.module.fail_json.called)
+        self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
     @patch.object(clc_modify_server, 'clc_sdk')
@@ -121,7 +151,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
         # Assert
         self.assertTrue(self.module.exit_json.called)
-        self.assertTrue(self.module.fail_json.called)
+        self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
     @patch.object(clc_modify_server, 'clc_sdk')
@@ -260,6 +290,44 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         # Assert
         self.assertFalse(self.module.fail_json.called)
         self.assertIsNotNone(result)
+
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_get_anti_affinity_policy_id_by_name_singe_match(self, mock_clc_sdk):
+        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
+                                                [{'name' : 'test1', 'id' : '111'},
+                                                 {'name' : 'test2', 'id' : '222'}]}]
+
+        policy_id = ClcModifyServer._get_anti_affinity_policy_id_by_name(mock_clc_sdk, None, 'alias', 'test1')
+        self.assertEqual('111', policy_id)
+
+    @patch.object(clc_modify_server, 'AnsibleModule')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_get_anti_affinity_policy_id_by_name_no_match(self, mock_clc_sdk, mock_ansible_module):
+        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
+                                                [{'name' : 'test1', 'id' : '111'},
+                                                 {'name' : 'test2', 'id' : '222'}]}]
+
+        policy_id = ClcModifyServer._get_anti_affinity_policy_id_by_name(mock_clc_sdk,
+                                                                         mock_ansible_module,
+                                                                         'alias',
+                                                                         'testnone')
+        mock_ansible_module.fail_json.assert_called_with(
+            msg='No anti affinity policy was found with policy name : testnone')
+
+    @patch.object(clc_modify_server, 'AnsibleModule')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_get_anti_affinity_policy_id_by_name_duplicate_match(self, mock_clc_sdk, mock_ansible_module):
+        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
+                                                [{'name' : 'test1', 'id' : '111'},
+                                                 {'name' : 'test2', 'id' : '222'},
+                                                 {'name' : 'test1', 'id' : '111'}]}]
+
+        policy_id = ClcModifyServer._get_anti_affinity_policy_id_by_name(mock_clc_sdk,
+                                                                         mock_ansible_module,
+                                                                         'alias',
+                                                                         'test1')
+        mock_ansible_module.fail_json.assert_called_with(
+            msg='mutiple anti affinity policies were found with policy name : test1')
 
 if __name__ == '__main__':
     unittest.main()
