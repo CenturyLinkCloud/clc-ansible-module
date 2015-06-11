@@ -1,0 +1,5 @@
+clc-sdk
+pybuilder
+mock
+nose
+coverage
