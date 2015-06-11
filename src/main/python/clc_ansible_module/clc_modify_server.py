@@ -376,11 +376,11 @@ class ClcModifyServer():
         aa_policy_id = server_params.get('anti_affinity_policy_id')
         aa_policy_name = server_params.get('anti_affinity_policy_name')
         if not aa_policy_id and aa_policy_name:
-            aa_policy_id = ClcModifyServer._get_anti_affinity_policy_id_by_name(clc, module, acct_alias, aa_policy_name)
-        current_aa_policy_id = ClcModifyServer._get_anti_affinity_policy_id_of_server(clc,
-                                                                                      module,
-                                                                                      acct_alias,
-                                                                                      server.id)
+            aa_policy_id = ClcModifyServer._get_aa_policy_id_by_name(clc, module, acct_alias, aa_policy_name)
+        current_aa_policy_id = ClcModifyServer._get_aa_policy_id_of_server(clc,
+                                                                           module,
+                                                                           acct_alias,
+                                                                           server.id)
 
         if aa_policy_id and aa_policy_id != current_aa_policy_id:
             if server not in changed_servers:
@@ -412,7 +412,7 @@ class ClcModifyServer():
 
 
     @staticmethod
-    def _get_anti_affinity_policy_id_by_name(clc, module, alias, aa_policy_name):
+    def _get_aa_policy_id_by_name(clc, module, alias, aa_policy_name):
         """
         retrieves the anti affinity policy id of the server based on the name of the policy
         :param clc: the clc-sdk instance to use
@@ -437,7 +437,7 @@ class ClcModifyServer():
         return aa_policy_id
 
     @staticmethod
-    def _get_anti_affinity_policy_id_of_server(clc, module, alias, server_id):
+    def _get_aa_policy_id_of_server(clc, module, alias, server_id):
         """
         retrieves the anti affinity policy id of the server based on the CLC server id
         :param clc: the clc-sdk instance to use

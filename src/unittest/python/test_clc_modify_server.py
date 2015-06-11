@@ -297,7 +297,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                                 [{'name' : 'test1', 'id' : '111'},
                                                  {'name' : 'test2', 'id' : '222'}]}]
 
-        policy_id = ClcModifyServer._get_anti_affinity_policy_id_by_name(mock_clc_sdk, None, 'alias', 'test1')
+        policy_id = ClcModifyServer._get_aa_policy_id_by_name(mock_clc_sdk, None, 'alias', 'test1')
         self.assertEqual('111', policy_id)
 
     @patch.object(clc_modify_server, 'AnsibleModule')
@@ -307,10 +307,10 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                                 [{'name' : 'test1', 'id' : '111'},
                                                  {'name' : 'test2', 'id' : '222'}]}]
 
-        policy_id = ClcModifyServer._get_anti_affinity_policy_id_by_name(mock_clc_sdk,
-                                                                         mock_ansible_module,
-                                                                         'alias',
-                                                                         'testnone')
+        policy_id = ClcModifyServer._get_aa_policy_id_by_name(mock_clc_sdk,
+                                                              mock_ansible_module,
+                                                              'alias',
+                                                              'testnone')
         mock_ansible_module.fail_json.assert_called_with(
             msg='No anti affinity policy was found with policy name : testnone')
 
@@ -322,10 +322,10 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                                  {'name' : 'test2', 'id' : '222'},
                                                  {'name' : 'test1', 'id' : '111'}]}]
 
-        policy_id = ClcModifyServer._get_anti_affinity_policy_id_by_name(mock_clc_sdk,
-                                                                         mock_ansible_module,
-                                                                         'alias',
-                                                                         'test1')
+        policy_id = ClcModifyServer._get_aa_policy_id_by_name(mock_clc_sdk,
+                                                              mock_ansible_module,
+                                                              'alias',
+                                                              'test1')
         mock_ansible_module.fail_json.assert_called_with(
             msg='mutiple anti affinity policies were found with policy name : test1')
 
