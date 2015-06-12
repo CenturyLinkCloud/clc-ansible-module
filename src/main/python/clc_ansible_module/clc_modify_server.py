@@ -40,9 +40,9 @@ options:
   state:
     description:
       - The state to insure that the provided resources are in.
-    default: 'update'
+    default: 'present'
     required: False
-    choices: ['update']
+    choices: ['present']
     aliases: []
   wait:
     description:
@@ -60,26 +60,26 @@ EXAMPLES = '''
   clc_server:
     server_ids: ['UC1ACCTTEST01']
     cpu: 4
-    state: update
+    state: present
 
 - name: set the memory to 8GB on a server
   clc_server:
     server_ids: ['UC1ACCTTEST01']
     memory: 8
-    state: update
+    state: present
 
 - name: set the anti affinity policy on a server
   clc_server:
     server_ids: ['UC1ACCTTEST01']
     anti_affinity_policy_name: 'aa_policy'
-    state: update
+    state: present
 
 - name: set the memory to 16GB and cpu to 8 core on a lust if servers
   clc_server:
     server_ids: ['UC1ACCTTEST01','UC1ACCTTEST02']
     cpu: 8
     memory: 16
-    state: update
+    state: present
 '''
 
 import sys
@@ -137,7 +137,7 @@ class ClcModifyServer():
         #  Handle each state
         #
 
-        if state == 'update':
+        if state == 'present':
             server_ids = p['server_ids']
             cpu = p.get('cpu')
             memory = p.get('memory')
@@ -165,7 +165,7 @@ class ClcModifyServer():
         """
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
-            state=dict(default='update', choices=['update']),
+            state=dict(default='present', choices=['present']),
             cpu=dict(),
             memory=dict(),
             anti_affinity_policy_id=dict(),

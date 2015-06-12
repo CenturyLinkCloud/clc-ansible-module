@@ -45,7 +45,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                           mock_set_clc_creds):
         # Setup Test
         self.module.params = {
-            'state': 'update',
+            'state': 'present',
             'server_ids': ['TEST_SERVER'],
             'cpu': 2,
             'memory': 4,
@@ -74,7 +74,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                           mock_set_clc_creds):
         # Setup Test
         self.module.params = {
-            'state': 'update',
+            'state': 'present',
             'server_ids': ['TEST_SERVER'],
             'cpu': 2,
             'anti_affinity_policy_id': 123,
@@ -104,7 +104,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                           mock_set_clc_creds):
         # Setup Test
         self.module.params = {
-            'state': 'update',
+            'state': 'present',
             'server_ids': ['TEST_SERVER'],
             'cpu': 2,
             'wait': True
@@ -132,7 +132,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                           mock_set_clc_creds):
         # Setup Test
         self.module.params = {
-            'state': 'update',
+            'state': 'present',
             'server_ids': ['TEST_SERVER'],
             'memory': 2,
             'wait': True
@@ -160,7 +160,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                           mock_set_clc_creds):
         # Setup Test
         self.module.params = {
-            'state': 'update',
+            'state': 'present',
             'server_ids': None,
             'cpu': 2,
             'memory': 4,
@@ -192,7 +192,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                           mock_set_clc_creds):
         # Setup Test
         self.module.params = {
-            'state': 'update',
+            'state': 'present',
             'server_ids': ['TEST_SERVER'],
             'cpu': 2,
             'memory': 4,
@@ -268,7 +268,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                           mock_clc_sdk):
         # Setup Test
         self.module.params = {
-            'state': 'update',
+            'state': 'present',
             'server_ids': ['TEST_SERVER'],
             'cpu': 2,
             'memory': 4,
