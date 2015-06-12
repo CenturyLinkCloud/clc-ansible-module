@@ -311,6 +311,9 @@ class ClcGroup():
         groups = child_group.Subgroups().groups
         if len(groups) > 0:
             for group in groups:
+                if group.type != 'default':
+                    continue
+
                 result.update(self._walk_groups_recursive(child_group, group))
         return result
 
