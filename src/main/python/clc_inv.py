@@ -27,7 +27,6 @@ The following information is returned for each host:
 #
 #  TODO: Add caching
 #  TODO: Add ability to specify AccountAlias
-#  TODO: Add ability to limit inventory queries to certain datacenters
 
 import sys
 import os
@@ -74,7 +73,7 @@ def _find_all_groups():
     :return: group dictionary
     '''
     p = Pool(GROUP_POOL_CNT)
-    datacenters = _filter_datacenters(clc.v2.Datacenter().Datacenters())
+    datacenters = _filter_datacenters(clc.v2.Datacenter.Datacenters())
     results = p.map(_find_groups_for_datacenter, datacenters)
     p.close()
     p.join()
@@ -102,6 +101,10 @@ def _find_groups_for_datacenter(datacenter):
     groups = datacenter.Groups().groups
     result = {}
     for group in groups:
+
+        if group.type == 'trash' or group.type == 'template':
+            continue
+
         try:
             servers = group.Servers().servers_lst
         except CLCException:
@@ -143,6 +146,9 @@ def _find_hostvars_single_server(server_id):
     result = {}
     try:
         server = clc.v2.Server(server_id)
+
+        if len(server.data['details']['ipAddresses']) == 0:
+            return
 
         result[server.name] = {
             'ansible_ssh_host': server.data['details']['ipAddresses'][0]['internal'],
@@ -237,12 +243,19 @@ def _set_clc_credentials_from_env():
     :return: None
     '''
     env = os.environ
-    v2_api_token = env.get('Authorization', False)
+    v2_api_token = env.get('CLC_V2_API_TOKEN', False)
     v2_api_username = env.get('CLC_V2_API_USERNAME', False)
     v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
+    clc_alias = env.get('CLC_ACCT_ALIAS', False)
+    api_url = env.get('CLC_V2_API_URL', False)
 
-    if v2_api_token:
+    if api_url:
+        clc.defaults.ENDPOINT_URL_V2 = api_url
+
+    if v2_api_token and clc_alias:
         clc._LOGIN_TOKEN_V2 = v2_api_token
+        clc._V2_ENABLED = True
+        clc.ALIAS = clc_alias
     elif v2_api_username and v2_api_passwd:
         clc.v2.SetCredentials(
             api_username=v2_api_username,

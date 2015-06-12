@@ -1,0 +1,6 @@
+ansible
+clc-sdk
+pybuilder
+mock
+nose
+coverage

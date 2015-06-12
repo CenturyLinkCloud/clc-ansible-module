@@ -401,12 +401,19 @@ class ClcServer():
         :return: none
         """
         env = os.environ
-        v2_api_token = env.get('Authorization', False)
+        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
         v2_api_username = env.get('CLC_V2_API_USERNAME', False)
         v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
+        clc_alias = env.get('CLC_ACCT_ALIAS', False)
+        api_url = env.get('CLC_V2_API_URL', False)
 
-        if v2_api_token:
+        if api_url:
+            self.clc.defaults.ENDPOINT_URL_V2 = api_url
+
+        if v2_api_token and clc_alias:
             self.clc._LOGIN_TOKEN_V2 = v2_api_token
+            self.clc._V2_ENABLED = True
+            self.clc.ALIAS = clc_alias
         elif v2_api_username and v2_api_passwd:
             self.clc.v2.SetCredentials(
                 api_username=v2_api_username,
@@ -1059,6 +1066,14 @@ class ClcServer():
 
     @staticmethod
     def _get_anti_affinity_policy_id(clc, module, alias, aa_policy_name):
+        """
+        retrieves the anti affinity policy id of the server based on the name of the policy
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param alias: the CLC account alias
+        :param aa_policy_name: the anti affinity policy name
+        :return: aa_policy_id: The anti affinity policy id
+        """
         aa_policy_id = None
         aa_policies = clc.v2.API.Call(method='GET',
                                            url='antiAffinityPolicies/%s' % (alias))

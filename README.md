@@ -147,10 +147,11 @@ This module can be used to modify server configuration in CLC.
         cpu: 2
         memory: 4
         wait: True
-        state: update
+        state: present
       register: clc
     - name: debug
       debug: var=clc.server_ids
+```
 
 ```yaml
 ---
@@ -165,7 +166,26 @@ This module can be used to modify server configuration in CLC.
             - UC1ACCTSRVR01
         memory: 8
         wait: True
-        state: update
+        state: present
+      register: clc
+    - name: debug
+      debug: var=clc.server_ids
+```
+
+```yaml
+---
+- name: modify clc server example
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Modify anti affinity policy of a hyper scale server at CLC
+      clc_modify_server:
+        server_ids:
+            - UC1ACCTSRVR01
+        anti_affinity_policy_name: 'aa_policy'
+        wait: True
+        state: present
       register: clc
     - name: debug
       debug: var=clc.server_ids
@@ -178,7 +198,9 @@ This module can be used to modify server configuration in CLC.
 | `server_ids:` | Y |  |  | The lis of servers to be modified.
 | `cpu:` | N |  | valid int value | How many CPUs to set on the server.
 | `memory:` | N |  | valid int value | Memory in GB.
-| `state:` | Y | `update` | `update` | The state to insure that the provided resources are in( Note: more states are on the way).
+| `anti_affinity_policy_id:` | N | | | The anti-affinity policy id to assign to the server. This is mutually exclusive with `anti_affinity_policy_name:`
+| `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server. This is mutually exclusive with `anti_affinity_policy_id:`
+| `state:` | Y | `present` | `present` | The state to insure that the provided resources are in( Note: more states are on the way).
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
@@ -566,3 +588,6 @@ pyb clean
 pyb -X -v
 ```
 
+###Mirrored
+This project is now mirrored to https://github.com/CenturylinkTechnology/wf-clc-ansible-module-mirror
+Test

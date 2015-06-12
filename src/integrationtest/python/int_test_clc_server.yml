@@ -4,6 +4,11 @@
   gather_facts: False
   connection: local
   tasks:
+    - name: Setup Test | Insure Default Group is Present
+      clc_group:
+        name: 'Default Group'
+        state: present
+
     - name: Setup Test | Create Test Group
       clc_group:
         name: Integration_Test

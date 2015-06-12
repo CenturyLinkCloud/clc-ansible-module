@@ -173,9 +173,16 @@ class ClcGroup():
         v2_api_token = env.get('CLC_V2_API_TOKEN', False)
         v2_api_username = env.get('CLC_V2_API_USERNAME', False)
         v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
+        clc_alias = env.get('CLC_ACCT_ALIAS', False)
+        api_url = env.get('CLC_V2_API_URL', False)
 
-        if v2_api_token:
+        if api_url:
+            self.clc.defaults.ENDPOINT_URL_V2 = api_url
+
+        if v2_api_token and clc_alias:
             self.clc._LOGIN_TOKEN_V2 = v2_api_token
+            self.clc._V2_ENABLED = True
+            self.clc.ALIAS = clc_alias
         elif v2_api_username and v2_api_passwd:
             self.clc.v2.SetCredentials(
                 api_username=v2_api_username,

@@ -12,7 +12,7 @@
         cpu: 1
         memory: 4
         wait: True
-        state: update
+        state: present
       register: clc
 
     - name: debug
