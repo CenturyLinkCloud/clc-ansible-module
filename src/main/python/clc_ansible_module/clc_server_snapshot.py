@@ -1,25 +1,67 @@
 #!/usr/bin/python
 
-"""
-CenturyLink Cloud Server Snapshot
-=================================
-This is an Ansible module which can be used to create
-a snapshot of a CLC server
-This module expects the below list of arguments to be used in playbook
-    server_ids : the list of server ids to perform create snapshot operation on
-    expiration_days : the no.of days to keep the snapshot (must be between 1 and 10)
-    wait : True/False flag indicating weather to wait until the snapshot job finishes.
-           It is an optional argument. The default value is 'True'
-NOTE:  This script assumes that environment variables are already set
-with control portal credentials in the format of:
-    export CLC_V2_API_USERNAME=<your Control Portal Username>
-    export CLC_V2_API_PASSWD=<your Control Portal Password>
-These credentials are required to use the CLC API and must be provided.
-"""
+DOCUMENTATION = '''
+module: clc_server
+short_desciption: Create, Delete and Restore server snapshots in CenturyLink Cloud.
+description:
+  - An Ansible module to Create, Delete and Restore server snapshots in CenturyLink Cloud.
+options:
+  server_ids:
+    description:
+      - A list of server Ids to snapshot.
+    default: []
+    required: True
+    aliases: []
+  expiration_days:
+    description:
+      - The number of days to keep the server snapshot before it expires.
+    default: 7
+    required: False
+    aliases: []
+  state:
+    description:
+      - The state to insure that the provided resources are in.
+    default: 'present'
+    required: False
+    choices: ['present', 'absent', 'restore']
+    aliases: []
+  wait:
+    description:
+      - Whether to wait for the provisioning tasks to finish before returning.
+    default: True
+    required: False
+    choices: [ True, False]
+    aliases: []
+'''
 
-#
-#  @author: Siva Popuri
-#
+EXAMPLES = '''
+# Note - You must set the CLC_V2_API_USERNAME And CLC_V2_API_PASSWD Environment variables before running these examples
+
+- name: Create server snapshot
+  clc_server_snapshot:
+    server_ids:
+        - UC1WFSDTEST01
+        - UC1WFSDTEST02
+    expiration_days: 10
+    wait: True
+    state: present
+
+- name: Restore server snapshot
+  clc_server_snapshot:
+    server_ids:
+        - UC1WFSDTEST01
+        - UC1WFSDTEST02
+    wait: True
+    state: restore
+
+- name: Delete server snapshot
+  clc_server_snapshot:
+    server_ids:
+        - UC1WFSDTEST01
+        - UC1WFSDTEST02
+    wait: True
+    state: absent
+'''
 
 import json
 import socket
@@ -58,8 +100,8 @@ class ClcSnapshot():
 
     def process_request(self):
         """
-        The root function which handles the Ansible module execution
-        :return: TODO:
+        Process the request - Main Code Path
+        :return: Returns with either an exit_json or fail_json
         """
         p = self.module.params
 
@@ -99,6 +141,11 @@ class ClcSnapshot():
             servers=result_servers)
 
     def run_clc_commands(self, command_list):
+        """
+        Executes the CLC commands
+        :param command_list: the list of commands to be executed
+        :return: a flag indicating if any change made to the server and the list of servers modified
+        """
         requests_list = []
         changed_servers = []
         for command in command_list:
@@ -154,12 +201,13 @@ class ClcSnapshot():
         )
         return argument_spec
 
-    #
-    #   Module Behavior Functions
-    #
-
-
     def clc_create_servers_snapshot(self, server_ids, expiration_days):
+        """
+        Create the snapshot on the given list of CLC servers
+        :param server_ids: the list of clc servier ids to create snapshot
+        :param expiration_days: the number of days to keep the snapshot
+        :return: the create snapshot API response and the list of servers modified
+        """
         try:
             servers = self._get_servers_from_clc(
             server_ids,
@@ -177,11 +225,11 @@ class ClcSnapshot():
 
 
     def clc_delete_servers_snapshot(self, server_ids):
-        '''
+        """
         deletes the existing servers snapshot
-        :param server_ids: the list of target clc server ids
-        :return: nothing
-        '''
+        :param server_ids: the list of clc server ids
+        :return: the delete snapshot API response and the list of servers modified
+        """
         servers = self._get_servers_from_clc(
             server_ids,
             'Failed to obtain server list from the CLC API')
@@ -198,7 +246,7 @@ class ClcSnapshot():
         '''
         restores to the existing snapshot (if available)
         :param server_ids: the list of target clc server ids
-        :return: nothing
+        :return: the restore snapshot API response and the list of servers modified
         '''
         servers = self._get_servers_from_clc(
             server_ids,
