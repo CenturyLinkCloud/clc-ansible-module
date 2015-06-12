@@ -408,7 +408,7 @@ class ClcServer():
         api_url = env.get('CLC_V2_API_URL', False)
 
         if api_url:
-          self.clc.defaults.ENDPOINT_URL_V2 = api_url
+            self.clc.defaults.ENDPOINT_URL_V2 = api_url
 
         if v2_api_token and clc_alias:
             self.clc._LOGIN_TOKEN_V2 = v2_api_token
