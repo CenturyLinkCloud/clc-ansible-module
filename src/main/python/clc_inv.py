@@ -27,7 +27,6 @@ The following information is returned for each host:
 #
 #  TODO: Add caching
 #  TODO: Add ability to specify AccountAlias
-#  TODO: Add ability to limit inventory queries to certain datacenters
 
 import sys
 import os
@@ -74,7 +73,7 @@ def _find_all_groups():
     :return: group dictionary
     '''
     p = Pool(GROUP_POOL_CNT)
-    datacenters = _filter_datacenters(clc.v2.Datacenter().Datacenters())
+    datacenters = _filter_datacenters(clc.v2.Datacenter.Datacenters())
     results = p.map(_find_groups_for_datacenter, datacenters)
     p.close()
     p.join()
