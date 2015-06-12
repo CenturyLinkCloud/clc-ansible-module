@@ -47,6 +47,20 @@ class TestClcServerFunctions(unittest.TestCase):
 
         self.assertEqual(self.module.fail_json.called, True)
 
+    def test_override_v2_api_url_from_environment(self):
+        original_url = clc_sdk.defaults.ENDPOINT_URL_V2
+        under_test = ClcGroup(self.module)
+
+        under_test.set_clc_credentials_from_env()
+        self.assertEqual(clc_sdk.defaults.ENDPOINT_URL_V2, original_url)
+
+        with patch.dict('os.environ', {'CLC_V2_API_URL': 'http://unittest.example.com/'}):
+            under_test.set_clc_credentials_from_env()
+
+        self.assertEqual(clc_sdk.defaults.ENDPOINT_URL_V2, 'http://unittest.example.com/')
+
+        clc_sdk.defaults.ENDPOINT_URL_V2 = original_url
+
     def test_define_argument_spec(self):
         result = ClcGroup.define_argument_spec()
         self.assertIsInstance(result, dict)
