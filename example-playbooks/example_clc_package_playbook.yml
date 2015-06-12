@@ -4,7 +4,7 @@
   gather_facts: False
   connection: local
   tasks:
-    - name: Create server snapshot
+    - name: Deploy a package on CLC Servers
       clc_package:
         server_ids:
             - UC1WFSDANS01
