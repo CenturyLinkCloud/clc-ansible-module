@@ -102,6 +102,10 @@ def _find_groups_for_datacenter(datacenter):
     groups = datacenter.Groups().groups
     result = {}
     for group in groups:
+
+        if group.type == 'trash' or group.type == 'template':
+            continue
+
         try:
             servers = group.Servers().servers_lst
         except CLCException:
@@ -143,6 +147,9 @@ def _find_hostvars_single_server(server_id):
     result = {}
     try:
         server = clc.v2.Server(server_id)
+
+        if len(server.data['details']['ipAddresses']) == 0:
+            return
 
         result[server.name] = {
             'ansible_ssh_host': server.data['details']['ipAddresses'][0]['internal'],
@@ -241,6 +248,10 @@ def _set_clc_credentials_from_env():
     v2_api_username = env.get('CLC_V2_API_USERNAME', False)
     v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
     clc_alias = env.get('CLC_ACCT_ALIAS', False)
+    api_url = env.get('CLC_V2_API_URL', False)
+
+    if api_url:
+        clc.defaults.ENDPOINT_URL_V2 = api_url
 
     if v2_api_token and clc_alias:
         clc._LOGIN_TOKEN_V2 = v2_api_token
