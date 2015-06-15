@@ -132,6 +132,8 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_clc_sdk.v2.Requests.return_value = mock_requests
         mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
 
+        self.module.check_mode = False
+
         # Test
         under_test = ClcServer(self.module)
         under_test.process_request()

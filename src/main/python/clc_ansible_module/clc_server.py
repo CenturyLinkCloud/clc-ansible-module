@@ -663,21 +663,22 @@ class ClcServer():
 
         if changed:
             for i in range(0, count):
-                req = ClcServer._create_clc_server(clc=clc,
-                                                   module=module,
-                                                   server_params=params)
-                server = req.requests[0].Server()
-                requests.append(req)
-                servers.append(server)
+                if not module.check_mode:
+                    req = ClcServer._create_clc_server(clc=clc,
+                                                       module=module,
+                                                       server_params=params)
+                    server = req.requests[0].Server()
+                    requests.append(req)
+                    servers.append(server)
 
-            ClcServer._wait_for_requests(clc, requests, servers, wait)
+                    ClcServer._wait_for_requests(clc, requests, servers, wait)
 
-            ClcServer._add_public_ip_to_servers(
-                should_add_public_ip=add_public_ip,
-                servers=servers,
-                public_ip_protocol=public_ip_protocol,
-                public_ip_ports=public_ip_ports,
-                wait=wait)
+                    ClcServer._add_public_ip_to_servers(
+                        should_add_public_ip=add_public_ip,
+                        servers=servers,
+                        public_ip_protocol=public_ip_protocol,
+                        public_ip_ports=public_ip_ports,
+                        wait=wait)
 
             for server in servers:
                 # reload server details so public IP shows up
@@ -722,7 +723,6 @@ class ClcServer():
         p = module.params
         changed_server_ids = None
         changed = False
-        checkmode = False
         count_group = p.get('count_group')
         datacenter = ClcServer._find_datacenter(clc, module)
         exact_count = p.get('exact_count')
@@ -742,22 +742,20 @@ class ClcServer():
         elif len(running_servers) < exact_count:
             changed = True
             to_create = exact_count - len(running_servers)
-            if not checkmode:
-                server_dict_array, changed_server_ids, changed \
-                    = ClcServer._create_servers(module, clc, override_count=to_create)
+            server_dict_array, changed_server_ids, changed \
+                = ClcServer._create_servers(module, clc, override_count=to_create)
 
-                for server in server_dict_array:
-                    running_servers.append(server)
+            for server in server_dict_array:
+                running_servers.append(server)
 
         elif len(running_servers) > exact_count:
             changed = True
             to_remove = len(running_servers) - exact_count
-            if not checkmode:
-                all_server_ids = sorted([x.id for x in running_servers])
-                remove_ids = all_server_ids[0:to_remove]
+            all_server_ids = sorted([x.id for x in running_servers])
+            remove_ids = all_server_ids[0:to_remove]
 
-                (changed, server_dict_array, changed_server_ids) \
-                    = ClcServer._delete_servers(module, clc, remove_ids)
+            (changed, server_dict_array, changed_server_ids) \
+                = ClcServer._delete_servers(module, clc, remove_ids)
 
         return server_dict_array, changed_server_ids, changed
 
@@ -847,7 +845,8 @@ class ClcServer():
         changed = True
 
         for server in servers:
-            requests.append(server.Delete())
+            if not module.check_mode:
+                requests.append(server.Delete())
 
         if wait:
             for r in requests:
@@ -887,7 +886,8 @@ class ClcServer():
         for server in servers:
             if server.powerState != state:
                 changed_servers.append(server)
-                requests.append(ClcServer._change_server_power_state(module, server, state))
+                if not module.check_mode:
+                    requests.append(ClcServer._change_server_power_state(module, server, state))
                 changed = True
 
         if wait:
@@ -909,7 +909,7 @@ class ClcServer():
         :param module: the module to check for intended state
         :param server: the server to start or stop
         :param state: the intended powerState for the server
-        :return:
+        :return: the request object from clc-sdk call
         """
         result = None
         try:
@@ -1153,7 +1153,7 @@ def main():
     :return: none
     """
     argument_dict = ClcServer._define_module_argument_spec()
-    module = AnsibleModule(**argument_dict)
+    module = AnsibleModule(supports_check_mode=True, **argument_dict)
 
     clc_server = ClcServer(module)
     clc_server.process_request()
