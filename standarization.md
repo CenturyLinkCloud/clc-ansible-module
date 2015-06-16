@@ -1,18 +1,24 @@
 
 
-### 
+### Insure that all modules honor CHECK mode:
+See http://docs.ansible.com/developing_modules.html#check-mode and https://docs.ansible.com/playbooks_checkmode.html
 
-### Standard wait parameter
+1.  Pass ```supports_check_mode=True``` when instantiating the AnsibleModule object.
+2.  Place ```if not module.check_mode:``` before any call to the CLC API that would change state.
+3.  Insure that module.exit_json only returns items actually changed from ```changed=```
+
+### Standardize wait parameter
 All modules should take ```wait``` as a parameter.  It should default to ```True```.  If wait is set to false, then the 
 module should not wait for queued actions to complete before finishing.
 
-## Standard state parameter
+### Standardize state parameter
 All modules should take state as a parameter, and should accept ```present``` and ```absent``` as a minimum.
 ```python
             state=dict(default='present', choices=['present', 'absent'])
 ```
 
-## Standard _set_clc_credentials_from_env
+### Standardize ```_set_clc_credentials_from_env```
+All modules should have a standard ```_set_clc_credentials_from_env``` function that follows this form:
 
 ```python
     def _set_clc_credentials_from_env(self):
@@ -43,3 +49,15 @@ All modules should take state as a parameter, and should accept ```present``` an
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
 ```
+
+### Fix or Remove all # TODO lines
+
+No module should have any outstanding TODO lines.   Please implement any outstanding TODOs or remove them and create a card in the backlog.
+
+###  All Modules should have DOCUMENTATION and EXAMPLES strings
+
+See the clc_server module for an example.
+
+### All Classes and Functions should have docstrings
+
+Insure that all classes and functions should have docstrings that follow the conventions in [PEP257](https://www.python.org/dev/peps/pep-0257/).
