@@ -63,6 +63,7 @@ See the clc_server module for an example.
 Insure that all classes and functions should have docstrings that follow the conventions in [PEP257](https://www.python.org/dev/peps/pep-0257/).
 
 ### Add copywrite comment to the beginning of each module
+This should be included in each file at the very beginning, before the DOCUMENTATION string.
 
 ```python
 # CenturyLink Cloud Ansible Modules.
