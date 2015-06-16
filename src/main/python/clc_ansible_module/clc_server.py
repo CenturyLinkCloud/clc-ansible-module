@@ -1,4 +1,31 @@
 #!/usr/bin/python
+
+# CenturyLink Cloud Ansible Modules.
+#
+# These Ansible modules enable the CenturyLink Cloud v2 API to be called
+# from an within Ansible Playbook.
+#
+# This file is part of CenturyLink Cloud, and is maintained
+# by the Workflow as a Service Team
+#
+# Copyright 2015 CenturyLink Cloud
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# CenturyLink Cloud: http://www.CenturyLinkCloud.com
+# API Documentation: https://www.centurylinkcloud.com/api-docs/v2/
+#
+
 DOCUMENTATION = '''
 module: clc_server
 short_desciption: Create, Delete, Start and Stop servers in CenturyLink Cloud.
@@ -243,10 +270,6 @@ EXAMPLES = '''
 
 # TODO: Handle clc.APIExceptions
 
-import sys
-import os
-import datetime
-import json
 import socket
 from time import sleep
 
@@ -263,6 +286,7 @@ except ImportError:
     clc_sdk = None
 else:
     CLC_FOUND = True
+
 
 class ClcServer():
     clc = clc_sdk
@@ -364,34 +388,45 @@ class ClcServer():
                              password=dict(default=None),
                              ip_address=dict(default=None),
                              storage_type=dict(default='standard'),
-                             type=dict(default='standard', choices=['standard', 'hyperscale']),
-                             primary_dns=dict(default=None),
-                             secondary_dns=dict(default=None),
-                             additional_disks=dict(type='list', default=[]),
-                             custom_fields=dict(type='list', default=[]),
-                             ttl=dict(default=None),
-                             managed_os=dict(type='bool', default=False),
-                             description=dict(default=None),
-                             source_server_password=dict(default=None),
-                             cpu_autoscale_policy_id=dict(default=None),
-                             anti_affinity_policy_id=dict(default=None),
-                             anti_affinity_policy_name=dict(default=None),
-                             packages=dict(type='list', default=[]),
-                             state=dict(default='present', choices=['present', 'absent', 'started', 'stopped']),
-                             count=dict(type='int', default='1'),
-                             exact_count=dict(type='int', default=None),
-                             count_group=dict(),
-                             server_ids=dict(type='list'),
-                             add_public_ip=dict(type='bool', default=False),
-                             public_ip_protocol=dict(default='TCP'),
-                             public_ip_ports=dict(type='list'),
-                             wait=dict(type='bool', default=True))
+                             type=dict(
+            default='standard',
+            choices=[
+                'standard',
+                'hyperscale']),
+            primary_dns=dict(default=None),
+            secondary_dns=dict(default=None),
+            additional_disks=dict(type='list', default=[]),
+            custom_fields=dict(type='list', default=[]),
+            ttl=dict(default=None),
+            managed_os=dict(type='bool', default=False),
+            description=dict(default=None),
+            source_server_password=dict(default=None),
+            cpu_autoscale_policy_id=dict(default=None),
+            anti_affinity_policy_id=dict(default=None),
+            anti_affinity_policy_name=dict(default=None),
+            packages=dict(type='list', default=[]),
+            state=dict(
+            default='present',
+            choices=[
+                'present',
+                'absent',
+                'started',
+                'stopped']),
+            count=dict(type='int', default='1'),
+            exact_count=dict(type='int', default=None),
+            count_group=dict(),
+            server_ids=dict(type='list'),
+            add_public_ip=dict(type='bool', default=False),
+            public_ip_protocol=dict(default='TCP'),
+            public_ip_ports=dict(type='list'),
+            wait=dict(type='bool', default=True))
 
         mutually_exclusive = [
-                                ['exact_count', 'count'],
-                                ['exact_count', 'state'],
-                                ['anti_affinity_policy_id', 'anti_affinity_policy_name'],
-                             ]
+            ['exact_count', 'count'],
+            ['exact_count', 'state'],
+            ['anti_affinity_policy_id',
+             'anti_affinity_policy_name'],
+        ]
         return {"argument_spec": argument_spec,
                 "mutually_exclusive": mutually_exclusive}
 
@@ -437,14 +472,14 @@ class ClcServer():
         ClcServer._validate_types(module)
         ClcServer._validate_name(module)
 
-        params['alias']          = ClcServer._find_alias(clc, module)
-        params['cpu']            = ClcServer._find_cpu(clc, module)
-        params['memory']         = ClcServer._find_memory(clc, module)
-        params['description']    = ClcServer._find_description(module)
-        params['ttl']            = ClcServer._find_ttl(clc, module)
-        params['template']       = ClcServer._find_template_id(module, datacenter)
-        params['group']          = ClcServer._find_group(module, datacenter).id
-        params['network_id']     = ClcServer._find_network_id(module, datacenter)
+        params['alias'] = ClcServer._find_alias(clc, module)
+        params['cpu'] = ClcServer._find_cpu(clc, module)
+        params['memory'] = ClcServer._find_memory(clc, module)
+        params['description'] = ClcServer._find_description(module)
+        params['ttl'] = ClcServer._find_ttl(clc, module)
+        params['template'] = ClcServer._find_template_id(module, datacenter)
+        params['group'] = ClcServer._find_group(module, datacenter).id
+        params['network_id'] = ClcServer._find_network_id(module, datacenter)
 
         return params
 
@@ -471,7 +506,7 @@ class ClcServer():
         :param module: module to validate
         :return: clc-sdk.Account instance
         """
-        alias  = module.params.get('alias')
+        alias = module.params.get('alias')
         if not alias:
             alias = clc.v2.Account.GetAlias()
         return alias
@@ -495,7 +530,8 @@ class ClcServer():
             if group.Defaults("cpu"):
                 cpu = group.Defaults("cpu")
             else:
-                module.fail_json(msg=str("Cannot determine a default cpu value. Please provide a value for cpu."))
+                module.fail_json(
+                    msg=str("Cannot determine a default cpu value. Please provide a value for cpu."))
         return cpu
 
     @staticmethod
@@ -517,7 +553,8 @@ class ClcServer():
             if group.Defaults("memory"):
                 memory = group.Defaults("memory")
             else:
-                module.fail_json(msg=str("Cannot determine a default memory value. Please provide a value for memory."))
+                module.fail_json(msg=str(
+                    "Cannot determine a default memory value. Please provide a value for memory."))
         return memory
 
     @staticmethod
@@ -540,15 +577,20 @@ class ClcServer():
         :return: none
         """
         state = module.params.get('state')
-        type = module.params.get('type').lower() if module.params.get('type') else None
-        storage_type = module.params.get('storage_type').lower() if module.params.get('storage_type') else None
+        type = module.params.get(
+            'type').lower() if module.params.get('type') else None
+        storage_type = module.params.get(
+            'storage_type').lower() if module.params.get('storage_type') else None
 
         if state == "present":
-            if type == "standard" and storage_type not in ("standard", "premium"):
-                module.fail_json(msg=str("Standard VMs must have storage_type = 'standard' or 'premium'"))
+            if type == "standard" and storage_type not in (
+                    "standard", "premium"):
+                module.fail_json(
+                    msg=str("Standard VMs must have storage_type = 'standard' or 'premium'"))
 
             if type == "hyperscale" and storage_type != "hyperscale":
-                module.fail_json(msg=str("Hyperscale VMs must have storage_type = 'hyperscale'"))
+                module.fail_json(
+                    msg=str("Hyperscale VMs must have storage_type = 'hyperscale'"))
 
     @staticmethod
     def _find_ttl(clc, module):
@@ -684,7 +726,8 @@ class ClcServer():
                 # reload server details so public IP shows up
                 server = clc.v2.Server(server.id)
                 if len(server.PublicIPs().public_ips) > 0:
-                    server.data['publicip'] = str(server.PublicIPs().public_ips[0])
+                    server.data['publicip'] = str(
+                        server.PublicIPs().public_ips[0])
                 server.data['ipaddress'] = server.details[
                     'ipAddresses'][0]['internal']
                 server_dict_array.append(server.data)
@@ -703,8 +746,8 @@ class ClcServer():
         state = module.params.get('state')
 
         if state == 'present' and (len(name) < 1 or len(name) > 6):
-                module.fail_json(msg=str(
-                    "When state = 'present', name must be a string with a minimum length of 1 and a maximum length of 6"))
+            module.fail_json(msg=str(
+                "When state = 'present', name must be a string with a minimum length of 1 and a maximum length of 6"))
 
 #
 #  Functions to execute the module's behaviors
@@ -734,7 +777,8 @@ class ClcServer():
             module.fail_json(
                 msg="you must use the 'count_group' option with exact_count")
 
-        servers, running_servers = ClcServer._find_running_servers_by_group(module, datacenter, count_group)
+        servers, running_servers = ClcServer._find_running_servers_by_group(
+            module, datacenter, count_group)
 
         if len(running_servers) == exact_count:
             changed = False
@@ -771,13 +815,13 @@ class ClcServer():
         """
         if wait:
             # Requests.WaitUntilComplete() returns the count of failed requests
-            failed_requests_count = sum([request.WaitUntilComplete() for request in requests])
+            failed_requests_count = sum(
+                [request.WaitUntilComplete() for request in requests])
 
             if failed_requests_count > 0:
                 raise clc
             else:
                 ClcServer._refresh_servers(servers)
-
 
     @staticmethod
     def _refresh_servers(servers):
@@ -811,7 +855,8 @@ class ClcServer():
             requests = []
 
             for port in public_ip_ports:
-                ports_lst.append({'protocol': public_ip_protocol, 'port': port})
+                ports_lst.append(
+                    {'protocol': public_ip_protocol, 'port': port})
 
             for server in servers:
                 requests.append(server.PublicIPs().Add(ports_lst))
@@ -887,7 +932,11 @@ class ClcServer():
             if server.powerState != state:
                 changed_servers.append(server)
                 if not module.check_mode:
-                    requests.append(ClcServer._change_server_power_state(module, server, state))
+                    requests.append(
+                        ClcServer._change_server_power_state(
+                            module,
+                            server,
+                            state))
                 changed = True
 
         if wait:
@@ -933,7 +982,10 @@ class ClcServer():
         :param count_group: the group to count the servers
         :return: list of servers, and list of running servers
         """
-        group = ClcServer._find_group(module=module, datacenter=datacenter, lookup_group=count_group)
+        group = ClcServer._find_group(
+            module=module,
+            datacenter=datacenter,
+            lookup_group=count_group)
 
         servers = group.Servers().Servers()
         running_servers = []
@@ -962,7 +1014,10 @@ class ClcServer():
             pass
 
         # The search above only acts on the main
-        result = ClcServer._find_group_recursive(module, datacenter.Groups(), lookup_group)
+        result = ClcServer._find_group_recursive(
+            module,
+            datacenter.Groups(),
+            lookup_group)
 
         if result is None:
             module.fail_json(
@@ -989,13 +1044,15 @@ class ClcServer():
             try:
                 return subgroups.Get(lookup_group)
             except:
-                result = ClcServer._find_group_recursive(module, subgroups, lookup_group)
+                result = ClcServer._find_group_recursive(
+                    module,
+                    subgroups,
+                    lookup_group)
 
             if result is not None:
                 break
 
         return result
-
 
     @staticmethod
     def _create_clc_server(
@@ -1014,7 +1071,8 @@ class ClcServer():
         if not aa_policy_id and aa_policy_name:
             aa_policy_id = ClcServer._get_anti_affinity_policy_id(clc,
                                                                   module,
-                                                                  server_params.get('alias'),
+                                                                  server_params.get(
+                                                                      'alias'),
                                                                   aa_policy_name)
 
         res = clc.v2.API.Call(method='POST',
@@ -1046,7 +1104,6 @@ class ClcServer():
         # Push the server create count metric to statsd
         ClcServer._push_metric(ClcServer.STATS_SERVER_CREATE, 1)
 
-
         #
         # Patch the Request object so that it returns a valid server
 
@@ -1076,17 +1133,17 @@ class ClcServer():
         """
         aa_policy_id = None
         aa_policies = clc.v2.API.Call(method='GET',
-                                           url='antiAffinityPolicies/%s' % (alias))
+                                      url='antiAffinityPolicies/%s' % (alias))
         for aa_policy in aa_policies.get('items'):
             if aa_policy.get('name') == aa_policy_name:
                 if not aa_policy_id:
                     aa_policy_id = aa_policy.get('id')
                 else:
                     return module.fail_json(
-                        msg='mutiple anti affinity policies were found with policy name : %s' %(aa_policy_name))
+                        msg='mutiple anti affinity policies were found with policy name : %s' % (aa_policy_name))
         if not aa_policy_id:
             return module.fail_json(
-                msg='No anti affinity policy was found with policy name : %s' %(aa_policy_name))
+                msg='No anti affinity policy was found with policy name : %s' % (aa_policy_name))
         return aa_policy_id
 
     #
@@ -1094,7 +1151,8 @@ class ClcServer():
     #
 
     @staticmethod
-    def _find_server_by_uuid_w_retry(clc, module, svr_uuid, alias=None, retries=5, backout=2):
+    def _find_server_by_uuid_w_retry(
+            clc, module, svr_uuid, alias=None, retries=5, backout=2):
         """
         Find the clc server by the UUID returned from the provisioning request.  Retry the request if a 404 is returned.
         :param clc: the clc-sdk instance to use
@@ -1126,7 +1184,8 @@ class ClcServer():
                                          % (svr_uuid, e.response_status_code, e.message))
                     return
                 if retries == 0:
-                    module.fail_json(msg='Unable to reach the CLC API after 5 attempts')
+                    module.fail_json(
+                        msg='Unable to reach the CLC API after 5 attempts')
                     return
 
                 sleep(backout)
@@ -1134,18 +1193,25 @@ class ClcServer():
 
     @staticmethod
     def _push_metric(path, count):
+        """
+        Sends the usage metric to statsd
+        :param path: The metric path
+        :param count: The number of ticks to record to the metric
+        :return None
+        """
         try:
             sock = socket.socket()
             sock.settimeout(ClcServer.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcServer.STATSD_HOST, ClcServer.STATSD_PORT))
-            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
             sock.close()
         except socket.gaierror:
             # do nothing, ignore and move forward
             error = ''
         except socket.error:
-            #nothing, ignore and move forward
+            # nothing, ignore and move forward
             error = ''
+
 
 def main():
     """
@@ -1154,7 +1220,6 @@ def main():
     """
     argument_dict = ClcServer._define_module_argument_spec()
     module = AnsibleModule(supports_check_mode=True, **argument_dict)
-
     clc_server = ClcServer(module)
     clc_server.process_request()
 
