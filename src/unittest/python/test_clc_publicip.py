@@ -111,7 +111,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
                                        'CLC_ACCT_ALIAS': 'TEST' }):
             with patch.object(ClcPublicIp, 'clc') as mock_clc_sdk:
                 under_test = ClcPublicIp(self.module)
-                under_test.set_clc_credentials_from_env()
+                under_test._set_clc_credentials_from_env()
         self.assertEqual(mock_clc_sdk._LOGIN_TOKEN_V2, 'Token12345')
         self.assertFalse(mock_clc_sdk.v2.SetCredentials.called)
         self.assertEqual(self.module.fail_json.called, False)
@@ -121,30 +121,32 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
             with patch.object(ClcPublicIp, 'clc') as mock_clc_sdk:
                 under_test = ClcPublicIp(self.module)
-                under_test.set_clc_credentials_from_env()
+                under_test._set_clc_credentials_from_env()
         mock_clc_sdk.v2.SetCredentials.assert_called_once_with(api_username='hansolo', api_passwd='falcon')
 
 
     def test_set_clc_credentials_w_no_creds(self):
         with patch.dict('os.environ', {}, clear=True):
             under_test = ClcPublicIp(self.module)
-            under_test.set_clc_credentials_from_env()
+            under_test._set_clc_credentials_from_env()
         self.assertEqual(self.module.fail_json.called, True)
 
 
     def test_define_argument_spec(self):
-        result = ClcPublicIp.define_argument_spec()
+        result = ClcPublicIp._define_module_argument_spec()
         self.assertIsInstance(result, dict)
 
 
     @patch.object(ClcPublicIp, 'run_clc_commands')
-    @patch.object(ClcPublicIp, 'set_clc_credentials_from_env')
+    @patch.object(ClcPublicIp, '_set_clc_credentials_from_env')
     def test_process_request_state_present(self, mock_set_clc_creds, mock_run_clc_commands):
+        None
         test_params = {
             'server_ids': ['TESTSVR1', 'TESTSVR2']
             , 'ports': [80]
             , 'protocol': 'TCP'
             , 'state': 'present'
+            , 'wait': True
         }
         mock_run_clc_commands.return_value = True, ['list1'], ['list2']
 
@@ -155,14 +157,16 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
 
 
+
     @patch.object(ClcPublicIp, 'run_clc_commands')
-    @patch.object(ClcPublicIp, 'set_clc_credentials_from_env')
+    @patch.object(ClcPublicIp, '_set_clc_credentials_from_env')
     def test_process_request_state_absent(self, mock_set_clc_creds, mock_run_clc_commands):
         test_params = {
             'server_ids': ['TESTSVR1', 'TESTSVR2']
             , 'ports': [80]
             , 'protocol': 'TCP'
             , 'state': 'absent'
+            , 'wait': True
         }
         mock_run_clc_commands.return_value = True, ['list1'], ['list2']
 
@@ -174,13 +178,14 @@ class TestClcPublicIpFunctions(unittest.TestCase):
 
 
     @patch.object(ClcPublicIp, 'run_clc_commands')
-    @patch.object(ClcPublicIp, 'set_clc_credentials_from_env')
+    @patch.object(ClcPublicIp, '_set_clc_credentials_from_env')
     def test_process_request_state_invalid(self, mock_set_clc_creds, mock_run_clc_commands):
         test_params = {
             'server_ids': ['TESTSVR1', 'TESTSVR2']
             , 'ports': [80]
             , 'protocol': 'TCP'
             , 'state': 'NOT_VALID_STATE'
+            , 'wait': True
         }
 
         under_test = ClcPublicIp(self.module)

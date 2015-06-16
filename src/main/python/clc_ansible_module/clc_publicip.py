@@ -1,4 +1,31 @@
 #!/usr/bin/python
+
+# CenturyLink Cloud Ansible Modules.
+#
+# These Ansible modules enable the CenturyLink Cloud v2 API to be called
+# from an within Ansible Playbook.
+#
+# This file is part of CenturyLink Cloud, and is maintained
+# by the Workflow as a Service Team
+#
+# Copyright 2015 CenturyLink Cloud
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# CenturyLink Cloud: http://www.CenturyLinkCloud.com
+# API Documentation: https://www.centurylinkcloud.com/api-docs/v2/
+#
+
 DOCUMENTATION = '''
 module: clc_publicip
 short_description: Add and Delete public ips on servers in CenturyLink Cloud.
@@ -73,7 +100,6 @@ EXAMPLES = '''
 '''
 import socket
 import time
-from ansible.module_utils.basic import *  # pylint: disable=W0614
 #
 #  Requires the clc-python-sdk.
 #  sudo pip install clc-sdk
@@ -86,6 +112,7 @@ except ImportError:
     clc_sdk = None
 else:
     CLC_FOUND = True
+
 
 class ClcPublicIp(object):
     clc = clc_sdk
@@ -113,7 +140,7 @@ class ClcPublicIp(object):
         :param params: dictionary of module parameters
         :return: Returns with either an exit_json or fail_json
         """
-        self.set_clc_credentials_from_env()
+        self._set_clc_credentials_from_env()
         server_ids = params['server_ids']
         ports = params['ports']
         protocol = params['protocol']
@@ -220,7 +247,9 @@ class ClcPublicIp(object):
         ports_to_expose = [{'protocol': protocol, 'port': port}
                            for port in ports]
         if not self.module.check_mode:
-            ClcPublicIp._push_metric(ClcPublicIp.STATS_PUBLICIP_CREATE,len(servers_to_change))
+            ClcPublicIp._push_metric(
+                ClcPublicIp.STATS_PUBLICIP_CREATE,
+                len(servers_to_change))
         return [server.PublicIPs().Add(ports_to_expose)
                 for server in servers_to_change], servers_to_change
 
@@ -242,7 +271,9 @@ class ClcPublicIp(object):
             for ip_address in server.PublicIPs().public_ips:
                 ips_to_delete.append(ip_address)
         if not self.module.check_mode:
-            ClcPublicIp._push_metric(ClcPublicIp.STATS_PUBLICIP_DELETE,len(servers_to_change))
+            ClcPublicIp._push_metric(
+                ClcPublicIp.STATS_PUBLICIP_DELETE,
+                len(servers_to_change))
         return [ip.Delete() for ip in ips_to_delete], servers_to_change
 
     def _wait_for_requests_to_complete(self, requests_lst, action='create'):
@@ -302,8 +333,6 @@ class ClcPublicIp(object):
             servers_result.append(server.data)
         return changed, servers_result
 
-
-
     def _get_servers_from_clc_api(self, server_ids, message):
         """
         Gets list of servers form CLC api
@@ -322,13 +351,13 @@ class ClcPublicIp(object):
             sock = socket.socket()
             sock.settimeout(ClcPublicIp.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcPublicIp.STATSD_HOST, ClcPublicIp.STATSD_PORT))
-            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
             sock.close()
         except socket.gaierror:
             # do nothing, ignore and move forward
             error = ''
         except socket.error:
-            #nothing, ignore and move forward
+            # nothing, ignore and move forward
             error = ''
 
 
@@ -344,6 +373,6 @@ def main():
     clc_public_ip = ClcPublicIp(module)
     clc_public_ip.process_request(module.params)
 
-
+from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
     main()
