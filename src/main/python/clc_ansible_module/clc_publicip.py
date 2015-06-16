@@ -140,7 +140,7 @@ class ClcPublicIp(object):
         :param params: dictionary of module parameters
         :return: Returns with either an exit_json or fail_json
         """
-        self.set_clc_credentials_from_env()
+        self._set_clc_credentials_from_env()
         server_ids = params['server_ids']
         ports = params['ports']
         protocol = params['protocol']
