@@ -111,6 +111,7 @@ except ImportError:
 else:
     clc_found = True
 
+
 class ClcAntiAffinityPolicy():
 
     STATSD_HOST = '64.94.114.218'
@@ -141,7 +142,7 @@ class ClcAntiAffinityPolicy():
             alias=dict(default=None),
             wait=dict(type='bool', default=False),
             state=dict(default='present', choices=['present', 'absent']),
-            )
+        )
         return argument_spec
 
     # Module Behavior Goodness
@@ -153,11 +154,12 @@ class ClcAntiAffinityPolicy():
         p = self.module.params
 
         if not clc_found:
-            self.module.fail_json(msg='clc-python-sdk required for this module')
+            self.module.fail_json(
+                msg='clc-python-sdk required for this module')
 
         self._set_clc_credentials_from_env()
         self.policy_dict = self._get_policies_for_datacenter(p)
-        
+
         if p['state'] == "absent":
             changed, policy = self._ensure_policy_is_absent(p)
         else:
@@ -204,7 +206,7 @@ class ClcAntiAffinityPolicy():
 
         if not self.module.check_mode:
             policies = self.clc.v2.AntiAffinity.GetAll(location=p['location'])
-        
+
         for policy in policies:
             response[policy.name] = policy
         return response
@@ -216,8 +218,12 @@ class ClcAntiAffinityPolicy():
         :return: response dictionary from the CLC API.
         """
         if not self.module.check_mode:
-            ClcAntiAffinityPolicy._push_metric(ClcAntiAffinityPolicy.STATS_AAPOLICY_CREATE, 1)
-        return self.clc.v2.AntiAffinity.Create(name=p['name'], location=p['location'])
+            ClcAntiAffinityPolicy._push_metric(
+                ClcAntiAffinityPolicy.STATS_AAPOLICY_CREATE,
+                1)
+        return self.clc.v2.AntiAffinity.Create(
+            name=p['name'],
+            location=p['location'])
 
     def _delete_policy(self, p):
         """
@@ -228,7 +234,9 @@ class ClcAntiAffinityPolicy():
         policy = self.policy_dict[p['name']]
         policy.Delete()
         if not self.module.check_mode:
-            ClcAntiAffinityPolicy._push_metric(ClcAntiAffinityPolicy.STATS_AAPOLICY_DELETE, 1)
+            ClcAntiAffinityPolicy._push_metric(
+                ClcAntiAffinityPolicy.STATS_AAPOLICY_DELETE,
+                1)
 
     def _policy_exists(self, policy_name):
         """
@@ -281,15 +289,18 @@ class ClcAntiAffinityPolicy():
         try:
             sock = socket.socket()
             sock.settimeout(ClcAntiAffinityPolicy.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect((ClcAntiAffinityPolicy.STATSD_HOST, ClcAntiAffinityPolicy.STATSD_PORT))
-            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.connect(
+                (ClcAntiAffinityPolicy.STATSD_HOST,
+                 ClcAntiAffinityPolicy.STATSD_PORT))
+            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
             sock.close()
         except socket.gaierror:
             # do nothing, ignore and move forward
             error = ''
         except socket.error:
-            #nothing, ignore and move forward
+            # nothing, ignore and move forward
             error = ''
+
 
 def main():
     """
