@@ -268,8 +268,6 @@ EXAMPLES = '''
     state: absent
 '''
 
-# TODO: Handle clc.APIExceptions
-
 import socket
 from time import sleep
 
