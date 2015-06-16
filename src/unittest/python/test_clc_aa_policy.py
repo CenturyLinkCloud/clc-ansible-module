@@ -46,11 +46,12 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
         self.policy.clc.v2.SetCredentials.assert_called_once_with(api_username='passWORD',api_passwd='UsErnaME')
 
     def testArgumentSpecContract(self):
-        args = ClcAntiAffinityPolicy.define_argument_spec()
+        args = ClcAntiAffinityPolicy._define_argument_spec()
         self.assertEqual(args, dict(
             name=dict(required=True),
             location=dict(required=True),
             alias=dict(default=None),
+            wait=dict(type='bool', default=False),
             state=dict(default='present', choices=['present', 'absent']),
         ))
 
