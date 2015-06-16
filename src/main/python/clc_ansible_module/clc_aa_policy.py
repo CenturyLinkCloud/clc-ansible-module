@@ -202,7 +202,8 @@ class ClcAntiAffinityPolicy():
         """
         response = {}
 
-        policies = self.clc.v2.AntiAffinity.GetAll(location=p['location'])
+        if not self.module.check_mode:
+            policies = self.clc.v2.AntiAffinity.GetAll(location=p['location'])
         
         for policy in policies:
             response[policy.name] = policy
@@ -214,7 +215,8 @@ class ClcAntiAffinityPolicy():
         :param p: datacenter to create policy in
         :return: response dictionary from the CLC API.
         """
-        ClcAntiAffinityPolicy._push_metric(ClcAntiAffinityPolicy.STATS_AAPOLICY_CREATE, 1)
+        if not self.module.check_mode:
+            ClcAntiAffinityPolicy._push_metric(ClcAntiAffinityPolicy.STATS_AAPOLICY_CREATE, 1)
         return self.clc.v2.AntiAffinity.Create(name=p['name'], location=p['location'])
 
     def _delete_policy(self, p):
@@ -225,7 +227,8 @@ class ClcAntiAffinityPolicy():
         """
         policy = self.policy_dict[p['name']]
         policy.Delete()
-        ClcAntiAffinityPolicy._push_metric(ClcAntiAffinityPolicy.STATS_AAPOLICY_DELETE, 1)
+        if not self.module.check_mode:
+            ClcAntiAffinityPolicy._push_metric(ClcAntiAffinityPolicy.STATS_AAPOLICY_DELETE, 1)
 
     def _policy_exists(self, policy_name):
         """
@@ -293,7 +296,8 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    module = AnsibleModule(argument_spec=ClcAntiAffinityPolicy.define_argument_spec()   )
+    argument_dict = ClcAntiAffinityPolicy._define_module_argument_spec()
+    module = AnsibleModule(supports_check_mode=True, **argument_dict)
     me = ClcAntiAffinityPolicy(module)
     me.do_work()
 
