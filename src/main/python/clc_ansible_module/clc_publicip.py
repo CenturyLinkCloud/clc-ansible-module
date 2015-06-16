@@ -1,7 +1,7 @@
 #!/usr/bin/python
 DOCUMENTATION = '''
-module: clc_public_ip
-short_description: add and/or delete public ips on servers in CenturyLink Cloud.
+module: clc_publicip
+short_description: Add and Delete public ips on servers in CenturyLink Cloud.
 description:
   - An Ansible module to add or delete public ip addresses on an existing server or servers in CenturyLink Cloud.
 options:
@@ -40,7 +40,7 @@ EXAMPLES = '''
   connection: local
   tasks:
     - name: Create Public IP For Servers
-      clc_public_ip:
+      clc_publicip:
         protocol: 'TCP'
         ports:
             - 80
@@ -59,7 +59,7 @@ EXAMPLES = '''
   connection: local
   tasks:
     - name: Create Public IP For Servers
-      clc_public_ip:
+      clc_publicip:
         server_ids:
             - UC1ACCTSRVR01
             - UC1ACCTSRVR02
@@ -138,6 +138,45 @@ class ClcPublicIp(object):
             changed=has_made_changes,
             servers=result_servers,
             server_ids=result_server_ids)
+
+    @staticmethod
+    def _define_module_argument_spec():
+        """
+        Define the argument spec for the ansible module
+        :return: argument spec dictionary
+        """
+        argument_spec = dict(
+            server_ids=dict(type='list', required=True),
+            protocol=dict(default='TCP'),
+            ports=dict(type='list'),
+            wait=dict(default=True),
+            state=dict(default='present', choices=['present', 'absent']),
+        )
+        return argument_spec
+
+    def _set_clc_credentials_from_env(self):
+        """
+        Set the CLC Credentials on the sdk by reading environment variables
+        :return: none
+        """
+        env = os.environ
+        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
+        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
+        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
+        clc_alias = env.get('CLC_ACCT_ALIAS', False)
+
+        if v2_api_token and clc_alias:
+            self.clc._LOGIN_TOKEN_V2 = v2_api_token
+            self.clc._V2_ENABLED = True
+            self.clc.ALIAS = clc_alias
+        elif v2_api_username and v2_api_passwd:
+            self.clc.v2.SetCredentials(
+                api_username=v2_api_username,
+                api_passwd=v2_api_passwd)
+        else:
+            return self.module.fail_json(
+                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
+                    "environment variables")
 
     def run_clc_commands(self, command_list):
         """
@@ -261,6 +300,8 @@ class ClcPublicIp(object):
             servers_result.append(server.data)
         return changed, servers_result
 
+
+
     def _get_servers_from_clc_api(self, server_ids, message):
         """
         Gets list of servers form CLC api
@@ -269,40 +310,6 @@ class ClcPublicIp(object):
             return self.clc.v2.Servers(server_ids).servers
         except CLCException as exception:
             self.module.fail_json(msg=message + ': %s' % exception)
-
-    @staticmethod
-    def define_argument_spec():
-        argument_spec = dict(
-            server_ids=dict(type='list', required=True),
-            protocol=dict(default='TCP'),
-            ports=dict(type='list'),
-            wait=dict(default=True),
-            state=dict(default='present', choices=['present', 'absent']),
-        )
-        return argument_spec
-
-    def set_clc_credentials_from_env(self):
-        """
-        Sets the CLC environment variables
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-
-        if v2_api_token and clc_alias:
-            self.clc._LOGIN_TOKEN_V2 = v2_api_token
-            self.clc._V2_ENABLED = True
-            self.clc.ALIAS = clc_alias
-        elif v2_api_username and v2_api_passwd:
-            self.clc.v2.SetCredentials(
-                api_username=v2_api_username,
-                api_passwd=v2_api_passwd)
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
 
     @staticmethod
     def _push_metric(path, count):
