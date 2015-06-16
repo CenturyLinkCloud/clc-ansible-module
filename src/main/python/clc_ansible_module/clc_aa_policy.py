@@ -1,4 +1,68 @@
 #!/usr/bin/python
+DOCUMENTATION = '''
+module: clc_aa_policy
+short_descirption: Create or Deletes Anti Affinity Policies at CenturyLink Cloud.
+description:
+  - An Ansible module to Create or Deletes Anti Affinity Policies at CenturyLink Cloud.
+options:
+  name:
+    description:
+      - The name of the Anti Affinity Policy.
+    required: True
+  location:
+    description:
+      - Datacenter in which the policy lives/should live.
+    required: True
+  state:
+    description:
+      - Whether to create or delete the policy.
+    required: False
+    default: present
+    choices: ['present','absent']
+  wait:
+    description:
+      - Whether to wait for the provisioning tasks to finish before returning.
+    default: True
+    required: False
+    choices: [ True, False]
+    aliases: []
+'''
+
+EXAMPLES = '''
+# Note - You must set the CLC_V2_API_USERNAME And CLC_V2_API_PASSWD Environment variables before running these examples
+
+---
+- name: Create AA Policy
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create an Anti Affinity Policy
+      clc_aa_policy:
+        name: 'Hammer Time'
+        location: 'UK3'
+        state: present
+      register: policy
+
+    - name: debug
+      debug: var=policy
+
+---
+- name: Delete AA Policy
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete an Anti Affinity Policy
+      clc_aa_policy:
+        name: 'Hammer Time'
+        location: 'UK3'
+        state: absent
+      register: policy
+
+    - name: debug
+      debug: var=policy
+'''
 
 import sys
 import os
@@ -37,11 +101,12 @@ class ClcAntiAffinityPolicy():
     # Ansible module goodness
 
     @staticmethod
-    def define_argument_spec():
+    def _define_argument_spec():
         argument_spec = dict(
             name=dict(required=True),
             location=dict(required=True),
             alias=dict(default=None),
+            wait=dict(type='bool', default=False),
             state=dict(default='present', choices=['present', 'absent']),
             )
         return argument_spec
