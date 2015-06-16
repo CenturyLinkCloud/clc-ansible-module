@@ -103,6 +103,7 @@ except ImportError:
 else:
     CLC_FOUND = True
 
+
 class ClcSnapshot():
 
     clc = clc_sdk
@@ -129,7 +130,8 @@ class ClcSnapshot():
         p = self.module.params
 
         if not CLC_FOUND:
-            self.module.fail_json(msg='clc-python-sdk required for this module')
+            self.module.fail_json(
+                msg='clc-python-sdk required for this module')
 
         server_ids = p['server_ids']
         expiration_days = p['expiration_days']
@@ -144,9 +146,11 @@ class ClcSnapshot():
             changed, requests, changed_servers = self.ensure_server_snapshot_present(server_ids=server_ids,
                                                                                      expiration_days=expiration_days)
         elif state == 'absent':
-            changed, requests, changed_servers = self.ensure_server_snapshot_absent(server_ids=server_ids)
+            changed, requests, changed_servers = self.ensure_server_snapshot_absent(
+                server_ids=server_ids)
         elif state == 'restore':
-            changed, requests, changed_servers = self.ensure_server_snapshot_restore(server_ids=server_ids)
+            changed, requests, changed_servers = self.ensure_server_snapshot_restore(
+                server_ids=server_ids)
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
 
@@ -160,30 +164,35 @@ class ClcSnapshot():
         changed = False
         try:
             servers = self._get_servers_from_clc(
-            server_ids,
-            'Failed to obtain server list from the CLC API')
+                server_ids,
+                'Failed to obtain server list from the CLC API')
             servers_to_change = [
                 server for server in servers if len(
                     server.GetSnapshots()) == 0]
             for server in servers_to_change:
                 changed = True
                 if not self.module.check_mode:
-                    res = server.CreateSnapshot(delete_existing=True, expiration_days=expiration_days)
-                    ClcSnapshot._push_metric(ClcSnapshot.STATS_SNAPSHOT_CREATE, 1)
+                    res = server.CreateSnapshot(
+                        delete_existing=True,
+                        expiration_days=expiration_days)
+                    ClcSnapshot._push_metric(
+                        ClcSnapshot.STATS_SNAPSHOT_CREATE,
+                        1)
                     result.append(res)
             changed_servers = [
                 server.id for server in servers_to_change if server.id]
             return changed, result, changed_servers
         except CLCException as ex:
-            return self.module.fail_json(msg='Failed to create snap shot with Error : %s' %(ex))
+            return self.module.fail_json(
+                msg='Failed to create snap shot with Error : %s' % (ex))
 
     def ensure_server_snapshot_absent(self, server_ids):
         result = []
         changed = False
         try:
             servers = self._get_servers_from_clc(
-            server_ids,
-            'Failed to obtain server list from the CLC API')
+                server_ids,
+                'Failed to obtain server list from the CLC API')
             servers_to_change = [
                 server for server in servers if len(
                     server.GetSnapshots()) > 0]
@@ -191,21 +200,24 @@ class ClcSnapshot():
                 changed = True
                 if not self.module.check_mode:
                     res = server.DeleteSnapshot()
-                    ClcSnapshot._push_metric(ClcSnapshot.STATS_SNAPSHOT_CREATE, 1)
+                    ClcSnapshot._push_metric(
+                        ClcSnapshot.STATS_SNAPSHOT_CREATE,
+                        1)
                     result.append(res)
             changed_servers = [
                 server.id for server in servers_to_change if server.id]
             return changed, result, changed_servers
         except CLCException as ex:
-            return self.module.fail_json(msg='Failed to delete snap shot with Error : %s' %(ex))
+            return self.module.fail_json(
+                msg='Failed to delete snap shot with Error : %s' % (ex))
 
     def ensure_server_snapshot_restore(self, server_ids):
         result = []
         changed = False
         try:
             servers = self._get_servers_from_clc(
-            server_ids,
-            'Failed to obtain server list from the CLC API')
+                server_ids,
+                'Failed to obtain server list from the CLC API')
             servers_to_change = [
                 server for server in servers if len(
                     server.GetSnapshots()) > 0]
@@ -213,13 +225,16 @@ class ClcSnapshot():
                 changed = True
                 if not self.module.check_mode:
                     res = server.RestoreSnapshot()
-                    ClcSnapshot._push_metric(ClcSnapshot.STATS_SNAPSHOT_CREATE, 1)
+                    ClcSnapshot._push_metric(
+                        ClcSnapshot.STATS_SNAPSHOT_CREATE,
+                        1)
                     result.append(res)
             changed_servers = [
                 server.id for server in servers_to_change if server.id]
             return changed, result, changed_servers
         except CLCException as ex:
-            return self.module.fail_json(msg='Failed to restore snap shot with Error : %s' %(ex))
+            return self.module.fail_json(
+                msg='Failed to restore snap shot with Error : %s' % (ex))
 
     def _wait_for_requests_to_complete(self, requests_lst, action='create'):
         if self.module.params['wait']:
@@ -241,7 +256,12 @@ class ClcSnapshot():
             server_ids=dict(type='list', required=True),
             expiration_days=dict(default=7),
             wait=dict(default=True),
-            state=dict(default='present', choices=['present', 'absent', 'restore']),
+            state=dict(
+                default='present',
+                choices=[
+                    'present',
+                    'absent',
+                    'restore']),
         )
         return argument_spec
 
@@ -254,7 +274,7 @@ class ClcSnapshot():
         try:
             return self.clc.v2.Servers(server_list).servers
         except CLCException as ex:
-            return self.module.fail_json(msg=message + ': %s' %ex)
+            return self.module.fail_json(msg=message + ': %s' % ex)
 
     def _set_clc_credentials_from_env(self):
         """
@@ -290,13 +310,13 @@ class ClcSnapshot():
             sock = socket.socket()
             sock.settimeout(ClcSnapshot.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcSnapshot.STATSD_HOST, ClcSnapshot.STATSD_PORT))
-            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
             sock.close()
         except socket.gaierror:
             # do nothing, ignore and move forward
             error = ''
         except socket.error:
-            #nothing, ignore and move forward
+            # nothing, ignore and move forward
             error = ''
 
 
@@ -306,9 +326,9 @@ def main():
     :return: None
     """
     module = AnsibleModule(
-            argument_spec=ClcSnapshot.define_argument_spec(),
-            supports_check_mode=True
-        )
+        argument_spec=ClcSnapshot.define_argument_spec(),
+        supports_check_mode=True
+    )
     clc_snapshot = ClcSnapshot(module)
     clc_snapshot.process_request()
 
