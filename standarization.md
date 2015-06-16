@@ -61,3 +61,20 @@ See the clc_server module for an example.
 ### All Classes and Functions should have docstrings
 
 Insure that all classes and functions should have docstrings that follow the conventions in [PEP257](https://www.python.org/dev/peps/pep-0257/).
+
+### Add copywrite comment to the beginning of each module
+
+```python
+# CenturyLink Cloud Ansible Modules.
+#
+# These Ansible modules enable the CenturyLink Cloud v2 API to be called# from an within Ansible Playbook.
+#
+# This file is part of CenturyLink Cloud, and is maintained
+# by the Workflow as a Service Team
+#
+# Copyright 2015 CenturyLink Cloud## Licensed under the Apache License, Version 2.0 (the "License");# you may not use this file except in compliance with the License.# You may obtain a copy of the License at##    http://www.apache.org/licenses/LICENSE-2.0## Unless required by applicable law or agreed to in writing, software# distributed under the License is distributed on an "AS IS" BASIS,# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.# See the License for the specific language governing permissions and# limitations under the License.
+#
+# CenturyLink Cloud: http://www.CenturyLinkCloud.com
+# API Documentation: https://www.centurylinkcloud.com/api-docs/v2/
+#
+```
