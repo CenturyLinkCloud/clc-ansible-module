@@ -101,11 +101,12 @@ class ClcAntiAffinityPolicy():
     # Ansible module goodness
 
     @staticmethod
-    def define_argument_spec():
+    def _define_argument_spec():
         argument_spec = dict(
             name=dict(required=True),
             location=dict(required=True),
             alias=dict(default=None),
+            wait=dict(type='bool', default=False),
             state=dict(default='present', choices=['present', 'absent']),
             )
         return argument_spec
