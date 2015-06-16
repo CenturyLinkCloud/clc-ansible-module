@@ -1193,6 +1193,12 @@ class ClcServer():
 
     @staticmethod
     def _push_metric(path, count):
+        """
+        Sends the usage metric to statsd
+        :param path: The metric path
+        :param count: The number of ticks to record to the metric
+        :return None
+        """
         try:
             sock = socket.socket()
             sock.settimeout(ClcServer.SOCKET_CONNECTION_TIMEOUT)

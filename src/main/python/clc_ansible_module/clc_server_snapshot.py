@@ -117,6 +117,9 @@ class ClcSnapshot():
     SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
+        """
+        Construct module
+        """
         self.module = module
         if not CLC_FOUND:
             self.module.fail_json(
@@ -160,6 +163,15 @@ class ClcSnapshot():
             server_ids=changed_servers)
 
     def ensure_server_snapshot_present(self, server_ids, expiration_days):
+        """
+        Ensures the given set of server_ids have the snapshots created
+        :param server_ids: The list of server_ids to create the snapshot
+        :param expiration_days: The number of days to keep the snapshot
+        :return: (changed, result, changed_servers)
+                 changed: A flag indicating whether any change was made
+                 result: the list of clc request objects from CLC API call
+                 changed_servers: The list of servers ids that are modified
+        """
         result = []
         changed = False
         try:
@@ -187,6 +199,14 @@ class ClcSnapshot():
                 msg='Failed to create snap shot with Error : %s' % (ex))
 
     def ensure_server_snapshot_absent(self, server_ids):
+        """
+        Ensures the given set of server_ids have the snapshots removed
+        :param server_ids: The list of server_ids to delete the snapshot
+        :return: (changed, result, changed_servers)
+                 changed: A flag indicating whether any change was made
+                 result: the list of clc request objects from CLC API call
+                 changed_servers: The list of servers ids that are modified
+        """
         result = []
         changed = False
         try:
@@ -212,6 +232,14 @@ class ClcSnapshot():
                 msg='Failed to delete snap shot with Error : %s' % (ex))
 
     def ensure_server_snapshot_restore(self, server_ids):
+        """
+        Ensures the given set of server_ids have the snapshots restored
+        :param server_ids: The list of server_ids to delete the snapshot
+        :return: (changed, result, changed_servers)
+                 changed: A flag indicating whether any change was made
+                 result: the list of clc request objects from CLC API call
+                 changed_servers: The list of servers ids that are modified
+        """
         result = []
         changed = False
         try:
@@ -236,7 +264,12 @@ class ClcSnapshot():
             return self.module.fail_json(
                 msg='Failed to restore snap shot with Error : %s' % (ex))
 
-    def _wait_for_requests_to_complete(self, requests_lst, action='create'):
+    def _wait_for_requests_to_complete(self, requests_lst):
+        """
+        Waits until the CLC requests are complete if the wait argument is True
+        :param requests_lst: The list of CLC request objects
+        :return: none
+        """
         if self.module.params['wait']:
             for request in requests_lst:
                 request.WaitUntilComplete()
@@ -306,6 +339,12 @@ class ClcSnapshot():
 
     @staticmethod
     def _push_metric(path, count):
+        """
+        Sends the usage metric to statsd
+        :param path: The metric path
+        :param count: The number of ticks to record to the metric
+        :return None
+        """
         try:
             sock = socket.socket()
             sock.settimeout(ClcSnapshot.SOCKET_CONNECTION_TIMEOUT)
