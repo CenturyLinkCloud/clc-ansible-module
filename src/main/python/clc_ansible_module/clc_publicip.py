@@ -151,7 +151,7 @@ class ClcPublicIp(object):
             server_ids=dict(type='list', required=True),
             protocol=dict(default='TCP'),
             ports=dict(type='list'),
-            wait=dict(default=True),
+            wait=dict(type='bool', default=True),
             state=dict(default='present', choices=['present', 'absent']),
         )
         return argument_spec
@@ -214,12 +214,12 @@ class ClcPublicIp(object):
         servers = self._get_servers_from_clc_api(
             server_ids,
             'Failed to obtain server list from the CLC API')
+        servers_to_change = [
+            server for server in servers if len(
+                server.PublicIPs().public_ips) == 0]
+        ports_to_expose = [{'protocol': protocol, 'port': port}
+                           for port in ports]
         if not self.module.check_mode:
-            servers_to_change = [
-                server for server in servers if len(
-                    server.PublicIPs().public_ips) == 0]
-            ports_to_expose = [{'protocol': protocol, 'port': port}
-                               for port in ports]
             ClcPublicIp._push_metric(ClcPublicIp.STATS_PUBLICIP_CREATE,len(servers_to_change))
         return [server.PublicIPs().Add(ports_to_expose)
                 for server in servers_to_change], servers_to_change
@@ -233,15 +233,15 @@ class ClcPublicIp(object):
         servers = self._get_servers_from_clc_api(
             server_ids,
             'Failed to obtain server list from the CLC API')
-        if not self.module.check_mode:
-            servers_to_change = [
-                server for server in servers if len(
-                    server.PublicIPs().public_ips) > 0]
+        servers_to_change = [
+            server for server in servers if len(
+                server.PublicIPs().public_ips) > 0]
 
-            ips_to_delete = []
-            for server in servers_to_change:
-                for ip_address in server.PublicIPs().public_ips:
-                    ips_to_delete.append(ip_address)
+        ips_to_delete = []
+        for server in servers_to_change:
+            for ip_address in server.PublicIPs().public_ips:
+                ips_to_delete.append(ip_address)
+        if not self.module.check_mode:
             ClcPublicIp._push_metric(ClcPublicIp.STATS_PUBLICIP_DELETE,len(servers_to_change))
         return [ip.Delete() for ip in ips_to_delete], servers_to_change
 
