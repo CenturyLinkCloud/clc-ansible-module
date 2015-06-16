@@ -79,3 +79,57 @@ This should be included in each file at the very beginning, before the DOCUMENTA
 # API Documentation: https://www.centurylinkcloud.com/api-docs/v2/
 #
 ```
+
+### Insure the ansible.module_utils.basic import is at the bottom of the file:
+The import should be right before main, not at the top of the file.
+
+Main should be invoked like this:
+```python
+from ansible.module_utils.basic import *  # pylint: disable=W0614if __name__ == '__main__':    main()
+```
+
+### Insure that main() is defined at the bottom of the file
+
+For readability, main should be defined just before it's called.  It should be the last function def in the file.
+
+### Insure that main calls a .process_request() method on a class named for the module
+
+Example: 
+
+```python
+def main():
+    """
+    The main function.  Instantiates the module and calls process_request.
+    :return: none
+    """
+    argument_dict = ClcServer._define_module_argument_spec()
+    module = AnsibleModule(supports_check_mode=True, **argument_dict)
+
+    clc_server = ClcServer(module)
+    clc_server.process_request()
+```
+
+This should not be ```do_work``` or anything other than ```process_request```.  I'm looking at you, anti affinity module.  ;)
+
+### Run autopep8 on the module:
+
+Autopep8 will reformat the module to insure that it complies with the pep8 guidelines.  The autopep8 tool will reformat
+the module to comply with standards.  This should be the last thing you do
+
+If you don't already have it, install autopep8:
+```
+> sudo pip install --upgrade autopep8
+```
+Run it:
+
+```
+> autopep8 --in-place --aggressive --aggressive <filename>
+```
+
+
+
+
+
+
+
+
