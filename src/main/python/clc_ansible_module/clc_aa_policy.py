@@ -1,4 +1,30 @@
 #!/usr/bin/python
+
+# CenturyLink Cloud Ansible Modules.
+#
+# These Ansible modules enable the CenturyLink Cloud v2 API to be called
+# from an within Ansible Playbook.
+#
+# This file is part of CenturyLink Cloud, and is maintained
+# by the Workflow as a Service Team
+#
+# Copyright 2015 CenturyLink Cloud
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# CenturyLink Cloud: http://www.CenturyLinkCloud.com
+# API Documentation: https://www.centurylinkcloud.com/api-docs/v2/
+
 DOCUMENTATION = '''
 module: clc_aa_policy
 short_descirption: Create or Deletes Anti Affinity Policies at CenturyLink Cloud.
@@ -94,6 +120,9 @@ class ClcAntiAffinityPolicy():
     SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
+        """
+        Construct module
+        """
         self.module = module
         self.policy_dict = {}
         self.clc = clc_sdk
@@ -101,7 +130,11 @@ class ClcAntiAffinityPolicy():
     # Ansible module goodness
 
     @staticmethod
-    def _define_argument_spec():
+    def _define_module_argument_spec():
+        """
+        Define the argument spec for the ansible module
+        :return: argument spec dictionary
+        """
         argument_spec = dict(
             name=dict(required=True),
             location=dict(required=True),
@@ -112,7 +145,11 @@ class ClcAntiAffinityPolicy():
         return argument_spec
 
     # Module Behavior Goodness
-    def do_work(self):
+    def process_request(self):
+        """
+        Process the request - Main Code Path
+        :return: Returns with either an exit_json or fail_json
+        """
         p = self.module.params
 
         if not clc_found:
@@ -133,7 +170,11 @@ class ClcAntiAffinityPolicy():
 
         self.module.exit_json(changed=changed, policy=policy)
 
-    def _clc_set_credentials(self):
+    def _set_clc_credentials_from_env(self):
+        """
+        Set the CLC Credentials on the sdk by reading environment variables
+        :return: none
+        """
         env = os.environ
         v2_api_token = env.get('CLC_V2_API_TOKEN', False)
         v2_api_username = env.get('CLC_V2_API_USERNAME', False)
@@ -154,6 +195,11 @@ class ClcAntiAffinityPolicy():
                     "environment variables")
 
     def _get_policies_for_datacenter(self, p):
+        """
+        Get the Policies for a datacenter by calling the CLC API.
+        :param p: datacenter to get policies from
+        :return: policies in the datacenter
+        """
         response = {}
 
         policies = self.clc.v2.AntiAffinity.GetAll(location=p['location'])
@@ -163,21 +209,41 @@ class ClcAntiAffinityPolicy():
         return response
 
     def _create_policy(self, p):
+        """
+        Create an Anti Affinnity Policy using the CLC API.
+        :param p: datacenter to create policy in
+        :return: response dictionary from the CLC API.
+        """
         ClcAntiAffinityPolicy._push_metric(ClcAntiAffinityPolicy.STATS_AAPOLICY_CREATE, 1)
         return self.clc.v2.AntiAffinity.Create(name=p['name'], location=p['location'])
 
     def _delete_policy(self, p):
+        """
+        Delete an Anti Affinity Policy using the CLC API.
+        :param p: datacenter to delete a policy from
+        :return: none
+        """
         policy = self.policy_dict[p['name']]
         policy.Delete()
         ClcAntiAffinityPolicy._push_metric(ClcAntiAffinityPolicy.STATS_AAPOLICY_DELETE, 1)
 
     def _policy_exists(self, policy_name):
+        """
+        Check to see if an Anti Affinity Policy exists
+        :param policy_name: name of the policy
+        :return: boolean of if the policy exists
+        """
         if policy_name in self.policy_dict:
             return True
 
         return False
 
     def _ensure_policy_is_absent(self, p):
+        """
+        Makes sure that a policy is absent
+        :param p: dictionary of policy name
+        :return: tuple of if a deletion occurred and the name of the policy that was deleted
+        """
         changed = False
         policy = None
 
@@ -187,6 +253,11 @@ class ClcAntiAffinityPolicy():
         return changed, policy
 
     def _ensure_policy_is_present(self, p):
+        """
+        Ensures that a policy is present
+        :param p: dictonary of a policy name
+        :return: tuple of if an addition occurred and the name of the policy that was added
+        """
         changed = False
         policy = None
 
@@ -198,6 +269,12 @@ class ClcAntiAffinityPolicy():
 
     @staticmethod
     def _push_metric(path, count):
+        """
+        Sends the usage metric to statsd
+        :param path: The metric path
+        :param count: The number of ticks to record to the metric
+        :return None
+        """
         try:
             sock = socket.socket()
             sock.settimeout(ClcAntiAffinityPolicy.SOCKET_CONNECTION_TIMEOUT)
@@ -212,9 +289,14 @@ class ClcAntiAffinityPolicy():
             error = ''
 
 def main():
+    """
+    The main function.  Instantiates the module and calls process_request.
+    :return: none
+    """
     module = AnsibleModule(argument_spec=ClcAntiAffinityPolicy.define_argument_spec()   )
     me = ClcAntiAffinityPolicy(module)
     me.do_work()
 
+from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
     main()
