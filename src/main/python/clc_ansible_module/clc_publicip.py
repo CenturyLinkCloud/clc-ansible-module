@@ -34,6 +34,8 @@ options:
 '''
 
 EXAMPLES = '''
+# Note - You must set the CLC_V2_API_USERNAME And CLC_V2_API_PASSWD Environment variables before running these examples
+
 - name: Add Public IP to Server
   hosts: localhost
   gather_facts: False
