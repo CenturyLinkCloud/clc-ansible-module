@@ -99,7 +99,6 @@ EXAMPLES = '''
       debug: var=clc
 '''
 import socket
-import time
 #
 #  Requires the clc-python-sdk.
 #  sudo pip install clc-sdk
@@ -193,6 +192,10 @@ class ClcPublicIp(object):
         v2_api_username = env.get('CLC_V2_API_USERNAME', False)
         v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
         clc_alias = env.get('CLC_ACCT_ALIAS', False)
+        api_url = env.get('CLC_V2_API_URL', False)
+
+        if api_url:
+            self.clc.defaults.ENDPOINT_URL_V2 = api_url
 
         if v2_api_token and clc_alias:
             self.clc._LOGIN_TOKEN_V2 = v2_api_token
@@ -367,7 +370,7 @@ def main():
     :return: none
     """
     module = AnsibleModule(
-        argument_spec=ClcPublicIp.define_argument_spec(),
+        argument_spec=ClcPublicIp._define_module_argument_spec(),
         supports_check_mode=True
     )
     clc_public_ip = ClcPublicIp(module)
