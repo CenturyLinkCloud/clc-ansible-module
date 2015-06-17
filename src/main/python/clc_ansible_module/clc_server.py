@@ -723,11 +723,12 @@ class ClcServer():
             for server in servers:
                 # reload server details so public IP shows up
                 server = clc.v2.Server(server.id)
-                if len(server.PublicIPs().public_ips) > 0:
-                    server.data['publicip'] = str(
-                        server.PublicIPs().public_ips[0])
-                server.data['ipaddress'] = server.details[
-                    'ipAddresses'][0]['internal']
+                if add_public_ip:
+                    if len(server.PublicIPs().public_ips) > 0:
+                        server.data['publicip'] = str(
+                            server.PublicIPs().public_ips[0])
+                    server.data['ipaddress'] = server.details[
+                        'ipAddresses'][0]['internal']
                 server_dict_array.append(server.data)
                 created_server_ids.append(server.id)
 
