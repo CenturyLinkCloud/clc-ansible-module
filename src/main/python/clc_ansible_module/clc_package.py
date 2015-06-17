@@ -80,6 +80,7 @@ except ImportError:
 else:
     CLC_FOUND = True
 
+
 class ClcPackage():
 
     clc = clc_sdk
@@ -107,7 +108,8 @@ class ClcPackage():
         p = self.module.params
 
         if not CLC_FOUND:
-            self.module.fail_json(msg='clc-python-sdk required for this module')
+            self.module.fail_json(
+                msg='clc-python-sdk required for this module')
 
         self._set_clc_credentials_from_env()
 
@@ -116,9 +118,8 @@ class ClcPackage():
         package_params = p['package_params']
         state = p['state']
         if state == 'present':
-            changed, changed_server_ids, requests = self.ensure_package_installed(server_ids,
-                                                                                  package_id,
-                                                                                  package_params)
+            changed, changed_server_ids, requests = self.ensure_package_installed(
+                server_ids, package_id, package_params)
             if not self.module.check_mode:
                 self._wait_for_requests_to_complete(requests)
         self.module.exit_json(changed=changed, server_ids=changed_server_ids)
@@ -151,14 +152,21 @@ class ClcPackage():
         """
         changed = False
         requests = []
-        servers = self._get_servers_from_clc(server_ids, 'Failed to get servers from CLC')
+        servers = self._get_servers_from_clc(
+            server_ids,
+            'Failed to get servers from CLC')
         try:
             for server in servers:
-                request = self.clc_install_package(server, package_id, package_params)
+                request = self.clc_install_package(
+                    server,
+                    package_id,
+                    package_params)
                 requests.append(request)
                 changed = True
         except CLCException as ex:
-            self.module.fail_json(msg='Failed while installing package : %s with Error : %s' %(package_id,ex))
+            self.module.fail_json(
+                msg='Failed while installing package : %s with Error : %s' %
+                (package_id, ex))
         return changed, server_ids, requests
 
     def clc_install_package(self, server, package_id, package_params):
@@ -172,7 +180,9 @@ class ClcPackage():
         """
         result = None
         if not self.module.check_mode:
-            result = server.ExecutePackage(package_id=package_id,  parameters=package_params)
+            result = server.ExecutePackage(
+                package_id=package_id,
+                parameters=package_params)
             ClcPackage._push_metric(ClcPackage.STATS_PACKAGE_DEPLOY, 1)
         return result
 
@@ -199,7 +209,7 @@ class ClcPackage():
         try:
             return self.clc.v2.Servers(server_list).servers
         except CLCException as ex:
-            self.module.fail_json(msg=message + ': %s' %ex)
+            self.module.fail_json(msg=message + ': %s' % ex)
 
     def _set_clc_credentials_from_env(self):
         """
@@ -241,14 +251,15 @@ class ClcPackage():
             sock = socket.socket()
             sock.settimeout(ClcPackage.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcPackage.STATSD_HOST, ClcPackage.STATSD_PORT))
-            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
             sock.close()
         except socket.gaierror:
             # do nothing, ignore and move forward
             error = ''
         except socket.error:
-            #nothing, ignore and move forward
+            # nothing, ignore and move forward
             error = ''
+
 
 def main():
     """
@@ -256,9 +267,9 @@ def main():
     :return: None
     """
     module = AnsibleModule(
-            argument_spec=ClcPackage.define_argument_spec(),
-            supports_check_mode=True
-        )
+        argument_spec=ClcPackage.define_argument_spec(),
+        supports_check_mode=True
+    )
     clc_package = ClcPackage(module)
     clc_package.process_request()
 
