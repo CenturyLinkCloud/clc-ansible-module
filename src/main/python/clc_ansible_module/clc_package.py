@@ -1,5 +1,31 @@
 #!/usr/bin/python
 
+# CenturyLink Cloud Ansible Modules.
+#
+# These Ansible modules enable the CenturyLink Cloud v2 API to be called
+# from an within Ansible Playbook.
+#
+# This file is part of CenturyLink Cloud, and is maintained
+# by the Workflow as a Service Team
+#
+# Copyright 2015 CenturyLink Cloud
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# CenturyLink Cloud: http://www.CenturyLinkCloud.com
+# API Documentation: https://www.centurylinkcloud.com/api-docs/v2/
+#
+
 DOCUMENTATION = '''
 module: clc_package
 short_desciption: deploys a blue print on a set of servers in CenturyLink Cloud.
@@ -39,9 +65,8 @@ EXAMPLES = '''
 '''
 
 
-import json
 import socket
-import time
+
 #
 #  Requires the clc-python-sdk.
 #  sudo pip install clc-sdk
@@ -66,6 +91,9 @@ class ClcPackage():
     SOCKET_CONNECTION_TIMEOUT = 3
 
     def __init__(self, module):
+        """
+        Construct module
+        """
         self.module = module
         if not CLC_FOUND:
             self.module.fail_json(
@@ -81,17 +109,19 @@ class ClcPackage():
         if not CLC_FOUND:
             self.module.fail_json(msg='clc-python-sdk required for this module')
 
-        self._set_clc_creds_from_env()
+        self._set_clc_credentials_from_env()
 
         server_ids = p['server_ids']
         package_id = p['package_id']
         package_params = p['package_params']
-        if not server_ids or len(server_ids) == 0:
-            self.module.fail_json(msg='Error: server_ids is required')
-        if not package_id:
-            self.module.fail_json(msg='Error: package_id is required')
-        self.clc_install_packages(server_ids, package_id, package_params)
-        self.module.exit_json(msg="Finished")
+        state = p['state']
+        if state == 'present':
+            changed, changed_server_ids, requests = self.ensure_package_installed(server_ids,
+                                                                                  package_id,
+                                                                                  package_params)
+            if not self.module.check_mode:
+                self._wait_for_requests_to_complete(requests)
+        self.module.exit_json(changed=changed, server_ids=changed_server_ids)
 
     @staticmethod
     def define_argument_spec():
@@ -103,33 +133,62 @@ class ClcPackage():
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
             package_id=dict(required=True),
-            package_params=dict(type='dict', default={})
+            package_params=dict(type='dict', default={}),
+            wait=dict(default=True),
+            state=dict(default='present', choices=['present'])
         )
         return argument_spec
 
-    def clc_install_packages(self, server_list, package_id, package_params):
+    def ensure_package_installed(self, server_ids, package_id, package_params):
+        """
+        Ensure the package is installed in the given list of servers
+        :param server_ids: the server list where the package needs to be installed
+        :param package_id: the package id
+        :param package_params: the package arguments
+        :return: (changed, server_ids)
+                    changed: A flag indicating if a change was made
+                    server_ids: The list of servers modfied
+        """
+        changed = False
+        requests = []
+        servers = self._get_servers_from_clc(server_ids, 'Failed to get servers from CLC')
+        try:
+            for server in servers:
+                request = self.clc_install_package(server, package_id, package_params)
+                requests.append(request)
+                changed = True
+        except CLCException as ex:
+            self.module.fail_json(msg='Failed while installing package : %s with Error : %s' %(package_id,ex))
+        return changed, server_ids, requests
+
+    def clc_install_package(self, server, package_id, package_params):
         """
         Read all servers from CLC and executes each package from package_list
         :param server_list: The target list of servers where the packages needs to be installed
         :param package_list: The list of packages to be installed
-        :return: the list of affected servers
+        :return: (changed, server_ids)
+                    changed: A flag indicating if a change was made
+                    server_ids: The list of servers modfied
         """
+        result = None
+        if not self.module.check_mode:
+            result = server.ExecutePackage(package_id=package_id,  parameters=package_params)
+            ClcPackage._push_metric(ClcPackage.STATS_PACKAGE_DEPLOY, 1)
+        return result
 
-        servers = self._get_servers_from_clc(server_list, 'Failed to get servers from CLC')
-        try:
-            for server in servers:
-                server.ExecutePackage(package_id=package_id,  parameters=package_params)
-                '''
-                self.clc.v2.API.Call(method='POST',
-                                     url='/v2/operations/%s/servers/executePackage' %(alias),
-                                     payload=json.dumps({'servers':server_list,
-                                                         'package':{'packageId':package_id,
-                                                                    'parameters':package_params}}) )
-                                                                    '''
-            ClcPackage._push_metric(ClcPackage.STATS_PACKAGE_DEPLOY, len(servers))
-        except CLCException as ex:
-            self.module.fail_json(msg='Failed while installing package : %s with Error : %s' %(package_id,ex))
-        return servers
+    def _wait_for_requests_to_complete(self, requests_lst):
+        """
+        Waits until the CLC requests are complete if the wait argument is True
+        :param requests_lst: The list of CLC request objects
+        :return: none
+        """
+        if self.module.params['wait']:
+            for request in requests_lst:
+                request.WaitUntilComplete()
+                for request_details in request.requests:
+                    if request_details.Status() != 'succeeded':
+                        self.module.fail_json(
+                            msg='Unable to process package install request')
 
     def _get_servers_from_clc(self, server_list, message):
         """
@@ -142,15 +201,20 @@ class ClcPackage():
         except CLCException as ex:
             self.module.fail_json(msg=message + ': %s' %ex)
 
-    def _set_clc_creds_from_env(self):
+    def _set_clc_credentials_from_env(self):
         """
-        Internal function to set the CLC credentials
+        Set the CLC Credentials on the sdk by reading environment variables
+        :return: none
         """
         env = os.environ
         v2_api_token = env.get('CLC_V2_API_TOKEN', False)
         v2_api_username = env.get('CLC_V2_API_USERNAME', False)
         v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
         clc_alias = env.get('CLC_ACCT_ALIAS', False)
+        api_url = env.get('CLC_V2_API_URL', False)
+
+        if api_url:
+            self.clc.defaults.ENDPOINT_URL_V2 = api_url
 
         if v2_api_token and clc_alias:
             self.clc._LOGIN_TOKEN_V2 = v2_api_token
@@ -164,10 +228,15 @@ class ClcPackage():
             return self.module.fail_json(
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
-        return self
 
     @staticmethod
     def _push_metric(path, count):
+        """
+        Sends the usage metric to statsd
+        :param path: The metric path
+        :param count: The number of ticks to record to the metric
+        :return None
+        """
         try:
             sock = socket.socket()
             sock.settimeout(ClcPackage.SOCKET_CONNECTION_TIMEOUT)
@@ -187,7 +256,8 @@ def main():
     :return: None
     """
     module = AnsibleModule(
-            argument_spec=ClcPackage.define_argument_spec()
+            argument_spec=ClcPackage.define_argument_spec(),
+            supports_check_mode=True
         )
     clc_package = ClcPackage(module)
     clc_package.process_request()
