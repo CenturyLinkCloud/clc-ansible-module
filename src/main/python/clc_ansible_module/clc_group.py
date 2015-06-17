@@ -353,14 +353,15 @@ class ClcGroup():
             sock = socket.socket()
             sock.settimeout(ClcGroup.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcGroup.STATSD_HOST, ClcGroup.STATSD_PORT))
-            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
             sock.close()
         except socket.gaierror:
             # do nothing, ignore and move forward
             error = ''
         except socket.error:
-            #nothing, ignore and move forward
+            # nothing, ignore and move forward
             error = ''
+
 
 def main():
     """
