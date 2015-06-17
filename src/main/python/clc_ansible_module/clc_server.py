@@ -345,7 +345,9 @@ class ClcServer():
 
             (changed,
              server_dict_array,
-             new_server_ids) = ClcServer._startstop_servers(self.module, self.clc, server_ids)
+             new_server_ids) = ClcServer._startstop_servers(self.module,
+                                                            self.clc,
+                                                            server_ids)
 
         elif state == 'present':
             # Changed is always set to true when provisioning new instances
@@ -1068,35 +1070,39 @@ class ClcServer():
         aa_policy_id = server_params.get('anti_affinity_policy_id')
         aa_policy_name = server_params.get('anti_affinity_policy_name')
         if not aa_policy_id and aa_policy_name:
-            aa_policy_id = ClcServer._get_anti_affinity_policy_id(clc,
-                                                                  module,
-                                                                  server_params.get(
-                                                                      'alias'),
-                                                                  aa_policy_name)
+            aa_policy_id = ClcServer._get_anti_affinity_policy_id(
+                clc,
+                module,
+                server_params.get('alias'),
+                aa_policy_name)
 
-        res = clc.v2.API.Call(method='POST',
-                              url='servers/%s' % (server_params.get('alias')),
-                              payload=json.dumps({'name': server_params.get('name'),
-                                                  'description': server_params.get('description'),
-                                                  'groupId': server_params.get('group_id'),
-                                                  'sourceServerId': server_params.get('template'),
-                                                  'isManagedOS': server_params.get('managed_os'),
-                                                  'primaryDNS': server_params.get('primary_dns'),
-                                                  'secondaryDNS': server_params.get('secondary_dns'),
-                                                  'networkId': server_params.get('network_id'),
-                                                  'ipAddress': server_params.get('ip_address'),
-                                                  'password': server_params.get('password'),
-                                                  'sourceServerPassword': server_params.get('source_server_password'),
-                                                  'cpu': server_params.get('cpu'),
-                                                  'cpuAutoscalePolicyId': server_params.get('cpu_autoscale_policy_id'),
-                                                  'memoryGB': server_params.get('memory'),
-                                                  'type': server_params.get('type'),
-                                                  'storageType': server_params.get('storage_type'),
-                                                  'antiAffinityPolicyId': aa_policy_id,
-                                                  'customFields': server_params.get('custom_fields'),
-                                                  'additionalDisks': server_params.get('additional_disks'),
-                                                  'ttl': server_params.get('ttl'),
-                                                  'packages': server_params.get('packages')}))
+        res = clc.v2.API.Call(
+            method='POST',
+            url='servers/%s' %
+            (server_params.get('alias')),
+            payload=json.dumps(
+                {
+                    'name': server_params.get('name'),
+                    'description': server_params.get('description'),
+                    'groupId': server_params.get('group_id'),
+                    'sourceServerId': server_params.get('template'),
+                    'isManagedOS': server_params.get('managed_os'),
+                    'primaryDNS': server_params.get('primary_dns'),
+                    'secondaryDNS': server_params.get('secondary_dns'),
+                    'networkId': server_params.get('network_id'),
+                    'ipAddress': server_params.get('ip_address'),
+                    'password': server_params.get('password'),
+                    'sourceServerPassword': server_params.get('source_server_password'),
+                    'cpu': server_params.get('cpu'),
+                    'cpuAutoscalePolicyId': server_params.get('cpu_autoscale_policy_id'),
+                    'memoryGB': server_params.get('memory'),
+                    'type': server_params.get('type'),
+                    'storageType': server_params.get('storage_type'),
+                    'antiAffinityPolicyId': aa_policy_id,
+                    'customFields': server_params.get('custom_fields'),
+                    'additionalDisks': server_params.get('additional_disks'),
+                    'ttl': server_params.get('ttl'),
+                    'packages': server_params.get('packages')}))
 
         result = clc.v2.Requests(res)
 
@@ -1139,10 +1145,12 @@ class ClcServer():
                     aa_policy_id = aa_policy.get('id')
                 else:
                     return module.fail_json(
-                        msg='mutiple anti affinity policies were found with policy name : %s' % (aa_policy_name))
+                        msg='mutiple anti affinity policies were found with policy name : %s' %
+                        (aa_policy_name))
         if not aa_policy_id:
             return module.fail_json(
-                msg='No anti affinity policy was found with policy name : %s' % (aa_policy_name))
+                msg='No anti affinity policy was found with policy name : %s' %
+                (aa_policy_name))
         return aa_policy_id
 
     #
@@ -1178,9 +1186,10 @@ class ClcServer():
 
             except APIFailedResponse as e:
                 if e.response_status_code != 404:
-                    module.fail_json(msg='A failure response was received from CLC API when '
-                                         'attempting to get details for a server:  UUID=%s, Code=%i, Message=%s'
-                                         % (svr_uuid, e.response_status_code, e.message))
+                    module.fail_json(
+                        msg='A failure response was received from CLC API when '
+                        'attempting to get details for a server:  UUID=%s, Code=%i, Message=%s' %
+                        (svr_uuid, e.response_status_code, e.message))
                     return
                 if retries == 0:
                     module.fail_json(
