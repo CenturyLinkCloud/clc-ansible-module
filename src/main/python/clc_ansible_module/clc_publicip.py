@@ -43,7 +43,7 @@ options:
     required: True
   server_ids:
     description:
-      - A list of servers to create publci ips on.
+      - A list of servers to create public ips on.
     required: True
   state:
     description:
@@ -148,15 +148,17 @@ class ClcPublicIp(object):
         command_list = []
 
         if state == 'present':
-            command_list.append(
-                lambda: self.ip_create_command(
-                    server_ids=server_ids,
-                    protocol=protocol,
-                    ports=ports))
+            if not self.module.check_mode:
+                command_list.append(
+                    lambda: self.ip_create_command(
+                        server_ids=server_ids,
+                        protocol=protocol,
+                        ports=ports))
         elif state == 'absent':
-            command_list.append(
-                lambda: self.ip_delete_command(
-                    server_ids=server_ids))
+            if not self.module.check_mode:
+                command_list.append(
+                    lambda: self.ip_delete_command(
+                        server_ids=server_ids))
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
 
@@ -249,12 +251,13 @@ class ClcPublicIp(object):
                 server.PublicIPs().public_ips) == 0]
         ports_to_expose = [{'protocol': protocol, 'port': port}
                            for port in ports]
-        if not self.module.check_mode:
-            ClcPublicIp._push_metric(
-                ClcPublicIp.STATS_PUBLICIP_CREATE,
-                len(servers_to_change))
-        return [server.PublicIPs().Add(ports_to_expose)
-                for server in servers_to_change], servers_to_change
+        ClcPublicIp._push_metric(
+            ClcPublicIp.STATS_PUBLICIP_CREATE,
+            len(servers_to_change))
+
+        result = [server.PublicIPs().Add(ports_to_expose)
+                  for server in servers_to_change], servers_to_change
+        return result
 
     def ip_delete_command(self, server_ids):
         """
@@ -273,11 +276,12 @@ class ClcPublicIp(object):
         for server in servers_to_change:
             for ip_address in server.PublicIPs().public_ips:
                 ips_to_delete.append(ip_address)
-        if not self.module.check_mode:
-            ClcPublicIp._push_metric(
-                ClcPublicIp.STATS_PUBLICIP_DELETE,
-                len(servers_to_change))
-        return [ip.Delete() for ip in ips_to_delete], servers_to_change
+        ClcPublicIp._push_metric(
+            ClcPublicIp.STATS_PUBLICIP_DELETE,
+            len(servers_to_change))
+
+        result = [ip.Delete() for ip in ips_to_delete], servers_to_change
+        return result
 
     def _wait_for_requests_to_complete(self, requests_lst, action='create'):
         """
