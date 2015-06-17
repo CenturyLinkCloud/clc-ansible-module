@@ -227,8 +227,8 @@ class ClcPublicIp(object):
             requests, servers = command()
             requests_list += requests
             changed_servers += servers
-
-        self._wait_for_requests_to_complete(requests_list)
+        wait = self.module.params.get('wait')
+        self._wait_for_requests_to_complete(requests_list, wait)
         changed_server_ids, changed_servers = self._refresh_server_public_ips(
             changed_servers)
         has_made_changes, result_changed_servers = self._parse_server_results(
@@ -283,24 +283,25 @@ class ClcPublicIp(object):
         result = [ip.Delete() for ip in ips_to_delete], servers_to_change
         return result
 
-    def _wait_for_requests_to_complete(self, requests_lst, action='create'):
+    def _wait_for_requests_to_complete(self, requests_lst, wait='True', action='create'):
         """
         Waits for the requests to complete
         :param requests_lst: a list of the requests that a being waited on
         :param action: action that is waiting to complete
         :return: none
         """
-        for request in requests_lst:
-            request.WaitUntilComplete()
-            for request_details in request.requests:
-                if request_details.Status() != 'succeeded':
-                    self.module.fail_json(
-                        msg='Unable to ' +
-                            action +
-                            ' Public IP for ' +
-                            request.server.id +
-                            ': ' +
-                            request.Status())
+        if wait != True:
+            for request in requests_lst:
+                request.WaitUntilComplete()
+                for request_details in request.requests:
+                    if request_details.Status() != 'succeeded':
+                        self.module.fail_json(
+                            msg='Unable to ' +
+                                action +
+                                ' Public IP for ' +
+                                request.server.id +
+                                ': ' +
+                                request.Status())
 
     def _refresh_server_public_ips(self, servers_to_refresh):
         """
