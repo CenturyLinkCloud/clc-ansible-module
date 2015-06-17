@@ -139,8 +139,7 @@ class ClcSnapshot():
         server_ids = p['server_ids']
         expiration_days = p['expiration_days']
         state = p['state']
-        command_list = []
-        requests = []
+
         if not server_ids:
             return self.module.fail_json(msg='List of Server ids are required')
 
