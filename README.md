@@ -200,7 +200,7 @@ This module can be used to modify server configuration in CLC.
 | `memory:` | N |  | valid int value | Memory in GB.
 | `anti_affinity_policy_id:` | N | | | The anti-affinity policy id to assign to the server. This is mutually exclusive with `anti_affinity_policy_name:`
 | `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server. This is mutually exclusive with `anti_affinity_policy_id:`
-| `state:` | Y | `present` | `present` | The state to insure that the provided resources are in( Note: more states are on the way).
+| `state:` | Y | `present` | `present` | The state to insure that the provided resources are in.
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
@@ -443,6 +443,8 @@ Executes a package on existing set of servers.
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
 | `package_id:` | Y |  |  | The package id which needs to be deployed |
 | `package_params:` | N | {} |  | The arguments required for the package execution. These arguments needs to be in JSON format |
+| `state:` | N | `present` | `present` | If `present` module will deploy the package. |
+| `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
 
 
 ## clc_loadbalancer Module
