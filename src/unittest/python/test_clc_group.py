@@ -35,7 +35,7 @@ class TestClcServerFunctions(unittest.TestCase):
         with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
             with patch.object(clc_group, 'clc_sdk') as mock_clc_sdk:
                 under_test = ClcGroup(self.module)
-                under_test.set_clc_credentials_from_env()
+                under_test._set_clc_credentials_from_env()
 
         mock_clc_sdk.v2.SetCredentials.assert_called_once_with(api_username='hansolo', api_passwd='falcon')
 
@@ -43,7 +43,7 @@ class TestClcServerFunctions(unittest.TestCase):
     def test_clc_set_credentials_w_no_creds(self):
         with patch.dict('os.environ', {}, clear=True):
             under_test = ClcGroup(self.module)
-            under_test.set_clc_credentials_from_env()
+            under_test._set_clc_credentials_from_env()
 
         self.assertEqual(self.module.fail_json.called, True)
 
@@ -51,18 +51,18 @@ class TestClcServerFunctions(unittest.TestCase):
         original_url = clc_sdk.defaults.ENDPOINT_URL_V2
         under_test = ClcGroup(self.module)
 
-        under_test.set_clc_credentials_from_env()
+        under_test._set_clc_credentials_from_env()
         self.assertEqual(clc_sdk.defaults.ENDPOINT_URL_V2, original_url)
 
         with patch.dict('os.environ', {'CLC_V2_API_URL': 'http://unittest.example.com/'}):
-            under_test.set_clc_credentials_from_env()
+            under_test._set_clc_credentials_from_env()
 
         self.assertEqual(clc_sdk.defaults.ENDPOINT_URL_V2, 'http://unittest.example.com/')
 
         clc_sdk.defaults.ENDPOINT_URL_V2 = original_url
 
     def test_define_argument_spec(self):
-        result = ClcGroup.define_argument_spec()
+        result = ClcGroup._define_module_argument_spec()
         self.assertIsInstance(result, dict)
 
     @patch.object(clc_group, 'clc_sdk')
@@ -125,6 +125,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
         mock_group_dict = {mock_parent.name: (mock_parent, mock_grandparent)}
 
+        self.module.check_mode = False
         under_test = ClcGroup(self.module)
         under_test.group_dict = mock_group_dict
         under_test.root_group = mock_rootgroup
@@ -206,6 +207,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
         mock_group_dict = {mock_group.name: (mock_group, mock_parent)}
 
+        self.module.check_mode = False
         under_test = ClcGroup(self.module)
         under_test.group_dict = mock_group_dict
 

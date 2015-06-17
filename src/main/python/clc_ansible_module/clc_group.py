@@ -22,7 +22,12 @@ options:
       - Whether to create or delete the group
     default: present
     choices: ['present', 'absent']
-
+  wait:
+    description:
+      - Whether to wait for the provisioning tasks to finish before returning.
+    default: True
+    required: False
+    choices: [ True, False ]
 
 '''
 
@@ -142,7 +147,7 @@ class ClcGroup():
     #
 
     @staticmethod
-    def define_argument_spec():
+    def _define_module_argument_spec():
         """
         Define the argument spec for the ansible module
         :return: argument spec dictionary
@@ -155,8 +160,8 @@ class ClcGroup():
             alias=dict(default=None),
             custom_fields=dict(type='list', default=[]),
             server_ids=dict(type='list', default=[]),
-            state=dict(default='present', choices=['present', 'absent'])
-        )
+            state=dict(default='present', choices=['present', 'absent']),
+            wait=dict(type='bool', default=True))
 
         return argument_spec
 
@@ -164,7 +169,7 @@ class ClcGroup():
     #   Module Behavior Functions
     #
 
-    def set_clc_credentials_from_env(self):
+    def _set_clc_credentials_from_env(self):
         """
         Set the CLC Credentials on the sdk by reading environment variables
         :return: none
@@ -202,8 +207,9 @@ class ClcGroup():
         changed = False
         group = None
         if self._group_exists(group_name=group_name, parent_name=parent_name):
-            self._delete_group(group_name)
-            changed = True
+            if not self.module.check_mode:
+                self._delete_group(group_name)
+                changed = True
         return changed, group
 
     def _delete_group(self, group_name):
@@ -213,8 +219,9 @@ class ClcGroup():
         :return: none
         """
         group, parent = self.group_dict.get(group_name)
-        group.Delete()
-        ClcGroup._push_metric(ClcGroup.STATS_GROUP_DELETE, 1)
+        if not self.module.check_mode:
+            group.Delete()
+            ClcGroup._push_metric(ClcGroup.STATS_GROUP_DELETE, 1)
 
     def _ensure_group_is_present(
             self,
@@ -243,11 +250,12 @@ class ClcGroup():
             group, parent = self.group_dict[group_name]
             changed = False
         elif parent_exists and not child_exists:
-            group = self._create_group(
-                group=group,
-                parent=parent,
-                description=description)
-            changed = True
+            if not self.module.check_mode:
+                group = self._create_group(
+                    group=group,
+                    parent=parent,
+                    description=description)
+                changed = True
         else:
             self.module.fail_json(
                 msg="parent group: " +
@@ -266,8 +274,9 @@ class ClcGroup():
         """
 
         (parent, grandparent) = self.group_dict[parent]
-        ClcGroup._push_metric(ClcGroup.STATS_GROUP_CREATE, 1)
-        return parent.Create(name=group, description=description)
+        if not self.module.check_mode:
+            ClcGroup._push_metric(ClcGroup.STATS_GROUP_CREATE, 1)
+            return parent.Create(name=group, description=description)
 
     #
     #   Utility Functions
@@ -334,6 +343,12 @@ class ClcGroup():
 
     @staticmethod
     def _push_metric(path, count):
+        """
+        Sends the usage metric to statsd
+        :param path: The metric path
+        :param count: The number of ticks to record to the metric
+        :return None
+        """
         try:
             sock = socket.socket()
             sock.settimeout(ClcGroup.SOCKET_CONNECTION_TIMEOUT)
@@ -348,7 +363,12 @@ class ClcGroup():
             error = ''
 
 def main():
-    module = AnsibleModule(argument_spec=ClcGroup.define_argument_spec())
+    """
+    The main function.  Instantiates the module and calls process_request.
+    :return: none
+    """
+    argument_dict = ClcGroup.define_argument_spec()
+    module = AnsibleModule(supports_check_mode=True, **argument_dict)
 
     clc_group = ClcGroup(module)
     clc_group.process_request()
