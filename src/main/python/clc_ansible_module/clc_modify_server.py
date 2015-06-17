@@ -169,11 +169,8 @@ class ClcModifyServer():
                     msg='server_ids needs to be a list of instances to modify: %s' %
                     server_ids)
 
-            (changed,
-             server_dict_array,
-             new_server_ids) = ClcModifyServer._modify_servers(module=self.module,
-                                                               clc=self.clc,
-                                                               server_ids=server_ids)
+            (changed, server_dict_array, new_server_ids) = ClcModifyServer._modify_servers(
+                module=self.module, clc=self.clc, server_ids=server_ids)
 
         self.module.exit_json(
             changed=changed,
@@ -288,20 +285,12 @@ class ClcModifyServer():
 
         servers = clc.v2.Servers(server_ids).Servers()
         for server in servers:
-            server_changed, server_result = ClcModifyServer._ensure_server_config(clc,
-                                                                                  module,
-                                                                                  None,
-                                                                                  server,
-                                                                                  server_params,
-                                                                                  changed_servers)
+            server_changed, server_result = ClcModifyServer._ensure_server_config(
+                clc, module, None, server, server_params, changed_servers)
             if server_result:
                 requests.append(server_result)
-            aa_changed, aa_result = ClcModifyServer._ensure_aa_policy(clc,
-                                                                      module,
-                                                                      None,
-                                                                      server,
-                                                                      server_params,
-                                                                      changed_servers)
+            aa_changed, aa_result = ClcModifyServer._ensure_aa_policy(
+                clc, module, None, server, server_params, changed_servers)
             if aa_changed or server_changed:
                 changed = True
 
@@ -419,10 +408,11 @@ class ClcModifyServer():
                 module,
                 acct_alias,
                 aa_policy_name)
-        current_aa_policy_id = ClcModifyServer._get_aa_policy_id_of_server(clc,
-                                                                           module,
-                                                                           acct_alias,
-                                                                           server.id)
+        current_aa_policy_id = ClcModifyServer._get_aa_policy_id_of_server(
+            clc,
+            module,
+            acct_alias,
+            server.id)
 
         if aa_policy_id and aa_policy_id != current_aa_policy_id:
             if server not in changed_servers:
@@ -480,10 +470,12 @@ class ClcModifyServer():
                     aa_policy_id = aa_policy.get('id')
                 else:
                     return module.fail_json(
-                        msg='mutiple anti affinity policies were found with policy name : %s' % (aa_policy_name))
+                        msg='mutiple anti affinity policies were found with policy name : %s' %
+                        (aa_policy_name))
         if not aa_policy_id:
             return module.fail_json(
-                msg='No anti affinity policy was found with policy name : %s' % (aa_policy_name))
+                msg='No anti affinity policy was found with policy name : %s' %
+                (aa_policy_name))
         return aa_policy_id
 
     @staticmethod
@@ -498,8 +490,9 @@ class ClcModifyServer():
         """
         aa_policy_id = None
         try:
-            result = clc.v2.API.Call(method='GET',
-                                     url='servers/%s/%s/antiAffinityPolicy' % (alias, server_id))
+            result = clc.v2.API.Call(
+                method='GET', url='servers/%s/%s/antiAffinityPolicy' %
+                (alias, server_id))
             aa_policy_id = result.get('id')
         except APIFailedResponse as e:
             if e.response_status_code != 404:
