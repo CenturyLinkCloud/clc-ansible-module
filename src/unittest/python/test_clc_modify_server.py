@@ -245,6 +245,16 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
         clc_sdk.defaults.ENDPOINT_URL_V2 = original_url
 
+    @patch.object(ClcModifyServer, 'clc')
+    def test_set_clc_credentials_from_env(self, mock_clc_sdk):
+        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',
+                                       'CLC_ACCT_ALIAS': 'TEST'}):
+            under_test = ClcModifyServer(self.module)
+            under_test._set_clc_credentials_from_env()
+        self.assertEqual(under_test.clc._LOGIN_TOKEN_V2, 'dummyToken')
+        self.assertFalse(mock_clc_sdk.v2.SetCredentials.called)
+        self.assertEqual(self.module.fail_json.called, False)
+
     def test_define_argument_spec(self):
         result = ClcModifyServer._define_module_argument_spec()
         self.assertIsInstance(result, dict)
@@ -342,6 +352,16 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                                               'test1')
         mock_ansible_module.fail_json.assert_called_with(
             msg='mutiple anti affinity policies were found with policy name : test1')
+
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_wait_for_requests(self, mock_clc_sdk):
+        try:
+            servers = mock.MagicMock()
+            requests = mock.MagicMock()
+            under_test = ClcModifyServer(self.module)
+            under_test._wait_for_requests(mock_clc_sdk, requests, servers, True)
+        except:
+            self.fail('Caught an unexpected exception')
 
 if __name__ == '__main__':
     unittest.main()

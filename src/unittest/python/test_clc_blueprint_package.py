@@ -97,6 +97,13 @@ class TestClcBluePrintPackageFunctions(unittest.TestCase):
             under_test._set_clc_credentials_from_env()
         self.assertEqual(self.module.fail_json.called, True)
 
+    @patch.object(ClcBlueprintPackage, 'clc')
+    def test_set_clc_credentials_w_api_url(self, mock_clc_sdk):
+        with patch.dict('os.environ', {'CLC_V2_API_URL': 'dummyapiurl'}):
+            under_test = ClcBlueprintPackage(self.module)
+            under_test._set_clc_credentials_from_env()
+            self.assertEqual(under_test.clc.defaults.ENDPOINT_URL_V2, 'dummyapiurl')
+
 
     def test_define_argument_spec(self):
         result = ClcBlueprintPackage.define_argument_spec()
