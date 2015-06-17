@@ -27,14 +27,14 @@
 #
 
 DOCUMENTATION = '''
-module: clc_package
-short_desciption: deploys a blue print on a set of servers in CenturyLink Cloud.
+module: clc_blueprint_package
+short_desciption: deploys a blue print package on a set of servers in CenturyLink Cloud.
 description:
-  - An Ansible module to deploy blue print on a set of servers in CenturyLink Cloud.
+  - An Ansible module to deploy blue print package on a set of servers in CenturyLink Cloud.
 options:
   server_ids:
     description:
-      - A list of server Ids to deploy the blue print.
+      - A list of server Ids to deploy the blue print package.
     default: []
     required: True
     aliases: []
@@ -56,7 +56,7 @@ EXAMPLES = '''
 # Note - You must set the CLC_V2_API_USERNAME And CLC_V2_API_PASSWD Environment variables before running these examples
 
 - name: Deploy package
-      clc_package:
+      clc_blueprint_package:
         server_ids:
             - UC1WFSDANS01
             - UC1WFSDANS02
@@ -81,7 +81,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcPackage():
+class ClcBlueprintPackage():
 
     clc = clc_sdk
     module = None
@@ -183,7 +183,7 @@ class ClcPackage():
             result = server.ExecutePackage(
                 package_id=package_id,
                 parameters=package_params)
-            ClcPackage._push_metric(ClcPackage.STATS_PACKAGE_DEPLOY, 1)
+            ClcBlueprintPackage._push_metric(ClcBlueprintPackage.STATS_PACKAGE_DEPLOY, 1)
         return result
 
     def _wait_for_requests_to_complete(self, requests_lst):
@@ -249,8 +249,8 @@ class ClcPackage():
         """
         try:
             sock = socket.socket()
-            sock.settimeout(ClcPackage.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect((ClcPackage.STATSD_HOST, ClcPackage.STATSD_PORT))
+            sock.settimeout(ClcBlueprintPackage.SOCKET_CONNECTION_TIMEOUT)
+            sock.connect((ClcBlueprintPackage.STATSD_HOST, ClcBlueprintPackage.STATSD_PORT))
             sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
             sock.close()
         except socket.gaierror:
@@ -267,11 +267,11 @@ def main():
     :return: None
     """
     module = AnsibleModule(
-        argument_spec=ClcPackage.define_argument_spec(),
+        argument_spec=ClcBlueprintPackage.define_argument_spec(),
         supports_check_mode=True
     )
-    clc_package = ClcPackage(module)
-    clc_package.process_request()
+    clc_blueprint_package = ClcBlueprintPackage(module)
+    clc_blueprint_package.process_request()
 
 from ansible.module_utils.basic import *
 if __name__ == '__main__':

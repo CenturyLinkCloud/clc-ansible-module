@@ -5,11 +5,16 @@
   connection: local
   tasks:
     - name: Deploy a package on CLC Servers
-      clc_package:
+      clc_blueprint_package:
         server_ids:
-            - UC1WFSDANS01
-            - UC1WFSDANS02
+            - uc1wfadubusvr06
+            - uc1wfadubusvr03
         package_id: 77abb844-579d-478d-3955-c69ab4a7ba1a
         package_params: {'User': 'root',
 'SshKey': 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDk6znP7Zkta+SXTRTAoSDCXmKJRwdvkcA5K60CcVTyCvDGiXnB3M0LZdXSwQeftlnolj2G3zqLsej77l6bqSWMWp5phit4P7KB9krCGx9wHQ5WOXX7fMgLkbFWYZCujfQwY0wlSany7fuZomFLvRtRcUKiw6x7UDsjX3jpG+P06te1H7ajUCcv+4Vieb4+FYi/2DN+eAzEOktPli7Na5wueLAgWcFO+//PNzHhEqE6OzazO3Z1b47eZdLu/kxfELrujq0ju85Etq2U4JL3R/yCrMW5FADHx28xLj1gszYGc15qUn9ppZ/tnFFfl8jTSyDEHmxjzOZHfS+DPU5gUL0x brianalbrecht@Brians-MacBook-Pro.local'}
+        wait: True
+        state: present
       register: clc
+
+    - name: debug
+      debug: var=clc.server_ids
