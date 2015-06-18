@@ -147,20 +147,19 @@ class ClcPublicIp(object):
         wait = params['wait']
         command_list = []
 
-        if state == 'present':
-            if not self.module.check_mode:
+        if not self.module.check_mode:
+            if state == 'present':
                 command_list.append(
                     lambda: self.ip_create_command(
                         server_ids=server_ids,
                         protocol=protocol,
                         ports=ports))
-        elif state == 'absent':
-            if not self.module.check_mode:
+            elif state == 'absent':
                 command_list.append(
                     lambda: self.ip_delete_command(
                         server_ids=server_ids))
-        else:
-            return self.module.fail_json(msg="Unknown State: " + state)
+            else:
+                return self.module.fail_json(msg="Unknown State: " + state)
 
         has_made_changes, result_servers, result_server_ids = self.run_clc_commands(
             command_list)
@@ -254,7 +253,7 @@ class ClcPublicIp(object):
         ClcPublicIp._push_metric(
             ClcPublicIp.STATS_PUBLICIP_CREATE,
             len(servers_to_change))
-
+        result = None
         result = [server.PublicIPs().Add(ports_to_expose)
                   for server in servers_to_change], servers_to_change
         return result
@@ -279,7 +278,7 @@ class ClcPublicIp(object):
         ClcPublicIp._push_metric(
             ClcPublicIp.STATS_PUBLICIP_DELETE,
             len(servers_to_change))
-
+        result = None
         result = [ip.Delete() for ip in ips_to_delete], servers_to_change
         return result
 

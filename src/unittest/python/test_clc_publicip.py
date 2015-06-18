@@ -187,7 +187,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
             , 'state': 'NOT_VALID_STATE'
             , 'wait': True
         }
-
+        self.module.check_mode = False
         under_test = ClcPublicIp(self.module)
         under_test.process_request(test_params)
 

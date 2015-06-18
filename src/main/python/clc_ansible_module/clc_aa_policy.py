@@ -170,6 +170,7 @@ class ClcAntiAffinityPolicy():
         elif hasattr(policy, '__dict__'):
             policy = policy.__dict__
 
+        self._wait_for_requests_to_complete(policy)
         self.module.exit_json(changed=changed, policy=policy)
 
     def _set_clc_credentials_from_env(self):
@@ -278,6 +279,20 @@ class ClcAntiAffinityPolicy():
 
         return changed, policy
 
+    def _wait_for_requests_to_complete(self, requests):
+        """
+        Waits until the CLC requests are complete if the wait argument is True
+        :param requests_lst: The list of CLC request objects
+        :return: none
+        """
+        if self.module.params['wait']:
+            for request in requests:
+                request.WaitUntilComplete()
+                for request_details in request.requests:
+                    if request_details.Status() != 'succeeded':
+                        self.module.fail_json(
+                            msg='Unable to process anti affinity policy request')
+
     @staticmethod
     def _push_metric(path, count):
         """
@@ -310,7 +325,7 @@ def main():
     argument_dict = ClcAntiAffinityPolicy._define_module_argument_spec()
     module = AnsibleModule(supports_check_mode=True, **argument_dict)
     me = ClcAntiAffinityPolicy(module)
-    me.do_work()
+    me.process_request()
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
