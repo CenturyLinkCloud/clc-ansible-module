@@ -255,7 +255,6 @@ class ClcAntiAffinityPolicy():
         changed = False
         policy = None
 
-
         if self._policy_exists(policy_name=p['name']):
             if not self.module.check_mode:
                 policy = self._delete_policy(p)
@@ -307,7 +306,9 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    module = AnsibleModule(argument_spec=ClcAntiAffinityPolicy._define_module_argument_spec(), supports_check_mode=True)
+    module = AnsibleModule(
+        argument_spec=ClcAntiAffinityPolicy._define_module_argument_spec(),
+        supports_check_mode=True)
     clc_aa_policy = ClcAntiAffinityPolicy(module)
     clc_aa_policy.process_request()
 
