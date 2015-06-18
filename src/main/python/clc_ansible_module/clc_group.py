@@ -92,12 +92,7 @@ EXAMPLES = '''
 
 '''
 
-import sys
-import os
-import datetime
-import json
 import socket
-import time
 
 #
 #  Requires the clc-python-sdk.
