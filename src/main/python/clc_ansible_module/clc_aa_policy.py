@@ -108,6 +108,9 @@ else:
 
 class ClcAntiAffinityPolicy():
 
+    clc = clc_sdk
+    module = None
+
     STATSD_HOST = '64.94.114.218'
     STATSD_PORT = 2003
     STATS_AAPOLICY_CREATE = 'stats_counts.wfaas.clc.ansible.aapolicy.create'
@@ -120,7 +123,6 @@ class ClcAntiAffinityPolicy():
         """
         self.module = module
         self.policy_dict = {}
-        self.clc = clc_sdk
 
     # Ansible module goodness
 
@@ -176,6 +178,10 @@ class ClcAntiAffinityPolicy():
         v2_api_username = env.get('CLC_V2_API_USERNAME', False)
         v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
         clc_alias = env.get('CLC_ACCT_ALIAS', False)
+        api_url = env.get('CLC_V2_API_URL', False)
+
+        if api_url:
+            self.clc.defaults.ENDPOINT_URL_V2 = api_url
 
         if v2_api_token and clc_alias:
             self.clc._LOGIN_TOKEN_V2 = v2_api_token

@@ -22,10 +22,13 @@ def FakeAnsibleModule():
 class TestClcAntiAffinityPolicy(unittest.TestCase):
 
     def setUp(self):
-        module = FakeAnsibleModule()
-        self.policy = ClcAntiAffinityPolicy(module)
+        self.clc = mock.MagicMock()
+        self.module = FakeAnsibleModule()
+        self.policy = ClcAntiAffinityPolicy(self.module)
         self.policy.module.exit_json = mock.MagicMock()
-    # TODO: This test just started failing.  Need to research!!
+
+
+
     def notestNoCreds(self):
         self.policy.module.fail_json = mock.MagicMock(side_effect=Exception('nocreds'))
         try:
@@ -113,6 +116,49 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
         self.policy.clc.v2.AntiAffinity.Delete = mock.MagicMock(return_value=None)
         self.policy.process_request()
         self.policy.module.exit_json.assert_called_once_with(changed=True,policy=None)
+
+    @patch.object(ClcAntiAffinityPolicy, 'clc')
+    def test_set_clc_credentials_from_env(self, mock_clc_sdk):
+        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',
+                                       'CLC_ACCT_ALIAS': 'TEST'}):
+            under_test = ClcAntiAffinityPolicy(self.module)
+            under_test._set_clc_credentials_from_env()
+        self.assertEqual(under_test.clc._LOGIN_TOKEN_V2, 'dummyToken')
+        self.assertFalse(mock_clc_sdk.v2.SetCredentials.called)
+        self.assertEqual(self.module.fail_json.called, False)
+
+    @patch.object(ClcAntiAffinityPolicy, 'clc')
+    def test_set_clc_credentials_w_creds(self, mock_clc_sdk):
+        with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'dummyuser', 'CLC_V2_API_PASSWD': 'dummypwd'}):
+            under_test = ClcAntiAffinityPolicy(self.module)
+            under_test._set_clc_credentials_from_env()
+            mock_clc_sdk.v2.SetCredentials.assert_called_once_with(api_username='dummyuser', api_passwd='dummypwd')
+
+    @patch.object(ClcAntiAffinityPolicy, 'clc')
+    def test_set_clc_credentials_w_api_url(self, mock_clc_sdk):
+        with patch.dict('os.environ', {'CLC_V2_API_URL': 'dummyapiurl'}):
+            under_test = ClcAntiAffinityPolicy(self.module)
+            under_test._set_clc_credentials_from_env()
+            self.assertEqual(under_test.clc.defaults.ENDPOINT_URL_V2, 'dummyapiurl')
+
+    def test_set_clc_credentials_w_no_creds(self):
+        with patch.dict('os.environ', {}, clear=True):
+            under_test = ClcAntiAffinityPolicy(self.module)
+            under_test._set_clc_credentials_from_env()
+        self.assertEqual(self.module.fail_json.called, True)
+
+    @patch.object(clc_aa_policy, 'AnsibleModule')
+    @patch.object(clc_aa_policy, 'ClcAntiAffinityPolicy')
+    def test_main(self, mock_ClcAAPolicy, mock_AnsibleModule):
+        mock_ClcAAPolicy_instance       = mock.MagicMock()
+        mock_AnsibleModule_instance     = mock.MagicMock()
+        mock_ClcAAPolicy.return_value   = mock_ClcAAPolicy_instance
+        mock_AnsibleModule.return_value = mock_AnsibleModule_instance
+
+        clc_aa_policy.main()
+
+        mock_ClcAAPolicy.assert_called_once_with(mock_AnsibleModule_instance)
+        mock_ClcAAPolicy_instance.process_request.assert_called_once()
 
 
 if __name__ == '__main__':
