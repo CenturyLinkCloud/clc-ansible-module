@@ -243,13 +243,6 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         ip.Delete.return_value = 'success'
         public_ips_obj.public_ips = [ip]
         mock_server1.PublicIPs.return_value = public_ips_obj
-        #mock_server2 = mock.MagicMock()
-        #mock_server2.id = 'TESTSVR2'
-        #mock_server2.PublicIPs = mock.MagicMock()
-        #mock_server2.PublicIPs.public_ips = [mock.MagicMock()]
-        #mock_server.PublicIPs.public_ips.return_value = [mock.MagicMock(),mock.MagicMock()]
-        #mock_server.PublicIPs.public_ips.side_effect = [mock.MagicMock(),mock.MagicMock()]
-        #mock_server.PublicIPs.public_ips = [80, 90]
         mock_get_servers.return_value=[mock_server1]
         self.module.check_mode = False
 
