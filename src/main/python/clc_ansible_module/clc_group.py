@@ -22,12 +22,6 @@ options:
       - Whether to create or delete the group
     default: present
     choices: ['present', 'absent']
-  wait:
-    description:
-      - Whether to wait for the provisioning tasks to finish before returning.
-    default: True
-    required: False
-    choices: [ True, False ]
 
 '''
 
@@ -133,7 +127,6 @@ class ClcGroup():
         if state == "absent":
             changed, group, response = self._ensure_group_is_absent(
                 group_name=group_name, parent_name=parent_name)
-            self._wait_for_requests_to_complete(response)
 
         else:
             changed, group, response = self._ensure_group_is_present(
@@ -160,8 +153,7 @@ class ClcGroup():
             alias=dict(default=None),
             custom_fields=dict(type='list', default=[]),
             server_ids=dict(type='list', default=[]),
-            state=dict(default='present', choices=['present', 'absent']),
-            wait=dict(type='bool', default=True))
+            state=dict(default='present', choices=['present', 'absent']))
 
         return argument_spec
 
@@ -349,20 +341,6 @@ class ClcGroup():
             if "Group not found" not in e.message:
                 self.module.fail_json(msg='error looking up group: %s' % e)
         return result
-
-    def _wait_for_requests_to_complete(self, requests):
-        """
-        Waits until the CLC requests are complete if the wait argument is True
-        :param requests_lst: The list of CLC request objects
-        :return: none
-        """
-        if self.module.params['wait']:
-            for request in requests:
-                request.WaitUntilComplete()
-                for request_details in request.requests:
-                    if request_details.Status() != 'succeeded':
-                        self.module.fail_json(
-                            msg='Unable to process group request')
 
     @staticmethod
     def _push_metric(path, count):
