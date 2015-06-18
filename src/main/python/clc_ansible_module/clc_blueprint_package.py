@@ -192,13 +192,14 @@ class ClcBlueprintPackage():
         :param requests_lst: The list of CLC request objects
         :return: none
         """
-        if self.module.params['wait']:
-            for request in requests_lst:
-                request.WaitUntilComplete()
-                for request_details in request.requests:
-                    if request_details.Status() != 'succeeded':
-                        self.module.fail_json(
-                            msg='Unable to process package install request')
+        if not self.module.params['wait']:
+            return
+        for request in requests_lst:
+            request.WaitUntilComplete()
+            for request_details in request.requests:
+                if request_details.Status() != 'succeeded':
+                    self.module.fail_json(
+                        msg='Unable to process package install request')
 
     def _get_servers_from_clc(self, server_list, message):
         """

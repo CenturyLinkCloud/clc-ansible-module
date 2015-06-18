@@ -648,9 +648,8 @@ class ClcLoadBalancer():
             if not node in nodes:
                 changed = True
                 nodes.append(node)
-        if changed == True:
-            if not self.module.check_mode:
-                result = self.set_loadbalancernodes(alias, location, lb_id, pool_id, nodes)
+        if changed == True and not self.module.check_mode:
+            result = self.set_loadbalancernodes(alias, location, lb_id, pool_id, nodes)
         return changed, result
 
     def remove_lbpool_nodes(self, alias, location, lb_id, pool_id, nodes_to_remove):
@@ -674,9 +673,8 @@ class ClcLoadBalancer():
             if node in nodes:
                 changed = True
                 nodes.remove(node)
-        if changed == True:
-            if not self.module.check_mode:
-                result = self.set_loadbalancernodes(alias, location, lb_id, pool_id, nodes)
+        if changed == True and not self.module.check_mode:
+            result = self.set_loadbalancernodes(alias, location, lb_id, pool_id, nodes)
         return changed, result
 
     def _get_lbpool_nodes(self, alias, location, lb_id, pool_id):
