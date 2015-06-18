@@ -237,54 +237,6 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(result_changed, False)
         self.assertFalse(mock_group.Delete.called)
 
-    def test_get_group(self):
-        # Setup
-        mock_group = mock.MagicMock(spec=clc_sdk.v2.Group)
-        mock_group.name = "MyCoolGroup"
-
-        with patch.object(clc_group, 'clc_sdk') as mock_clc_sdk:
-            mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
-            under_test = ClcGroup(self.module)
-
-            # Function Under Test
-            result = under_test._get_group(group_name="MyCoolGroup")
-
-        # Assert Result
-        mock_clc_sdk.v2.Datacenter().Groups().Get.assert_called_once_with("MyCoolGroup")
-        self.assertEqual(result.name, "MyCoolGroup")
-        self.assertEqual(self.module.fail_json.called, False)
-
-
-    def test_get_group_not_found(self):
-
-        # Setup
-        with patch.object(clc_group, 'clc_sdk') as mock_clc_sdk:
-            mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = clc_sdk.CLCException("Group not found")
-            under_test = ClcGroup(self.module)
-
-            # Function Under Test
-            result = under_test._get_group("MyCoolGroup")
-
-        # Assert Result
-        mock_clc_sdk.v2.Datacenter().Groups().Get.assert_called_once_with("MyCoolGroup")
-        self.assertEqual(result, None)
-        self.assertEqual(self.module.fail_json.called, False)
-
-
-    def test_get_group_exception(self):
-        # Setup
-        with patch.object(clc_group, 'clc_sdk') as mock_clc_sdk:
-            mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = clc_sdk.CLCException("other error")
-            under_test = ClcGroup(self.module)
-
-            # Function Under Test
-            result = under_test._get_group("MyCoolGroup")
-
-        # Assert Result
-        mock_clc_sdk.v2.Datacenter().Groups().Get.assert_called_once_with("MyCoolGroup")
-        self.assertEqual(result, None)
-        self.assertEqual(self.module.fail_json.called, True)
-
     @patch.object(clc_group, 'AnsibleModule')
     @patch.object(clc_group, 'ClcGroup')
     def test_main(self, mock_ClcGroup, mock_AnsibleModule):

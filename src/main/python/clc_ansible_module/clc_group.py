@@ -311,25 +311,10 @@ class ClcGroup():
         groups = child_group.Subgroups().groups
         if len(groups) > 0:
             for group in groups:
-                result.update(self._walk_groups_recursive(child_group, group))
-        return result
+                if group.type != 'default':
+                    continue
 
-    def _get_group(self, group_name, datacenter=None, alias=None):
-        """
-        Get a specified group from the CLC Api
-        :param group_name: string - the group to search for
-        :param datacenter: string - the datacenter to query against (ex: 'UC1')
-        :param alias: string - the account alias to search. Defaults to the current user's account
-        :return: clc_sdk.Group - a group object representing group_name.
-        """
-        result = None
-        try:
-            result = self.clc.v2.Datacenter(
-                location=datacenter,
-                alias=alias).Groups().Get(group_name)
-        except CLCException as e:
-            if "Group not found" not in e.message:
-                self.module.fail_json(msg='error looking up group: %s' % e)
+                result.update(self._walk_groups_recursive(child_group, group))
         return result
 
     @staticmethod
