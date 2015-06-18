@@ -354,6 +354,7 @@ Creates a public ip on an existing server or servers.
 | `ports:` | Y | | | A list of ports to expose|
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
 | `state:` | N | `present` | `present`,`absent` | Determine whether to create or delete public IPs.  If `present` module will not create a second public ip if one already exists. |
+| `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
 
 ## clc_server_snapshot Module
 Create/Delete/Restore a snapshot on an existing server or servers.
