@@ -124,6 +124,13 @@ class TestClcPublicIpFunctions(unittest.TestCase):
                 under_test._set_clc_credentials_from_env()
         mock_clc_sdk.v2.SetCredentials.assert_called_once_with(api_username='hansolo', api_passwd='falcon')
 
+    @patch.object(ClcPublicIp, 'clc')
+    def test_set_clc_credentials_w_api_url(self, mock_clc_sdk):
+        with patch.dict('os.environ', {'CLC_V2_API_URL': 'dummyapiurl'}):
+            under_test = ClcPublicIp(self.module)
+            under_test._set_clc_credentials_from_env()
+            self.assertEqual(under_test.clc.defaults.ENDPOINT_URL_V2, 'dummyapiurl')
+
 
     def test_set_clc_credentials_w_no_creds(self):
         with patch.dict('os.environ', {}, clear=True):
@@ -154,7 +161,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
     def test_get_servers_from_clc_api(self, mock_clc_sdk):
         mock_clc_sdk.v2.Servers.side_effect = CLCException("Server Not Found")
         under_test = ClcPublicIp(self.module)
-        under_test._get_servers_from_clc_api(['TESTSVR1', 'TESTSVR2'], 'FAILED TO OBTAIN LIST')
+        under_test._get_servers_from_clc(['TESTSVR1', 'TESTSVR2'], 'FAILED TO OBTAIN LIST')
         self.module.fail_json.assert_called_once_with(msg='FAILED TO OBTAIN LIST: Server Not Found')
 
     @patch.object(ClcPublicIp, 'ensure_public_ip_present')
@@ -179,7 +186,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
 
     @patch.object(ClcPublicIp, 'ensure_public_ip_absent')
     @patch.object(ClcPublicIp, '_set_clc_credentials_from_env')
-    def test_process_request_state_absent(self, mock_set_clc_creds, mock_server_snapshot):
+    def test_process_request_state_absent(self, mock_set_clc_creds, mock_public_ip):
         test_params = {
             'server_ids': ['TESTSVR1', 'TESTSVR2']
             ,'protocol': 'TCP'
@@ -187,7 +194,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
             ,'wait': True
             , 'state': 'absent'
         }
-        mock_server_snapshot.return_value = True, ['TESTSVR1','TESTSVR2'], mock.MagicMock()
+        mock_public_ip.return_value = True, ['TESTSVR1','TESTSVR2'], mock.MagicMock()
         self.module.params = test_params
         self.module.check_mode = False
 
@@ -196,6 +203,87 @@ class TestClcPublicIpFunctions(unittest.TestCase):
 
         self.module.exit_json.assert_called_once_with(changed=True, server_ids=['TESTSVR1', 'TESTSVR2'])
         self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcPublicIp, 'ensure_public_ip_absent')
+    @patch.object(ClcPublicIp, '_set_clc_credentials_from_env')
+    def test_process_request_state_invalid(self, mock_set_clc_creds, mock_public_ip):
+        test_params = {
+            'server_ids': ['TESTSVR1', 'TESTSVR2']
+            ,'protocol': 'TCP'
+            ,'ports': [80, 90]
+            ,'wait': True
+            , 'state': 'INVALID'
+        }
+
+        self.module.params = test_params
+        under_test = ClcPublicIp(self.module)
+        under_test.process_request()
+        self.assertFalse(mock_public_ip.called)
+        self.module.fail_json.assert_called_once_with(msg='Unknown State: INVALID')
+        self.assertFalse(self.module.exit_json.called)
+
+    @patch.object(ClcPublicIp, '_get_servers_from_clc')
+    def test_ensure_server_publicip_present_w_mock_server(self,mock_get_servers):
+        server_ids = ['TESTSVR1']
+        mock_get_servers.return_value=[mock.MagicMock()]
+        protocol = 'TCP'
+        ports = [80]
+        self.module.check_mode = False
+        under_test = ClcPublicIp(self.module)
+        under_test.ensure_public_ip_present(server_ids, protocol, ports)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcPublicIp, '_get_servers_from_clc')
+    def test_ensure_server_absent_absent_w_mock_server(self,mock_get_servers):
+        server_ids = ['TESTSVR1']
+        mock_server1 = mock.MagicMock()
+        mock_server1.id = 'TESTSVR1'
+        public_ips_obj = mock.MagicMock()
+        ip = mock.MagicMock()
+        ip.Delete.return_value = 'success'
+        public_ips_obj.public_ips = [ip]
+        mock_server1.PublicIPs.return_value = public_ips_obj
+        #mock_server2 = mock.MagicMock()
+        #mock_server2.id = 'TESTSVR2'
+        #mock_server2.PublicIPs = mock.MagicMock()
+        #mock_server2.PublicIPs.public_ips = [mock.MagicMock()]
+        #mock_server.PublicIPs.public_ips.return_value = [mock.MagicMock(),mock.MagicMock()]
+        #mock_server.PublicIPs.public_ips.side_effect = [mock.MagicMock(),mock.MagicMock()]
+        #mock_server.PublicIPs.public_ips = [80, 90]
+        mock_get_servers.return_value=[mock_server1]
+        self.module.check_mode = False
+
+        under_test = ClcPublicIp(self.module)
+        changed, servers_modified, requests = under_test.ensure_public_ip_absent(server_ids)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(changed, True)
+        self.assertEqual(servers_modified, ['TESTSVR1'])
+
+    def test_wait_for_requests_w_mock_request(self):
+        mock_r1 = mock.MagicMock()
+        mock_r1.WaitUntilComplete.return_value = True
+        mock_r2 = mock.MagicMock()
+        mock_r2.WaitUntilComplete.return_value = True
+        requests = [mock_r1, mock_r2]
+        self.module.wait = True
+
+        under_test = ClcPublicIp(self.module)
+        under_test._wait_for_requests_to_complete(requests)
+        self.assertFalse(self.module.fail_json.called)
+
+    def test_wait_for_requests_w_mock_request_fail(self):
+        mock_request = mock.MagicMock()
+        mock_request.WaitUntilComplete.return_value = True
+        mock_response = mock.MagicMock()
+        mock_response.Status.return_value = 'Failed'
+        mock_request.requests = [mock_response]
+        requests = [mock_request]
+        self.module.wait = True
+
+        under_test = ClcPublicIp(self.module)
+        under_test._wait_for_requests_to_complete(requests)
+        self.assertTrue(self.module.fail_json.called)
+
 
 
     @patch.object(clc_publicip, 'AnsibleModule')

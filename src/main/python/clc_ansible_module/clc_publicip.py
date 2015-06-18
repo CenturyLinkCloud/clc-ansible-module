@@ -190,7 +190,7 @@ class ClcPublicIp(object):
         changed = False
         results = []
         changed_server_ids = []
-        servers = self._get_servers_from_clc_api(
+        servers = self._get_servers_from_clc(
             server_ids,
             'Failed to obtain server list from the CLC API')
         servers_to_change = [
@@ -220,7 +220,7 @@ class ClcPublicIp(object):
         changed = False
         results = []
         changed_server_ids = []
-        servers = self._get_servers_from_clc_api(
+        servers = self._get_servers_from_clc(
             server_ids,
             'Failed to obtain server list from the CLC API')
         servers_to_change = [
@@ -283,7 +283,7 @@ class ClcPublicIp(object):
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
 
-    def _get_servers_from_clc_api(self, server_ids, message):
+    def _get_servers_from_clc(self, server_ids, message):
         """
         Gets list of servers form CLC api
         """
