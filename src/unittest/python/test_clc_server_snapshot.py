@@ -17,36 +17,6 @@ class TestClcServerSnapshotFunctions(unittest.TestCase):
         self.module = mock.MagicMock()
         reload(clc_server_snapshot)
 
-    def build_mock_server_list(self):
-        # Mock Add IP Requests
-        mock_req1 = mock.MagicMock()
-        mock_req2 = mock.MagicMock()
-        # Mock PublicIps
-        pubip1 = mock.MagicMock()
-        pubip2 = mock.MagicMock()
-        pubip1.id = '10.10.10.10'
-        pubip1.internal = '9.10.11.12'
-        pubip2.id = '11.11.11.11'
-        pubip2.internal = '13.14.15.16'
-        # Mock Servers
-        mock_server1 = mock.MagicMock()
-        mock_server2 = mock.MagicMock()
-        mock_server1.id = 'TESTSVR1'
-        mock_server1.data = {'details': {'ipAddresses': [{'internal': '1.2.3.4'}]}}
-        mock_server1.PublicIPs().public_ips = [pubip1]
-        pubip1.Delete.return_value = mock_req1
-        mock_req1.server = mock_server1
-        mock_req1.requests = [mock_req1]
-        mock_server1.PublicIPs().Add.return_value = mock_req1
-        mock_server2.id = 'TESTSVR2'
-        mock_server2.data = {'details': {'ipAddresses': [{'internal': '5.6.7.8'}]}}
-        mock_server2.PublicIPs().public_ips = [pubip2]
-        pubip2.Delete.return_value = mock_req2
-        mock_req2.server = mock_server2
-        mock_req2.requests = [mock_req2]
-        mock_server2.PublicIPs().Add.return_value = mock_req2
-        return [mock_server1, mock_server2]
-
 
     @patch.object(ClcSnapshot, 'clc')
     def test_set_clc_credentials_from_env(self, mock_clc_sdk):
