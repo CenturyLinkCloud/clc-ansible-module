@@ -90,13 +90,7 @@ EXAMPLES = '''
       debug: var=policy
 '''
 
-import sys
-import os
-import datetime
-import json
 import socket
-import time
-from ansible.module_utils.basic import *
 
 #
 #  Requires the clc-python-sdk.
