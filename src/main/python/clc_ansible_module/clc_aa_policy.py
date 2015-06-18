@@ -155,16 +155,15 @@ class ClcAntiAffinityPolicy():
         self.policy_dict = self._get_policies_for_datacenter(p)
 
         if p['state'] == "absent":
-            changed, policy, response = self._ensure_policy_is_absent(p)
+            changed, policy = self._ensure_policy_is_absent(p)
         else:
-            changed, policy, response = self._ensure_policy_is_present(p)
+            changed, policy = self._ensure_policy_is_present(p)
 
         if hasattr(policy, 'data'):
             policy = policy.data
         elif hasattr(policy, '__dict__'):
             policy = policy.__dict__
 
-        self._wait_for_requests_to_complete(response)
         self.module.exit_json(changed=changed, policy=policy)
 
     def _set_clc_credentials_from_env(self):
@@ -248,17 +247,14 @@ class ClcAntiAffinityPolicy():
         :return: tuple of if a deletion occurred and the name of the policy that was deleted
         """
         changed = False
-        policy = p
-        results = []
-        policies = p
+        policy = None
+
 
         if self._policy_exists(policy_name=p['name']):
             if not self.module.check_mode:
-                for policy in policies:
-                    policy = self._delete_policy(p)
-                    results.append(policy)
+                policy = self._delete_policy(p)
             changed = True
-        return changed, policy, results
+        return changed, policy
 
     def _ensure_policy_is_present(self, p):
         """
@@ -267,32 +263,14 @@ class ClcAntiAffinityPolicy():
         :return: tuple of if an addition occurred and the name of the policy that was added
         """
         changed = False
-        policy = p
-        results = []
-        policies = p
+        policy = None
 
         if not self._policy_exists(policy_name=p['name']):
             if not self.module.check_mode:
-                for policy in policies:
-                    policy = self._create_policy(p)
-                    results.append(policy)
+                policy = self._create_policy(p)
             changed = True
 
-        return changed, policy, results
-
-    def _wait_for_requests_to_complete(self, requests):
-        """
-        Waits until the CLC requests are complete if the wait argument is True
-        :param requests_lst: The list of CLC request objects
-        :return: none
-        """
-        if self.module.params['wait']:
-            for request in requests:
-                request.WaitUntilComplete()
-                for request_details in request.requests:
-                    if request_details.Status() != 'succeeded':
-                        self.module.fail_json(
-                            msg='Unable to process anti affinity policy request')
+        return changed, policy
 
     @staticmethod
     def _push_metric(path, count):
