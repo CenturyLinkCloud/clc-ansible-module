@@ -70,7 +70,7 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
 
         self.policy.clc.v2.AntiAffinity.GetAll = mock.MagicMock(return_value=[mock_policy])
         self.policy.process_request()
-        self.policy.module.exit_json.assert_called_once_with(changed=False,policy=None)
+        self.policy.module.exit_json.assert_called_once_with(changed=False,policy={})
 
 
     def testCreateWithChange(self):

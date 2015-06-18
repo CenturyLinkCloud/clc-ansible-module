@@ -242,7 +242,7 @@ class ClcAntiAffinityPolicy():
         :return: boolean of if the policy exists
         """
         if policy_name in self.policy_dict:
-            return True
+            return self.policy_dict.get(policy_name)
 
         return False
 
@@ -253,13 +253,11 @@ class ClcAntiAffinityPolicy():
         :return: tuple of if a deletion occurred and the name of the policy that was deleted
         """
         changed = False
-        policy = None
-
         if self._policy_exists(policy_name=p['name']):
-            if not self.module.check_mode:
-                policy = self._delete_policy(p)
             changed = True
-        return changed, policy
+            if not self.module.check_mode:
+                self._delete_policy(p)
+        return changed, None
 
     def _ensure_policy_is_present(self, p):
         """
@@ -268,13 +266,12 @@ class ClcAntiAffinityPolicy():
         :return: tuple of if an addition occurred and the name of the policy that was added
         """
         changed = False
-        policy = None
-
-        if not self._policy_exists(policy_name=p['name']):
+        policy = self._policy_exists(policy_name=p['name'])
+        if not policy:
+            changed = True
+            policy = None
             if not self.module.check_mode:
                 policy = self._create_policy(p)
-            changed = True
-
         return changed, policy
 
     @staticmethod
