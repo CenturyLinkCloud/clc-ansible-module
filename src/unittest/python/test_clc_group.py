@@ -69,19 +69,39 @@ class TestClcServerFunctions(unittest.TestCase):
 
         clc_sdk.defaults.ENDPOINT_URL_V2 = original_url
 
+    @patch.object(ClcGroup, 'clc')
+    def test_set_clc_credentials_from_env(self, mock_clc_sdk):
+        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',
+                                       'CLC_ACCT_ALIAS': 'TEST'}):
+            under_test = ClcGroup(self.module)
+            under_test._set_clc_credentials_from_env()
+        self.assertEqual(under_test.clc._LOGIN_TOKEN_V2, 'dummyToken')
+        self.assertFalse(mock_clc_sdk.v2.SetCredentials.called)
+        self.assertEqual(self.module.fail_json.called, False)
+
     def test_define_argument_spec(self):
         result = ClcGroup._define_module_argument_spec()
         self.assertIsInstance(result, dict)
 
+    @patch.object(ClcGroup, 'clc')
+    def test_walk_groups_recursive(self, mock_clc_sdk):
+        mock_child_group = mock.MagicMock()
+        sub_group = mock.MagicMock()
+        sub_group.groups = [mock.MagicMock()]
+        mock_child_group.Subgroups.return_value = sub_group
+        under_test = ClcGroup(self.module)
+        res = under_test._walk_groups_recursive('parent', mock_child_group)
+        self.assertIsNotNone(res)
+
+    @patch.object(ClcGroup, '_set_clc_credentials_from_env')
     @patch.object(clc_group, 'clc_sdk')
-    def test_process_request_state_present(self, mock_clc_sdk):
+    def test_process_request_state_present(self, mock_set_creds, mock_clc_sdk):
         self.module.params = {
             'location': 'UC1',
             'name': 'MyCoolGroup',
             'parent': 'Default Group',
             'description': 'Test Group',
-            'state': 'present',
-            'wait': False
+            'state': 'present'
         }
         mock_group = mock.MagicMock()
         mock_group.data = {"name": "MyCoolGroup"}
@@ -103,15 +123,15 @@ class TestClcServerFunctions(unittest.TestCase):
             changed=True,
             group=mock_group.data['name'])
 
+    @patch.object(ClcGroup, '_set_clc_credentials_from_env')
     @patch.object(clc_group, 'clc_sdk')
-    def test_process_request_state_absent(self, mock_clc_sdk):
+    def test_process_request_state_absent(self, mock_set_cres, mock_clc_sdk):
         self.module.params = {
             'location': 'UC1',
             'name': 'MyCoolGroup',
             'parent': 'Default Group',
             'description': 'Test Group',
-            'state': 'absent',
-            'wait': False
+            'state': 'absent'
         }
         mock_group = mock.MagicMock()
         mock_group.data = {"name": "MyCoolGroup"}
