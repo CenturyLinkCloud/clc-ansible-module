@@ -155,16 +155,16 @@ class ClcAntiAffinityPolicy():
         self.policy_dict = self._get_policies_for_datacenter(p)
 
         if p['state'] == "absent":
-            changed, policy = self._ensure_policy_is_absent(p)
+            changed, policy, response = self._ensure_policy_is_absent(p)
         else:
-            changed, policy = self._ensure_policy_is_present(p)
+            changed, policy, response = self._ensure_policy_is_present(p)
 
         if hasattr(policy, 'data'):
             policy = policy.data
         elif hasattr(policy, '__dict__'):
             policy = policy.__dict__
 
-        #self._wait_for_requests_to_complete(policy)
+        self._wait_for_requests_to_complete(response)
         self.module.exit_json(changed=changed, policy=policy)
 
     def _set_clc_credentials_from_env(self):
@@ -199,8 +199,7 @@ class ClcAntiAffinityPolicy():
         """
         response = {}
 
-        if not self.module.check_mode:
-            policies = self.clc.v2.AntiAffinity.GetAll(location=p['location'])
+        policies = self.clc.v2.AntiAffinity.GetAll(location=p['location'])
 
         for policy in policies:
             response[policy.name] = policy
@@ -212,10 +211,9 @@ class ClcAntiAffinityPolicy():
         :param p: datacenter to create policy in
         :return: response dictionary from the CLC API.
         """
-        if not self.module.check_mode:
-            ClcAntiAffinityPolicy._push_metric(
-                ClcAntiAffinityPolicy.STATS_AAPOLICY_CREATE,
-                1)
+        ClcAntiAffinityPolicy._push_metric(
+            ClcAntiAffinityPolicy.STATS_AAPOLICY_CREATE,
+            1)
         return self.clc.v2.AntiAffinity.Create(
             name=p['name'],
             location=p['location'])
@@ -228,10 +226,9 @@ class ClcAntiAffinityPolicy():
         """
         policy = self.policy_dict[p['name']]
         policy.Delete()
-        if not self.module.check_mode:
-            ClcAntiAffinityPolicy._push_metric(
-                ClcAntiAffinityPolicy.STATS_AAPOLICY_DELETE,
-                1)
+        ClcAntiAffinityPolicy._push_metric(
+            ClcAntiAffinityPolicy.STATS_AAPOLICY_DELETE,
+            1)
 
     def _policy_exists(self, policy_name):
         """
@@ -251,12 +248,17 @@ class ClcAntiAffinityPolicy():
         :return: tuple of if a deletion occurred and the name of the policy that was deleted
         """
         changed = False
-        policy = None
+        policy = p
+        results = []
+        policies = p
 
         if self._policy_exists(policy_name=p['name']):
-            self._delete_policy(p)
+            if not self.module.check_mode:
+                for policy in policies:
+                    policy = self._delete_policy(p)
+                    results.append(policy)
             changed = True
-        return changed, policy
+        return changed, policy, results
 
     def _ensure_policy_is_present(self, p):
         """
@@ -265,13 +267,18 @@ class ClcAntiAffinityPolicy():
         :return: tuple of if an addition occurred and the name of the policy that was added
         """
         changed = False
-        policy = None
+        policy = p
+        results = []
+        policies = p
 
         if not self._policy_exists(policy_name=p['name']):
-            policy = self._create_policy(p)
+            if not self.module.check_mode:
+                for policy in policies:
+                    policy = self._create_policy(p)
+                    results.append(policy)
             changed = True
 
-        return changed, policy
+        return changed, policy, results
 
     def _wait_for_requests_to_complete(self, requests):
         """
@@ -316,8 +323,7 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    argument_dict = ClcAntiAffinityPolicy._define_module_argument_spec()
-    module = AnsibleModule(supports_check_mode=True, **argument_dict)
+    module = AnsibleModule(argument_spec=ClcAntiAffinityPolicy._define_module_argument_spec(), supports_check_mode=True)
     clc_aa_policy = ClcAntiAffinityPolicy(module)
     clc_aa_policy.process_request()
 
