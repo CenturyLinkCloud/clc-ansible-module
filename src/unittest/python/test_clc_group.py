@@ -93,15 +93,15 @@ class TestClcServerFunctions(unittest.TestCase):
         res = under_test._walk_groups_recursive('parent', mock_child_group)
         self.assertIsNotNone(res)
 
+    @patch.object(ClcGroup, '_set_clc_credentials_from_env')
     @patch.object(clc_group, 'clc_sdk')
-    def test_process_request_state_present(self, mock_clc_sdk):
+    def test_process_request_state_present(self, mock_set_creds, mock_clc_sdk):
         self.module.params = {
             'location': 'UC1',
             'name': 'MyCoolGroup',
             'parent': 'Default Group',
             'description': 'Test Group',
-            'state': 'present',
-            'wait': False
+            'state': 'present'
         }
         mock_group = mock.MagicMock()
         mock_group.data = {"name": "MyCoolGroup"}
@@ -123,15 +123,15 @@ class TestClcServerFunctions(unittest.TestCase):
             changed=True,
             group=mock_group.data['name'])
 
+    @patch.object(ClcGroup, '_set_clc_credentials_from_env')
     @patch.object(clc_group, 'clc_sdk')
-    def test_process_request_state_absent(self, mock_clc_sdk):
+    def test_process_request_state_absent(self, mock_set_cres, mock_clc_sdk):
         self.module.params = {
             'location': 'UC1',
             'name': 'MyCoolGroup',
             'parent': 'Default Group',
             'description': 'Test Group',
-            'state': 'absent',
-            'wait': False
+            'state': 'absent'
         }
         mock_group = mock.MagicMock()
         mock_group.data = {"name": "MyCoolGroup"}
