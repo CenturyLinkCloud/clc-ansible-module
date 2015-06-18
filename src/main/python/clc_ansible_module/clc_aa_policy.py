@@ -140,7 +140,7 @@ class ClcAntiAffinityPolicy():
             name=dict(required=True),
             location=dict(required=True),
             alias=dict(default=None),
-            wait=dict(type='bool', default=False),
+            wait=dict(default=True),
             state=dict(default='present', choices=['present', 'absent']),
         )
         return argument_spec
@@ -170,7 +170,7 @@ class ClcAntiAffinityPolicy():
         elif hasattr(policy, '__dict__'):
             policy = policy.__dict__
 
-        self._wait_for_requests_to_complete(policy)
+        #self._wait_for_requests_to_complete(policy)
         self.module.exit_json(changed=changed, policy=policy)
 
     def _set_clc_credentials_from_env(self):
@@ -324,8 +324,8 @@ def main():
     """
     argument_dict = ClcAntiAffinityPolicy._define_module_argument_spec()
     module = AnsibleModule(supports_check_mode=True, **argument_dict)
-    me = ClcAntiAffinityPolicy(module)
-    me.process_request()
+    clc_aa_policy = ClcAntiAffinityPolicy(module)
+    clc_aa_policy.process_request()
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
