@@ -126,22 +126,21 @@ class ClcGroup():
         group_description = self.module.params.get('description')
         state = self.module.params.get('state')
 
-        self.set_clc_credentials_from_env()
+        self._set_clc_credentials_from_env()
         self.group_dict = self._get_group_tree_for_datacenter(
             datacenter=location)
 
         if state == "absent":
-            changed, group = self._ensure_group_is_absent(
+            changed, group, response = self._ensure_group_is_absent(
                 group_name=group_name, parent_name=parent_name)
+            self._wait_for_requests_to_complete(response)
+
         else:
-            changed, group = self._ensure_group_is_present(
+            changed, group, response = self._ensure_group_is_present(
                 group_name=group_name, parent_name=parent_name, group_description=group_description)
 
-        if group:
-            group = group.data
 
-        self._wait_for_requests_to_complete(group)
-        self.module.exit_json(changed=changed, group=group)
+        self.module.exit_json(changed=changed, group=group_name)
 
     #
     #  Functions to define the Ansible module and its arguments
@@ -206,12 +205,17 @@ class ClcGroup():
         :return: changed, group
         """
         changed = False
-        group = None
+        group = []
+        results = []
+
         if self._group_exists(group_name=group_name, parent_name=parent_name):
             if not self.module.check_mode:
-                self._delete_group(group_name)
-                changed = True
-        return changed, group
+                group.append(group_name)
+                for g in group:
+                    result = self._delete_group(group_name)
+                    results.append(result)
+            changed = True
+        return changed, group, results
 
     def _delete_group(self, group_name):
         """
@@ -220,9 +224,9 @@ class ClcGroup():
         :return: none
         """
         group, parent = self.group_dict.get(group_name)
-        if not self.module.check_mode:
-            group.Delete()
-            ClcGroup._push_metric(ClcGroup.STATS_GROUP_DELETE, 1)
+        response = group.Delete()
+        ClcGroup._push_metric(ClcGroup.STATS_GROUP_DELETE, 1)
+        return response
 
     def _ensure_group_is_present(
             self,
@@ -240,30 +244,35 @@ class ClcGroup():
         """
         assert self.root_group, "Implementation Error: Root Group not set"
         parent = parent_name if parent_name is not None else self.root_group.name
-        group = group_name
         description = group_description
         changed = False
+        results = []
+        groups = []
+        group = group_name
 
         parent_exists = self._group_exists(group_name=parent, parent_name=None)
-        child_exists = self._group_exists(group_name=group, parent_name=parent)
+        child_exists = self._group_exists(group_name=group_name, parent_name=parent)
 
         if parent_exists and child_exists:
             group, parent = self.group_dict[group_name]
             changed = False
         elif parent_exists and not child_exists:
             if not self.module.check_mode:
-                group = self._create_group(
-                    group=group,
-                    parent=parent,
-                    description=description)
-                changed = True
+                groups.append(group_name)
+                for g in groups:
+                    group = self._create_group(
+                        group=group,
+                        parent=parent,
+                        description=description)
+                    results.append(group)
+            changed = True
         else:
             self.module.fail_json(
                 msg="parent group: " +
                 parent +
                 " does not exist")
 
-        return changed, group
+        return changed, group, results
 
     def _create_group(self, group, parent, description):
         """
@@ -275,9 +284,8 @@ class ClcGroup():
         """
 
         (parent, grandparent) = self.group_dict[parent]
-        if not self.module.check_mode:
-            ClcGroup._push_metric(ClcGroup.STATS_GROUP_CREATE, 1)
-            return parent.Create(name=group, description=description)
+        ClcGroup._push_metric(ClcGroup.STATS_GROUP_CREATE, 1)
+        return parent.Create(name=group, description=description)
 
     #
     #   Utility Functions
@@ -383,8 +391,7 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    argument_dict = ClcGroup.define_argument_spec()
-    module = AnsibleModule(supports_check_mode=True, **argument_dict)
+    module = AnsibleModule(argument_spec=ClcGroup._define_module_argument_spec(), supports_check_mode=True)
 
     clc_group = ClcGroup(module)
     clc_group.process_request()
