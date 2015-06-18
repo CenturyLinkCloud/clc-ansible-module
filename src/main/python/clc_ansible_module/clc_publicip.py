@@ -150,11 +150,11 @@ class ClcPublicIp(object):
         changed = False
 
         if state == 'present':
-            changed, chagned_server_ids, requests = self.ensure_public_ip_present(server_ids=server_ids,
-                                                                                  protocol=protocol,
-                                                                                  ports=ports)
+            changed, chagned_server_ids, requests = self.ensure_public_ip_present(
+                server_ids=server_ids, protocol=protocol, ports=ports)
         elif state == 'absent':
-            changed, chagned_server_ids, requests = self.ensure_public_ip_absent(server_ids=server_ids)
+            changed, chagned_server_ids, requests = self.ensure_public_ip_absent(
+                server_ids=server_ids)
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
         self._wait_for_requests_to_complete(requests)
