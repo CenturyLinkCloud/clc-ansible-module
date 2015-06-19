@@ -200,7 +200,7 @@ This module can be used to modify server configuration in CLC.
 | `memory:` | N |  | valid int value | Memory in GB.
 | `anti_affinity_policy_id:` | N | | | The anti-affinity policy id to assign to the server. This is mutually exclusive with `anti_affinity_policy_name:`
 | `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server. This is mutually exclusive with `anti_affinity_policy_id:`
-| `state:` | Y | `present` | `present` | The state to insure that the provided resources are in( Note: more states are on the way).
+| `state:` | Y | `present` | `present` | The state to insure that the provided resources are in.
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
@@ -354,6 +354,7 @@ Creates a public ip on an existing server or servers.
 | `ports:` | Y | | | A list of ports to expose|
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
 | `state:` | N | `present` | `present`,`absent` | Determine whether to create or delete public IPs.  If `present` module will not create a second public ip if one already exists. |
+| `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
 
 ## clc_server_snapshot Module
 Create/Delete/Restore a snapshot on an existing server or servers.
@@ -415,20 +416,20 @@ Create/Delete/Restore a snapshot on an existing server or servers.
 | `state:` | N | `present` | `present`,`absent`,'restore' | Determine whether to create or delete or restore snapshots.  If `present` module will not create a second snapshot if one already exists. |
 | `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
 
-## clc_package Module
-Executes a package on existing set of servers.
+## clc_blueprint_package Module
+Executes a blue print package on existing set of servers.
 
 ### Example Playbook
 ```yaml
 ---
 ---
-- name: Install a package on set of servers
+- name: Install a blue print package on set of servers
   hosts: localhost
   gather_facts: False
   connection: local
   tasks:
     - name: Create server snapshot
-      clc_package:
+      clc_blueprint_package:
         server_ids:
             - UC1ACCTSRVR01
             - UC1ACCTSRVR02
@@ -440,9 +441,11 @@ Executes a package on existing set of servers.
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
-| `server_ids:` | Y |  |  | A list of servers to create public ips on. |
+| `server_ids:` | Y |  |  | A list of servers to deploy blue print package on. |
 | `package_id:` | Y |  |  | The package id which needs to be deployed |
-| `package_params:` | N | {} |  | The arguments required for the package execution. These arguments needs to be in JSON format |
+| `package_params:` | N | {} |  | The arguments required for the package execution.|
+| `state:` | N | `present` | `present` | If `present` module will deploy the package. |
+| `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
 
 
 ## clc_loadbalancer Module
