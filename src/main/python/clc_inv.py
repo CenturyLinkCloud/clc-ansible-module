@@ -102,7 +102,7 @@ def _find_groups_for_datacenter(datacenter):
     result = {}
     for group in groups:
 
-        if group.type == 'trash' or group.type == 'template':
+        if group.type != 'default':
             continue
 
         try:

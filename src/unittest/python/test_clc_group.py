@@ -8,7 +8,6 @@ import mock
 from mock import patch
 import unittest
 
-
 class TestClcServerFunctions(unittest.TestCase):
 
     def setUp(self):
