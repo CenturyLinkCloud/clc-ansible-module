@@ -257,13 +257,14 @@ class ClcSnapshot():
         :param requests_lst: The list of CLC request objects
         :return: none
         """
-        if self.module.params['wait']:
-            for request in requests_lst:
-                request.WaitUntilComplete()
-                for request_details in request.requests:
-                    if request_details.Status() != 'succeeded':
-                        self.module.fail_json(
-                            msg='Unable to process server snapshot request')
+        if not self.module.params['wait']:
+            return
+        for request in requests_lst:
+            request.WaitUntilComplete()
+            for request_details in request.requests:
+                if request_details.Status() != 'succeeded':
+                    self.module.fail_json(
+                        msg='Unable to process server snapshot request')
 
     @staticmethod
     def define_argument_spec():

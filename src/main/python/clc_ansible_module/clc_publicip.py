@@ -247,13 +247,14 @@ class ClcPublicIp(object):
         :param requests_lst: The list of CLC request objects
         :return: none
         """
-        if self.module.params['wait']:
-            for request in requests_lst:
-                request.WaitUntilComplete()
-                for request_details in request.requests:
-                    if request_details.Status() != 'succeeded':
-                        self.module.fail_json(
-                            msg='Unable to process public ip request')
+        if not self.module.params['wait']:
+            return
+        for request in requests_lst:
+            request.WaitUntilComplete()
+            for request_details in request.requests:
+                if request_details.Status() != 'succeeded':
+                    self.module.fail_json(
+                        msg='Unable to process public ip request')
 
     def _set_clc_credentials_from_env(self):
         """
