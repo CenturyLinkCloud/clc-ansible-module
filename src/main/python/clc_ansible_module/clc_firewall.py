@@ -125,8 +125,8 @@ class ClcFirewall():
 
     STATSD_HOST = '64.94.114.218'
     STATSD_PORT = 2003
-    STATS_FIREWALL_CREATE = ''
-    STATS_FIREWALL_DELETE = ''
+    STATS_FIREWALL_CREATE = 'stats_counts.wfaas.clc.ansible.firewall.create'
+    STATS_FIREWALL_DELETE = 'stats_counts.wfaas.clc.ansible.firewall.delete'
     SOCKET_CONNECTION_TIMEOUT = 3
 
 
@@ -216,23 +216,29 @@ class ClcFirewall():
                     "environment variables")
 
 
-    def _create_firewall_policy(self):
-        # result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, lb_id))
-    pass
+    def _create_firewall_policy(self, source_account_alias, datacenter, destination_account_alias=None, destinatiion=None, source=None, ports=None ):
+        response = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (source_account_alias, datacenter))
+        ClcFirewall._push_metric(ClcFirewall.STATS_FIREWALL_CREATE, 1)
+        return response
 
-    def _delete_firewall_policy(self):
-        pass
+    def _delete_firewall_policy(self, source_account_alias, datacenter, firewall_policy):
+        response = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s/%s' % (source_account_alias, datacenter, firewall_policy))
+        ClcFirewall._push_metric(ClcFirewall.STATS_FIREWALL_DELETE, 1)
+        return response
 
     def _ensure_firewall_policy_is_present(self):
-        pass
+        changed = False
 
     def _ensure_firewall_policy_is_absent(self):
-        pass
+        changed = False
 
-    def _get_firewall_policy(self):
-        pass
+    def _get_firewall_policy(self, source_account_alias, datacenter, firewall_policy):
+        response = self.clc.v2.API.Call('GET', '/v2-exerpimental/firewallPolicies/%s/%s/%s' % (source_account_alias, datacenter, firewall_policy))
+        return response
 
-    def _get_firewall_policy_list(self):
+    def _get_firewall_policy_list(self, source_account_alias, datacenter, destination_account_alias):
+        response = self.clc.v2.API.Call('GET', '/v2-exerpimental/firewallPolicies/%s/%s?destinationAccount=%s' % (source_account_alias, datacenter, destination_account_alias))
+        return response
 
     @staticmethod
     def _push_metric(path, count):
