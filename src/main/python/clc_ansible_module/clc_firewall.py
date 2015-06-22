@@ -189,9 +189,6 @@ class ClcFirewall():
 
         return self.module.exit_json(changed=changed, firewall_policy=firewall_policy)
 
-        #
-        #  Functions to define the Ansible module and its arguments
-        #
     def _set_clc_credentials_from_env(self):
         """
         Set the CLC Credentials on the sdk by reading environment variables
@@ -265,10 +262,9 @@ class ClcFirewall():
         changed = False
         response = []
         firewall_policy = None
-        if not self._policy_exists():
-            if not self.module.check_mode:
-                response = self._create_firewall_policy(source_account_alias, location, firewall_dict)
-            changed = True
+        if not self.module.check_mode:
+            response = self._create_firewall_policy(source_account_alias, location, firewall_dict)
+        changed = True
         return changed, firewall_policy, response
 
     def _ensure_firewall_policy_is_absent(self, source_account_alias, location, firewall_policy):
@@ -285,7 +281,7 @@ class ClcFirewall():
         changed = False
         response = []
         firewall_policy = None
-        if self._policy_exists():
+        if self._policy_exists(source_account_alias, location, firewall_policy):
             if not self.module.check_mode:
                 response = self._delete_firewall_policy(source_account_alias, location, firewall_policy)
             changed = True
@@ -299,7 +295,7 @@ class ClcFirewall():
         :param firewall_policy: id of the firewall policy to get
         :return: response from CLC API call
         """
-        response = self.clc.v2.API.Call('GET', '/v2-exerpimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, firewall_policy))
+        response = self.clc.v2.API.Call('GET', '/v2-experimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, firewall_policy))
         return response
 
     def _get_firewall_policy_list(self, source_account_alias, location, destination_account_alias):
@@ -310,12 +306,17 @@ class ClcFirewall():
         :param destination_account_alias: the destination account alias for the firewall policy
         :return: response from CLC API call
         """
-        response = self.clc.v2.API.Call('GET', '/v2-exerpimental/firewallPolicies/%s/%s?destinationAccount=%s' % (source_account_alias, location, destination_account_alias))
+        response = self.clc.v2.API.Call('GET', '/v2-experimental/firewallPolicies/%s/%s?destinationAccount=%s' % (source_account_alias, location, destination_account_alias))
         return response
 
-    def _policy_exists(self):
+    def _policy_exists(self, source_account_alias, location, firewall_policy):
+        """
+        Checks to see if a firewall policy exists
+        :return:
+        """
+        response = self._get_firewall_policy(source_account_alias, location, firewall_policy)
         result = False
-        if  in self.firewall_dict:
+        if firewall_policy in self.firewall_dict:
             result = True
         return result
 
