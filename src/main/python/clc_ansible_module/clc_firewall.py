@@ -71,9 +71,10 @@ options:
     aliases: []
   ports:
     description:
-      - types of ports associated with the policy
+      - types of ports associated with the policy. TCP & UDP can take in single ports or port ranges.
     default: None
     required: False
+    choices: ['any', 'icmp', 'TCP/123', 'UDP/123', 'TCP/123-456', 'UDP/123-456']
     aliases: []
   firewall_policy:
     description:
@@ -149,11 +150,14 @@ class ClcFirewall():
         :return: argument spec dictionary
         """
         argument_spec = dict(
-            name=dict(required=True),
-            location=dict(required=True),
-            source_account_alias=dict(default=None),
+            name=dict(default=None),
+            location=dict(required=True, defualt=None),
+            source_account_alias=dict(required=True, default=None),
             destination_account_alias=dict(default=None),
             firewall_policy=dict(default=None),
+            ports=dict(default=None),
+            source=dict(defualt=None),
+            destination=dict(defualt=None),
             wait=dict(default=True),
             state=dict(default='present', choices=['present', 'absent']),
         )
@@ -166,23 +170,24 @@ class ClcFirewall():
         :return: none
         """
         location = self.module.params.get('location')
-        group_name = self.module.params.get('name')
-        parent_name = self.module.params.get('parent')
-        group_description = self.module.params.get('description')
+        source_account_alias = self.module.params.get('source_account_alias')
+        destination_account_alias = self.module.params.get('destination_account_alias')
+        firewall_policy = self.module.params.get('firewall_policy')
         state = self.module.params.get('state')
+        wait = self.module.params.get('wait')
 
         self._set_clc_credentials_from_env()
-        self.group_dict = self._get_group_tree_for_datacenter_get_group_tree_for_datacenter(
-            datacenter=location)
 
         if state == "absent":
-            changed, group, response = self._ensure_firewall_policy_is_absent()
+            changed, firewall_policy, response = self._ensure_firewall_policy_is_absent(source_account_alias, location, firewall_policy)
 
+        elif state == "present":
+            changed, firewall_policy, response = self._ensure_firewall_policy_is_present(source_account_alias, location, self.firewall_dict)
         else:
-            changed, group, response = self._ensure_firewall_policy_is_present()
+            return self.module.fail_json(msg="Unknown State: " + state)
 
 
-        self.module.exit_json(changed=changed, group=group_name)
+        return self.module.exit_json(changed=changed, firewall_policy=firewall_policy)
 
         #
         #  Functions to define the Ansible module and its arguments
@@ -216,29 +221,103 @@ class ClcFirewall():
                     "environment variables")
 
 
-    def _create_firewall_policy(self, source_account_alias, datacenter, destination_account_alias=None, destinatiion=None, source=None, ports=None ):
-        response = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (source_account_alias, datacenter))
+    def _create_firewall_policy(self, source_account_alias, location, firewall_dict):
+        """
+        Ensures that a given firewall policy is present
+        :param source_account_alias: the source account alias for the firewall policy
+        :param location: datacenter of the firewall policy
+        :param firewall_dict: dictionary or request parameters for firewall policy creation
+        :return: response from CLC API call
+        """
+        payload = {
+            'destinationAccount': firewall_dict.get('destination_account_alias'),
+            'source': firewall_dict.get('source'),
+            'destination': firewall_dict.get('destination'),
+            'ports': firewall_dict.get('ports')
+        }
+        response = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (source_account_alias, location), payload)
         ClcFirewall._push_metric(ClcFirewall.STATS_FIREWALL_CREATE, 1)
         return response
 
-    def _delete_firewall_policy(self, source_account_alias, datacenter, firewall_policy):
-        response = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s/%s' % (source_account_alias, datacenter, firewall_policy))
+    def _delete_firewall_policy(self, source_account_alias, location, firewall_policy):
+        """
+        Deletes a given firewall policy for an account alias in a datacenter
+        :param source_account_alias: the source account alias for the firewall policy
+        :param location: datacenter of the firewall policy
+        :param firewall_policy: firewall policy to delete
+        :return: response from CLC API call
+        """
+        response = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s/%s' % (source_account_alias, location, firewall_policy))
         ClcFirewall._push_metric(ClcFirewall.STATS_FIREWALL_DELETE, 1)
         return response
 
-    def _ensure_firewall_policy_is_present(self):
+    def _ensure_firewall_policy_is_present(self, source_account_alias, location, firewall_dict):
+        """
+        Ensures that a given firewall policy is present
+        :param source_account_alias: the source account alias for the firewall policy
+        :param location: datacenter of the firewall policy
+        :param firewall_dict: dictionary or request parameters for firewall policy creation
+        :return: (changed, firewall_policy, response)
+            changed: flag for if a change occurred
+            firewall_policy: policy that was changed
+            response: response from CLC API call
+        """
         changed = False
+        response = []
+        firewall_policy = None
+        if not self._policy_exists():
+            if not self.module.check_mode:
+                response = self._create_firewall_policy(source_account_alias, location, firewall_dict)
+            changed = True
+        return changed, firewall_policy, response
 
-    def _ensure_firewall_policy_is_absent(self):
+    def _ensure_firewall_policy_is_absent(self, source_account_alias, location, firewall_policy):
+        """
+        Ensures that a given firewall policy is removed if present
+        :param source_account_alias: the source account alias for the firewall policy
+        :param location: datacenter of the firewall policy
+        :param firewall_policy: firewall policy to delete
+        :return: (changed, firewall_policy, response)
+            changed: flag for if a change occurred
+            firewall_policy: policy that was changed
+            response: response from CLC API call
+        """
         changed = False
+        response = []
+        firewall_policy = None
+        if self._policy_exists():
+            if not self.module.check_mode:
+                response = self._delete_firewall_policy(source_account_alias, location, firewall_policy)
+            changed = True
+        return changed, firewall_policy, response
 
-    def _get_firewall_policy(self, source_account_alias, datacenter, firewall_policy):
-        response = self.clc.v2.API.Call('GET', '/v2-exerpimental/firewallPolicies/%s/%s/%s' % (source_account_alias, datacenter, firewall_policy))
+    def _get_firewall_policy(self, source_account_alias, location, firewall_policy):
+        """
+        Get back details for a particular firewall policy
+        :param source_account_alias: the source account alias for the firewall policy
+        :param location: datacenter of the firewall policy
+        :param firewall_policy: id of the firewall policy to get
+        :return: response from CLC API call
+        """
+        response = self.clc.v2.API.Call('GET', '/v2-exerpimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, firewall_policy))
         return response
 
-    def _get_firewall_policy_list(self, source_account_alias, datacenter, destination_account_alias):
-        response = self.clc.v2.API.Call('GET', '/v2-exerpimental/firewallPolicies/%s/%s?destinationAccount=%s' % (source_account_alias, datacenter, destination_account_alias))
+    def _get_firewall_policy_list(self, source_account_alias, location, destination_account_alias):
+        """
+        Get back a list of firewall policies from a certain datacenter
+        :param source_account_alias: the source account alias for the firewall policy
+        :param location: datacenter of the firewall policy
+        :param destination_account_alias: the destination account alias for the firewall policy
+        :return: response from CLC API call
+        """
+        response = self.clc.v2.API.Call('GET', '/v2-exerpimental/firewallPolicies/%s/%s?destinationAccount=%s' % (source_account_alias, location, destination_account_alias))
         return response
+
+    def _policy_exists(self):
+        result = False
+        if  in self.firewall_dict:
+            result = True
+        return result
 
     @staticmethod
     def _push_metric(path, count):
