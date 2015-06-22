@@ -91,6 +91,196 @@ class TestClcAlertPolicy(unittest.TestCase):
         mock_ClcAlertPolicy.assert_called_once_with(mock_AnsibleModule_instance)
         mock_ClcAlertPolicy_instance.process_request.assert_called_once()
 
+    @patch.object(ClcAlertPolicy, '_get_alert_policies')
+    @patch.object(ClcAlertPolicy, '_ensure_alert_policy_is_present')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_process_request_state_present(self, mock_set_clc_creds, mock_ensure_alert_policy, mock_get_alert_policies):
+        test_params = {
+            'name': 'testname'
+            , 'alias': 'testalias'
+            , 'alert_recipients': ['test']
+            , 'metric': 'cpu'
+            , 'duration': 'duration'
+            , 'threshold': 'threashold'
+            , 'state': 'present'
+        }
+        mock_ensure_alert_policy.return_value = True, 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+
+        under_test = ClcAlertPolicy(self.module)
+        under_test.process_request()
+
+        self.module.exit_json.assert_called_once_with(changed=True, policy='success')
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcAlertPolicy, '_get_alert_policies')
+    @patch.object(ClcAlertPolicy, '_ensure_alert_policy_is_absent')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_process_request_state_absent(self, mock_set_clc_creds, mock_ensure_alert_policy, mock_get_alert_policies):
+        test_params = {
+            'name': 'testname'
+            , 'alias': 'testalias'
+            , 'alert_recipients': ['test']
+            , 'metric': 'cpu'
+            , 'duration': 'duration'
+            , 'threshold': 'threashold'
+            , 'state': 'absent'
+        }
+        mock_ensure_alert_policy.return_value = True, None
+        self.module.params = test_params
+        self.module.check_mode = False
+
+        under_test = ClcAlertPolicy(self.module)
+        under_test.process_request()
+
+        self.module.exit_json.assert_called_once_with(changed=True, policy=None)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcAlertPolicy, '_create_alert_policy')
+    @patch.object(ClcAlertPolicy, '_alert_policy_exists')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_ensure_alert_policy_is_present_new(self, mock_set_clc_creds, mock_alert_policy_exists, mock_create):
+        test_params = {
+            'name': 'testname'
+            , 'alias': 'testalias'
+            , 'alert_recipients': ['test']
+            , 'metric': 'cpu'
+            , 'duration': 'duration'
+            , 'threshold': 'threashold'
+            , 'state': 'absent'
+        }
+        mock_alert_policy_exists.return_value = False
+        mock_create.return_value = 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+
+        under_test = ClcAlertPolicy(self.module)
+        changed, policy = under_test._ensure_alert_policy_is_present()
+        self.assertEqual(changed, True)
+        self.assertEqual(policy,'success')
+
+    @patch.object(ClcAlertPolicy, '_create_alert_policy')
+    @patch.object(ClcAlertPolicy, '_alert_policy_exists')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_ensure_alert_policy_is_present_no_name(self, mock_set_clc_creds, mock_alert_policy_exists, mock_create):
+        test_params = {
+            'alias': 'testalias'
+            , 'alert_recipients': ['test']
+            , 'metric': 'cpu'
+            , 'duration': 'duration'
+            , 'threshold': 'threashold'
+            , 'state': 'absent'
+        }
+        mock_alert_policy_exists.return_value = False
+        mock_create.return_value = 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+
+        under_test = ClcAlertPolicy(self.module)
+        under_test._ensure_alert_policy_is_present()
+        self.module.fail_json.assert_called_once_with(msg='Policy name is a required')
+
+    @patch.object(ClcAlertPolicy, '_ensure_alert_policy_is_updated')
+    @patch.object(ClcAlertPolicy, '_alert_policy_exists')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_ensure_alert_policy_is_present_existing(self, mock_set_clc_creds, mock_alert_policy_exists, mock_update):
+        test_params = {
+            'name': 'testname'
+            , 'alias': 'testalias'
+            , 'alert_recipients': ['test']
+            , 'metric': 'cpu'
+            , 'duration': 'duration'
+            , 'threshold': 'threashold'
+            , 'state': 'absent'
+        }
+        mock_alert_policy_exists.return_value = mock.MagicMock()
+        mock_update.return_value = True, 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+
+        under_test = ClcAlertPolicy(self.module)
+        changed, policy = under_test._ensure_alert_policy_is_present()
+        self.assertEqual(changed, True)
+        self.assertEqual(policy,'success')
+
+    @patch.object(ClcAlertPolicy, '_delete_alert_policy')
+    @patch.object(ClcAlertPolicy, '_get_alert_policy_id')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_ensure_alert_policy_is_absent_name_only(self, mock_set_clc_creds, mock_get_id, mock_delete):
+        test_params = {
+            'name': 'testname'
+            , 'alias': 'testalias'
+            , 'state': 'absent'
+        }
+        mock_get_id.return_value = '12345'
+        mock_delete.return_value = 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+        under_test = ClcAlertPolicy(self.module)
+        under_test.policy_dict = {'12345', '23456'}
+        changed, policy = under_test._ensure_alert_policy_is_absent()
+        self.assertEqual(changed, True)
+        self.assertEqual(policy,None)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcAlertPolicy, '_delete_alert_policy')
+    @patch.object(ClcAlertPolicy, '_get_alert_policy_id')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_ensure_alert_policy_is_absent_id_only(self, mock_set_clc_creds, mock_get_id, mock_delete):
+        test_params = {
+            'id': 'testid'
+            , 'alias': 'testalias'
+            , 'state': 'absent'
+        }
+        mock_get_id.return_value = '12345'
+        mock_delete.return_value = 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+        under_test = ClcAlertPolicy(self.module)
+        under_test.policy_dict = {'12345', 'testid'}
+        changed, policy = under_test._ensure_alert_policy_is_absent()
+        self.assertEqual(changed, True)
+        self.assertEqual(policy,None)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcAlertPolicy, '_delete_alert_policy')
+    @patch.object(ClcAlertPolicy, '_get_alert_policy_id')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_ensure_alert_policy_is_absent_no_id_present(self, mock_set_clc_creds, mock_get_id, mock_delete):
+        test_params = {
+            'id': 'testid'
+            , 'alias': 'testalias'
+            , 'state': 'absent'
+        }
+        mock_get_id.return_value = '12345'
+        mock_delete.return_value = 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+        under_test = ClcAlertPolicy(self.module)
+        under_test.policy_dict = {'12345', '23456'}
+        changed, policy = under_test._ensure_alert_policy_is_absent()
+        self.assertEqual(changed, False)
+        self.assertEqual(policy,None)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcAlertPolicy, '_delete_alert_policy')
+    @patch.object(ClcAlertPolicy, '_get_alert_policy_id')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_ensure_alert_policy_is_absent_no_id_no_name(self, mock_set_clc_creds, mock_get_id, mock_delete):
+        test_params = {
+            'alias': 'testalias'
+            , 'state': 'absent'
+        }
+        mock_get_id.return_value = '12345'
+        mock_delete.return_value = 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+        under_test = ClcAlertPolicy(self.module)
+        under_test.policy_dict = {'12345', '23456'}
+        changed, policy = under_test._ensure_alert_policy_is_absent()
+        self.module.fail_json.assert_called_once_with(msg='Either alert policy id or policy name is required')
+
 
 if __name__ == '__main__':
     unittest.main()

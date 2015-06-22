@@ -265,9 +265,9 @@ class ClcAlertPolicy():
         p = self.module.params
         alert_policy_id = p.get('id')
         alert_policy_name = p.get('name')
+        alias = p.get('alias')
         if not alert_policy_id and not alert_policy_name:
             self.module.fail_json(msg='Either alert policy id or policy name is required')
-        alias = p.get('alias')
         if not alert_policy_id and alert_policy_name:
             alert_policy_id = self._get_alert_policy_id(
                 self.module,
