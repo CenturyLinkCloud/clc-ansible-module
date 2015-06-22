@@ -1,0 +1,15 @@
+---
+- name: Remove alert policy
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete alert policy
+      clc_alert_policy:
+        alias: wfad
+        name: testalert
+        state: absent
+      register: clc
+
+    - name: debug
+      debug: var=clc
