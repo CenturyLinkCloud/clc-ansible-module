@@ -34,21 +34,73 @@ description:
 options:
   name:
     description:
-      - The name of the Server Group
+      - The name of the firewall policy
+    default: None
+    required: False
+    aliases: []
   description:
     description:
-      - A description of the Server Group
-  parent:
-    description:
-      - The parent group of the server group
+      - A description of the firewall policy
+    default: None
+    required: False
+    aliases: []
   location:
     description:
-      - Datacenter to create the group in
+      - Target datacenter for the firewall policy
+    default: None
+    required: True
+    aliases: []
   state:
     description:
-      - Whether to create or delete the group
+      - Whether to create or delete the firewall policy
     default: present
+    required: True
     choices: ['present', 'absent']
+    aliases: []
+  source:
+    description:
+      - Source addresses for traffic on the originating firewall
+    default: None
+    required: False
+    aliases: []
+  destination:
+    description:
+      - Destination addresses for traffic on the terminating firewall
+    default: None
+    required: False
+    aliases: []
+  ports:
+    description:
+      - types of ports associated with the policy
+    default: None
+    required: False
+    aliases: []
+  firewall_policy:
+    description:
+      - id of the firewall policy
+    default: None
+    required: False
+    aliases: []
+  source_account_alias:
+    description:
+      - CLC alias for the source account
+    default: None
+    required: True
+    aliases: []
+  destination_account_alias:
+    description:
+      - CLC alias for the destination account
+    default: None
+    required: False
+    aliases: []
+  wait:
+    description:
+      - Whether to wait for the provisioning tasks to finish before returning.
+    default: True
+    required: False
+    choices: [ True, False]
+    aliases: []
+
 
 '''
 
@@ -99,7 +151,9 @@ class ClcFirewall():
         argument_spec = dict(
             name=dict(required=True),
             location=dict(required=True),
-            alias=dict(default=None),
+            source_account_alias=dict(default=None),
+            destination_account_alias=dict(default=None),
+            firewall_policy=dict(default=None),
             wait=dict(default=True),
             state=dict(default='present', choices=['present', 'absent']),
         )
@@ -118,16 +172,14 @@ class ClcFirewall():
         state = self.module.params.get('state')
 
         self._set_clc_credentials_from_env()
-        self.group_dict = self._get_group_tree_for_datacenter(
+        self.group_dict = self._get_group_tree_for_datacenter_get_group_tree_for_datacenter(
             datacenter=location)
 
         if state == "absent":
-            changed, group, response = self._ensure_group_is_absent(
-                group_name=group_name, parent_name=parent_name)
+            changed, group, response = self._ensure_firewall_policy_is_absent()
 
         else:
-            changed, group, response = self._ensure_group_is_present(
-                group_name=group_name, parent_name=parent_name, group_description=group_description)
+            changed, group, response = self._ensure_firewall_policy_is_present()
 
 
         self.module.exit_json(changed=changed, group=group_name)
@@ -165,7 +217,8 @@ class ClcFirewall():
 
 
     def _create_firewall_policy(self):
-        pass
+        # result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, lb_id))
+    pass
 
     def _delete_firewall_policy(self):
         pass
@@ -176,6 +229,10 @@ class ClcFirewall():
     def _ensure_firewall_policy_is_absent(self):
         pass
 
+    def _get_firewall_policy(self):
+        pass
+
+    def _get_firewall_policy_list(self):
 
     @staticmethod
     def _push_metric(path, count):
