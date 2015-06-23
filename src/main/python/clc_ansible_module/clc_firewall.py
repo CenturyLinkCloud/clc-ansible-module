@@ -379,17 +379,6 @@ class ClcFirewall():
             changed = True
         return changed, firewall_policy, response
 
-    # def _policy_exists(self, source_account_alias, location, firewall_policy):
-    #     """
-    #     Checks to see if a firewall policy exists
-    #     :return:
-    #     """
-    #     response, success = self._get_firewall_policy(source_account_alias, location, firewall_policy)
-    #
-    #     if firewall_policy in self.firewall_dict:
-    #         result = True
-    #     return result
-
     def _get_firewall_policy(self, source_account_alias, location, firewall_policy):
         """
         Get back details for a particular firewall policy
