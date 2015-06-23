@@ -36,7 +36,7 @@ def initialize( project ):
 	project.set_property('coverage_break_build', False)
 	# ----------------
 	# identify all the module source locations:
-	project.get_property('filter_resources_glob').append('**/clc_ansible_module/__init__.py')
+	project.get_property('filter_resources_glob').append('**/clc_ansible_module/*.py')
 	# ----------------
 	# install clc-sdk during installation
 	project.depends_on("clc-sdk")

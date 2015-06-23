@@ -48,6 +48,13 @@ class TestClcAlertPolicy(unittest.TestCase):
 
         self.policy.clc.v2.SetCredentials.assert_called_once_with(api_username='passWORD',api_passwd='UsErnaME')
 
+    @patch.object(clc_alert_policy, 'clc_sdk')
+    def test_set_user_agent(self, mock_clc_sdk):
+        clc_alert_policy.__version__ = "1"
+        ClcAlertPolicy._set_user_agent(mock_clc_sdk)
+
+        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
+
     @patch.object(ClcAlertPolicy, 'clc')
     def test_set_clc_credentials_from_env(self, mock_clc_sdk):
         with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',

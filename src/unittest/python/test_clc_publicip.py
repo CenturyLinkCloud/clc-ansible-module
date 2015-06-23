@@ -57,6 +57,12 @@ class TestClcPublicIpFunctions(unittest.TestCase):
             server.PublicIPs().public_ips = []
         return mock_server_list
 
+    @patch.object(clc_publicip, 'clc_sdk')
+    def test_set_user_agent(self, mock_clc_sdk):
+        clc_publicip.__version__ = "1"
+        ClcPublicIp._set_user_agent(mock_clc_sdk)
+
+        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
 
     def build_mock_publicip_add_request_list(self, mock_server_list=None, status='succeeded'):
         if mock_server_list is None:

@@ -37,6 +37,13 @@ class TestClcServerFunctions(unittest.TestCase):
         # Reset clc_group
         reload(clc_server)
 
+    @patch.object(clc_server, 'clc_sdk')
+    def test_set_user_agent(self, mock_clc_sdk):
+        clc_server.__version__ = "1"
+        ClcServer._set_user_agent(mock_clc_sdk)
+
+        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
+
     @patch.object(ClcServer, '_set_clc_credentials_from_env')
     @patch.object(clc_server, 'clc_sdk')
     def test_process_request_state_absent(self,

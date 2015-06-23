@@ -156,7 +156,10 @@ EXAMPLES = '''
 
 '''
 
+__version__ = '${version}'
+
 import socket
+import requests
 from time import sleep
 
 #
@@ -197,6 +200,8 @@ class ClcLoadBalancer():
         if not CLC_FOUND:
             self.module.fail_json(
                 msg='clc-python-sdk required for this module')
+
+        self._set_user_agent(self.clc)
 
     def process_request(self):
         """
@@ -765,6 +770,16 @@ class ClcLoadBalancer():
         except socket.error:
             #nothing, ignore and move forward
             error = ''
+
+    @staticmethod
+    def _set_user_agent(clc):
+        if hasattr(clc, 'SetRequestsSession'):
+            agent_string = "ClcAnsibleModule/" + __version__
+            ses = requests.Session()
+            ses.headers.update({"Api-Client": agent_string})
+            ses.headers['User-Agent'] += " " + agent_string
+            clc.SetRequestsSession(ses)
+
 
 def main():
     """

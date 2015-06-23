@@ -47,6 +47,13 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_loadbalancer, 'clc_sdk')
+    def test_set_user_agent(self, mock_clc_sdk):
+        clc_loadbalancer.__version__ = "1"
+        ClcLoadBalancer._set_user_agent(mock_clc_sdk)
+
+        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
+
+    @patch.object(clc_loadbalancer, 'clc_sdk')
     @patch.object(ClcLoadBalancer, '_set_clc_credentials_from_env')
     def test_process_request_state_absent(self,
                                           mock_set_clc_credentials,
