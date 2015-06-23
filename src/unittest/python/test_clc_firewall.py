@@ -38,18 +38,18 @@ class TestClcFirewall(unittest.TestCase):
         mock_policy = mock.MagicMock()
         # mock_policy.return_value =
         test_firewall_policy = ClcFirewall(self.module)
-        test_firewall_policy._get_firewall_policy(source_account_alias, location, firewall_policy)
-        self.assertTrue(self.module.fail_json.called)
+        response, success = test_firewall_policy._get_firewall_policy(source_account_alias, location, firewall_policy)
+        self.assertFalse(success)
 
-    def test_get_firewall_policy_pass(self):
-        source_account_alias = 'WFAD'
-        location = 'wa1'
-        firewall_policy = '4d6e52d872754e12a71d672b2b50ec19'
-
-
-        test_firewall_policy = ClcFirewall(self.module)
-        test_firewall_policy._get_firewall_policy(source_account_alias, location, firewall_policy)
-        self.assertFalse(self.module.fail_json.called)
+    # def test_get_firewall_policy_pass(self):
+    #     source_account_alias = 'WFAD'
+    #     location = 'wa1'
+    #     firewall_policy = '4d6e52d872754e12a71d672b2b50ec19'
+    #
+    #
+    #     test_firewall_policy = ClcFirewall(self.module)
+    #     response, success = test_firewall_policy._get_firewall_policy(source_account_alias, location, firewall_policy)
+    #     self.assertTrue(success)
 
 
     def test_get_firewall_policy_list_fail(self):
@@ -62,39 +62,77 @@ class TestClcFirewall(unittest.TestCase):
         test_firewall_policy._get_firewall_policy_list(source_account_alias, location)
         self.assertTrue(self.module.fail_json.called)
 
-    def test_get_firewall_policy_list_pass_w_destination(self):
+    def test_get_firewall_policy_list_pass_w_destination_pass(self):
         pass
 
-    def test_get_firewall_policy_list_pass_wo_destination(self):
+    def test_get_firewall_policy_list_pass_wo_destination_pass(self):
         pass
 
     def test_create_firewall_policy_fail(self):
-        pass
+        source_account_alias = 'WFAD'
+        location = 'VA1'
+        payload = {
+            'destinationAccount': 'wfas',
+            'source': '12345',
+            'destination': '12345',
+            'ports': 'any'
+        }
+
+        test_firewall_policy = ClcFirewall(self.module)
+        test_firewall_policy._create_firewall_policy(source_account_alias, location, payload)
+        self.assertTrue(self.module.fail_json.called)
+
     def test_create_firewall_policy_pass(self):
         pass
 
-    def test_delete_firewall_policy_fail(self):
+    def test_update_firewall_policy_pass(self):
         pass
+
+    def test_delete_firewall_policy_fail(self):
+        source_account_alias = 'WFAD'
+        location = 'wa1'
+        firewall_policy = 'this_is_not_a_real_policy'
+
+        test_firewall_policy = ClcFirewall(self.module)
+        test_firewall_policy._delete_firewall_policy(source_account_alias, location, firewall_policy)
+        self.assertTrue(self.module.fail_json.called)
 
     def test_delete_firewall_policy_pass(self):
         pass
 
     def test_ensure_firewall_policy_absent_fail(self):
-        pass
+        source_account_alias = 'WFAD'
+        location = 'wa1'
+        payload = {
+            'destinationAccount': 'wfas',
+            'source': '12345',
+            'destination': '12345',
+            'ports': 'any',
+            'firewall_policy': 'this_is_not_a_real_policy'
+        }
+        test_firewall_policy = ClcFirewall(self.module)
+        changed, policy, response =test_firewall_policy._ensure_firewall_policy_is_absent(source_account_alias, location, payload)
+        self.assertFalse(changed)
 
     def test_ensure_firewall_policy_absent_pass(self):
         pass
 
     def test_ensure_firewall_policy_present_fail(self):
-        pass
+        source_account_alias = 'WFAD'
+        location = 'wa1'
+        payload = {
+            'destinationAccount': 'wfas',
+            'source': '12345',
+            'destination': '12345',
+            'ports': 'any',
+            'firewall_policy': 'this_is_not_a_real_policy'
+        }
+        self.module.check_mode = False
+        test_firewall_policy = ClcFirewall(self.module)
+        changed, policy, response = test_firewall_policy._ensure_firewall_policy_is_present(source_account_alias, location, payload)
+        self.assertTrue(self.module.fail_json.called)
 
     def test_ensure_firewall_policy_present_pass(self):
-        pass
-
-    def test_main(self):
-        pass
-
-    def test_firewall_policy_does_not_exist(self):
         pass
 
     def test_get_policy_id_from_response(self):

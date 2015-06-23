@@ -243,8 +243,8 @@ class ClcFirewall():
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
 
-        if not self.module.check_mode:
-            self._wait_for_requests_to_complete(response)
+        # if not self.module.check_mode:
+        #     self._wait_for_requests_to_complete(response)
 
         return self.module.exit_json(changed=changed, firewall_policy=firewall_policy_id)
 
