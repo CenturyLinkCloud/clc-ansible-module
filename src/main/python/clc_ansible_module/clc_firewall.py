@@ -197,14 +197,13 @@ class ClcFirewall():
         self._set_clc_credentials_from_env()
 
         if state == "absent":
-            changed, firewall_policy, response = self._ensure_firewall_policy_is_absent(source_account_alias, location, self.firewall_dict)
+            changed, firewall_policy_id, response = self._ensure_firewall_policy_is_absent(source_account_alias, location, self.firewall_dict)
 
         elif state == "present":
-            changed, response = self._ensure_firewall_policy_is_present(source_account_alias, location, self.firewall_dict)
+            changed, firewall_policy_id, response = self._ensure_firewall_policy_is_present(source_account_alias, location, self.firewall_dict)
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
 
-        firewall_policy_id = self._get_policy_id_from_response(response)
         return self.module.exit_json(changed=changed, firewall_policy=firewall_policy_id)
 
     def _get_policy_id_from_response(self, response):
@@ -292,10 +291,12 @@ class ClcFirewall():
         """
         changed = False
         response = []
+        firewall_policy_id = None
         if not self.module.check_mode:
             response = self._create_firewall_policy(source_account_alias, location, firewall_dict)
+            firewall_policy_id = self._get_policy_id_from_response(response)
         changed = True
-        return changed, response
+        return changed, firewall_policy_id, response
 
     def _ensure_firewall_policy_is_absent(self, source_account_alias, location, firewall_dict):
         """
@@ -311,11 +312,23 @@ class ClcFirewall():
         changed = False
         response = []
         firewall_policy = firewall_dict.get('firewall_policy')
-        # if self._policy_exists(source_account_alias, location, firewall_policy):
-        if not self.module.check_mode:
-            response = self._delete_firewall_policy(source_account_alias, location, firewall_policy)
-        changed = True
+        result, success = self._get_firewall_policy(source_account_alias, location, firewall_policy)
+        if success == True:
+            if not self.module.check_mode:
+                response = self._delete_firewall_policy(source_account_alias, location, firewall_policy)
+            changed = True
         return changed, firewall_policy, response
+
+    # def _policy_exists(self, source_account_alias, location, firewall_policy):
+    #     """
+    #     Checks to see if a firewall policy exists
+    #     :return:
+    #     """
+    #     response, success = self._get_firewall_policy(source_account_alias, location, firewall_policy)
+    #
+    #     if firewall_policy in self.firewall_dict:
+    #         result = True
+    #     return result
 
     def _get_firewall_policy(self, source_account_alias, location, firewall_policy):
         """
@@ -325,11 +338,14 @@ class ClcFirewall():
         :param firewall_policy: id of the firewall policy to get
         :return: response from CLC API call
         """
+        response = []
+        success = False
         try:
             response = self.clc.v2.API.Call('GET', '/v2-experimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, firewall_policy))
+            success = True
         except:
-            return self.module.fail_json(msg="Failed to get policy from the %s datacenter" % location)
-        return response
+            pass
+        return response, success
 
     def _get_firewall_policy_list(self, source_account_alias, location, destination_account_alias=None):
         """
@@ -348,16 +364,7 @@ class ClcFirewall():
             return self.module.fail_json(msg="Failed to get polices from the %s datacenter" % location)
         return response
 
-    # def _policy_exists(self, source_account_alias, location, firewall_policy):
-    #     """
-    #     Checks to see if a firewall policy exists
-    #     :return:
-    #     """
-    #     response = self._get_firewall_policy(source_account_alias, location, firewall_policy)
-    #     result = False
-    #     if firewall_policy in self.firewall_dict:
-    #         result = True
-    #     return result
+
 
     @staticmethod
     def _push_metric(path, count):
