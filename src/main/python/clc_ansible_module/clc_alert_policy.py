@@ -52,7 +52,7 @@ options:
     aliases: []
   metric:
     description:
-      - he metric on which to measure the condition that will trigger the alert.
+      - The metric on which to measure the condition that will trigger the alert.
     required: True
     default: None
     choices: ['cpu','memory','disk']
