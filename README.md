@@ -200,7 +200,7 @@ This module can be used to modify server configuration in CLC.
 | `memory:` | N |  | valid int value | Memory in GB.
 | `anti_affinity_policy_id:` | N | | | The anti-affinity policy id to assign to the server. This is mutually exclusive with `anti_affinity_policy_name:`
 | `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server. This is mutually exclusive with `anti_affinity_policy_id:`
-| `state:` | Y | `present` | `present` | The state to insure that the provided resources are in( Note: more states are on the way).
+| `state:` | Y | `present` | `present` | The state to insure that the provided resources are in.
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
@@ -354,6 +354,7 @@ Creates a public ip on an existing server or servers.
 | `ports:` | Y | | | A list of ports to expose|
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
 | `state:` | N | `present` | `present`,`absent` | Determine whether to create or delete public IPs.  If `present` module will not create a second public ip if one already exists. |
+| `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
 
 ## clc_server_snapshot Module
 Create/Delete/Restore a snapshot on an existing server or servers.
@@ -412,23 +413,23 @@ Create/Delete/Restore a snapshot on an existing server or servers.
 |-----------|:--------:|:-------:|:-------:|-------------|
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
 | `expiration_days:` | N | `7` |  | Take a Hypervisor level snapshot retained for between 1 and 10 days (7 is default). Currently only one snapshop may exist at a time, thus will delete snapshots if one already exists before taking this snapshot. |
-| `state:` | N | `present` | `present`,`absent`,'restore' | Determine whether to create or delete or restore snapshots.  If `present` module will not create a second snapshot if one already exists. |
+| `state:` | N | `present` | `present`,`absent`,`restore` | Determine whether to create or delete or restore snapshots.  If `present` module will not create a second snapshot if one already exists. |
 | `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
 
-## clc_package Module
-Executes a package on existing set of servers.
+## clc_blueprint_package Module
+Executes a blue print package on existing set of servers.
 
 ### Example Playbook
 ```yaml
 ---
 ---
-- name: Install a package on set of servers
+- name: Install a blue print package on set of servers
   hosts: localhost
   gather_facts: False
   connection: local
   tasks:
     - name: Create server snapshot
-      clc_package:
+      clc_blueprint_package:
         server_ids:
             - UC1ACCTSRVR01
             - UC1ACCTSRVR02
@@ -440,9 +441,11 @@ Executes a package on existing set of servers.
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
-| `server_ids:` | Y |  |  | A list of servers to create public ips on. |
+| `server_ids:` | Y |  |  | A list of servers to deploy blue print package on. |
 | `package_id:` | Y |  |  | The package id which needs to be deployed |
-| `package_params:` | N | {} |  | The arguments required for the package execution. These arguments needs to be in JSON format |
+| `package_params:` | N | {} |  | The arguments required for the package execution.|
+| `state:` | N | `present` | `present` | If `present` module will deploy the package. |
+| `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
 
 
 ## clc_loadbalancer Module
@@ -546,6 +549,55 @@ Create/Delete a loadbalancer
 | `nodes` | N |  |  | A list of nodes you want your loadbalancer to send traffic to |
 | `status` | N | enabled | enabled, disabled | The status of your loadbalancer |
 | `state` | N | present | present, absent, port_absent, nodes_present, nodes_absent | Determine whether to create or delete your loadbalancer. If `present` module will not create another loadbalancer with the same name. If `absent` module will delete the entire loadbalancer. If `port_absent` module will delete the loadbalancer port and associated nodes only. If `nodes_present` module will ensure the provided nodes are added to the load balancer pool. If `nodes_absent` module will ensure the provided nodes are removed from the load balancer pool.|
+
+## clc_alert_policy Module
+Create/Update/Delete an alert policy in CLC
+
+### Example Playbook
+```yaml
+---
+- name: Create alert policy example
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Create alert policy on disk
+      clc_alert_policy:
+        alias: wfad
+        name: testalert
+        alert_recipients:
+            - test1@centurylink.com
+            - test2@centurylink.com
+        metric: 'disk'
+        duration: '00:05:00'
+        threshold: 80
+        state: present
+```
+```yaml
+---
+- name: Delete alert policy example
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Delete alert policy
+      clc_alert_policy:
+        alias: wfad
+        name: testalert
+        state: absent
+      register: clc
+```
+
+### Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `name:` | N |  |  | The name of the alert policy. This is mutually exclusive with `id`. this is required with state is `present` |
+| `id` | N |  |  | The alert policy id. This is mutually exclusive with `name`. |
+| `alias` | Y |  |  | The CLC Account Alias |
+| `alert_recipients` | N |  |  | A list of email ids to send alert notification. This is required when state is `present` |
+| `metric` | N |  | `cpu`, `memory`, `disk` | The metric on which to measure the condition that will trigger the alert. This is required when state is `present` |
+| `duration` | N |  |  | The length of time in minutes that the condition must exceed the threshold. This is required when state is `present` |
+| `threshold` | N |  |  | The threshold that will trigger the alert when the metric equals or exceeds it. This number represents a percentage and must be a value between 5.0 - 95.0 that is a multiple of 5.0. This is required when state is `present` |
+| `state` | N | `present` | `present`, `absent` | Determine whether to create or delete alert policy. If `present` module will not create another alert policy with the same name. If `absent` module will delete the alert policy.|
 
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script
 

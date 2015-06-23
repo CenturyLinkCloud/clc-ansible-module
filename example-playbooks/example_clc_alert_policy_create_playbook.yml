@@ -1,0 +1,21 @@
+---
+- name: Add alert policy
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create alert policy
+      clc_alert_policy:
+        alias: wfad
+        name: testalert
+        alert_recipients:
+            - test1@centurylink.com
+            - test2@centurylink.com
+        metric: 'disk'
+        duration: '00:05:00'
+        threshold: 80
+        state: present
+      register: clc
+
+    - name: debug
+      debug: var=clc

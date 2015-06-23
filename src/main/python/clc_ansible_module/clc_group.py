@@ -1,4 +1,31 @@
 #!/usr/bin/python
+
+# CenturyLink Cloud Ansible Modules.
+#
+# These Ansible modules enable the CenturyLink Cloud v2 API to be called
+# from an within Ansible Playbook.
+#
+# This file is part of CenturyLink Cloud, and is maintained
+# by the Workflow as a Service Team
+#
+# Copyright 2015 CenturyLink Cloud
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# CenturyLink Cloud: http://www.CenturyLinkCloud.com
+# API Documentation: https://www.centurylinkcloud.com/api-docs/v2/
+#
+
 DOCUMENTATION = '''
 module: clc_group
 short_desciption: Create/delete Server Groups at Centurylink Cloud
@@ -22,7 +49,6 @@ options:
       - Whether to create or delete the group
     default: present
     choices: ['present', 'absent']
-
 
 '''
 
@@ -66,12 +92,7 @@ EXAMPLES = '''
 
 '''
 
-import sys
-import os
-import datetime
-import json
 import socket
-import time
 
 #
 #  Requires the clc-python-sdk.
@@ -121,28 +142,27 @@ class ClcGroup():
         group_description = self.module.params.get('description')
         state = self.module.params.get('state')
 
-        self.set_clc_credentials_from_env()
+        self._set_clc_credentials_from_env()
         self.group_dict = self._get_group_tree_for_datacenter(
             datacenter=location)
 
         if state == "absent":
-            changed, group = self._ensure_group_is_absent(
+            changed, group, response = self._ensure_group_is_absent(
                 group_name=group_name, parent_name=parent_name)
+
         else:
-            changed, group = self._ensure_group_is_present(
+            changed, group, response = self._ensure_group_is_present(
                 group_name=group_name, parent_name=parent_name, group_description=group_description)
 
-        if group:
-            group = group.data
 
-        self.module.exit_json(changed=changed, group=group)
+        self.module.exit_json(changed=changed, group=group_name)
 
     #
     #  Functions to define the Ansible module and its arguments
     #
 
     @staticmethod
-    def define_argument_spec():
+    def _define_module_argument_spec():
         """
         Define the argument spec for the ansible module
         :return: argument spec dictionary
@@ -155,8 +175,7 @@ class ClcGroup():
             alias=dict(default=None),
             custom_fields=dict(type='list', default=[]),
             server_ids=dict(type='list', default=[]),
-            state=dict(default='present', choices=['present', 'absent'])
-        )
+            state=dict(default='present', choices=['present', 'absent']))
 
         return argument_spec
 
@@ -164,7 +183,7 @@ class ClcGroup():
     #   Module Behavior Functions
     #
 
-    def set_clc_credentials_from_env(self):
+    def _set_clc_credentials_from_env(self):
         """
         Set the CLC Credentials on the sdk by reading environment variables
         :return: none
@@ -200,11 +219,17 @@ class ClcGroup():
         :return: changed, group
         """
         changed = False
-        group = None
+        group = []
+        results = []
+
         if self._group_exists(group_name=group_name, parent_name=parent_name):
-            self._delete_group(group_name)
+            if not self.module.check_mode:
+                group.append(group_name)
+                for g in group:
+                    result = self._delete_group(group_name)
+                    results.append(result)
             changed = True
-        return changed, group
+        return changed, group, results
 
     def _delete_group(self, group_name):
         """
@@ -213,8 +238,9 @@ class ClcGroup():
         :return: none
         """
         group, parent = self.group_dict.get(group_name)
-        group.Delete()
+        response = group.Delete()
         ClcGroup._push_metric(ClcGroup.STATS_GROUP_DELETE, 1)
+        return response
 
     def _ensure_group_is_present(
             self,
@@ -232,21 +258,27 @@ class ClcGroup():
         """
         assert self.root_group, "Implementation Error: Root Group not set"
         parent = parent_name if parent_name is not None else self.root_group.name
-        group = group_name
         description = group_description
         changed = False
+        results = []
+        groups = []
+        group = group_name
 
         parent_exists = self._group_exists(group_name=parent, parent_name=None)
-        child_exists = self._group_exists(group_name=group, parent_name=parent)
+        child_exists = self._group_exists(group_name=group_name, parent_name=parent)
 
         if parent_exists and child_exists:
             group, parent = self.group_dict[group_name]
             changed = False
         elif parent_exists and not child_exists:
-            group = self._create_group(
-                group=group,
-                parent=parent,
-                description=description)
+            if not self.module.check_mode:
+                groups.append(group_name)
+                for g in groups:
+                    group = self._create_group(
+                        group=group,
+                        parent=parent,
+                        description=description)
+                    results.append(group)
             changed = True
         else:
             self.module.fail_json(
@@ -254,7 +286,7 @@ class ClcGroup():
                 parent +
                 " does not exist")
 
-        return changed, group
+        return changed, group, results
 
     def _create_group(self, group, parent, description):
         """
@@ -311,44 +343,40 @@ class ClcGroup():
         groups = child_group.Subgroups().groups
         if len(groups) > 0:
             for group in groups:
-                result.update(self._walk_groups_recursive(child_group, group))
-        return result
+                if group.type != 'default':
+                    continue
 
-    def _get_group(self, group_name, datacenter=None, alias=None):
-        """
-        Get a specified group from the CLC Api
-        :param group_name: string - the group to search for
-        :param datacenter: string - the datacenter to query against (ex: 'UC1')
-        :param alias: string - the account alias to search. Defaults to the current user's account
-        :return: clc_sdk.Group - a group object representing group_name.
-        """
-        result = None
-        try:
-            result = self.clc.v2.Datacenter(
-                location=datacenter,
-                alias=alias).Groups().Get(group_name)
-        except CLCException as e:
-            if "Group not found" not in e.message:
-                self.module.fail_json(msg='error looking up group: %s' % e)
+                result.update(self._walk_groups_recursive(child_group, group))
         return result
 
     @staticmethod
     def _push_metric(path, count):
+        """
+        Sends the usage metric to statsd
+        :param path: The metric path
+        :param count: The number of ticks to record to the metric
+        :return None
+        """
         try:
             sock = socket.socket()
             sock.settimeout(ClcGroup.SOCKET_CONNECTION_TIMEOUT)
             sock.connect((ClcGroup.STATSD_HOST, ClcGroup.STATSD_PORT))
-            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
+            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
             sock.close()
         except socket.gaierror:
             # do nothing, ignore and move forward
             error = ''
         except socket.error:
-            #nothing, ignore and move forward
+            # nothing, ignore and move forward
             error = ''
 
+
 def main():
-    module = AnsibleModule(argument_spec=ClcGroup.define_argument_spec())
+    """
+    The main function.  Instantiates the module and calls process_request.
+    :return: none
+    """
+    module = AnsibleModule(argument_spec=ClcGroup._define_module_argument_spec(), supports_check_mode=True)
 
     clc_group = ClcGroup(module)
     clc_group.process_request()
