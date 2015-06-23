@@ -281,6 +281,158 @@ class TestClcAlertPolicy(unittest.TestCase):
         changed, policy = under_test._ensure_alert_policy_is_absent()
         self.module.fail_json.assert_called_once_with(msg='Either alert policy id or policy name is required')
 
+    @patch.object(ClcAlertPolicy, '_update_alert_policy')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_ensure_alert_policy_is_updated_all_changed(self, mock_set_clc_creds, mock_update):
+        test_params = {
+            'name': 'testname'
+            , 'alias': 'testalias'
+            , 'alert_recipients': ['test']
+            , 'metric': 'metric'
+            , 'duration': 'duration'
+            , 'threshold': 'threashold'
+            , 'state': 'absent'
+        }
+        mock_update.return_value = 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+
+        policy = {"id":"51db33be37b040f6a135abbaf989e36a","name":"alert1","actions":[{"action":"email","settings":{"recipients":["test1@centurylink.com","test2@centurylink.com"]}}],"links":[{"rel":"self","href":"/v2/alertPolicies/wfad/51db33be37b040f6a135abbaf989e36a","verbs":["GET","DELETE","PUT"]}],"triggers":[{"metric":"disk","duration":"00:05:00","threshold":5.0}]}
+
+        under_test = ClcAlertPolicy(self.module)
+        changed, policy_res = under_test._ensure_alert_policy_is_updated(policy)
+        self.assertEqual(changed, True)
+        self.assertEqual(policy_res,'success')
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcAlertPolicy, '_update_alert_policy')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_ensure_alert_policy_is_updated_same_metric(self, mock_set_clc_creds, mock_update):
+        test_params = {
+            'name': 'testname'
+            , 'alias': 'testalias'
+            , 'alert_recipients': ['test']
+            , 'metric': 'disk'
+            , 'duration': 'duration'
+            , 'threshold': 15
+            , 'state': 'absent'
+        }
+        mock_update.return_value = 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+
+        policy = {"id":"51db33be37b040f6a135abbaf989e36a","name":"alert1","actions":[{"action":"email","settings":{"recipients":["test1@centurylink.com","test2@centurylink.com"]}}],"links":[{"rel":"self","href":"/v2/alertPolicies/wfad/51db33be37b040f6a135abbaf989e36a","verbs":["GET","DELETE","PUT"]}],"triggers":[{"metric":"disk","duration":"00:05:00","threshold":5.0}]}
+
+        under_test = ClcAlertPolicy(self.module)
+        changed, policy_res = under_test._ensure_alert_policy_is_updated(policy)
+        self.assertEqual(changed, True)
+        self.assertEqual(policy_res,'success')
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcAlertPolicy, '_update_alert_policy')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_ensure_alert_policy_is_updated_same_met_duration(self, mock_set_clc_creds, mock_update):
+        test_params = {
+            'name': 'testname'
+            , 'alias': 'testalias'
+            , 'alert_recipients': ['test']
+            , 'metric': 'disk'
+            , 'duration': '00:05:00'
+            , 'threshold': 15
+            , 'state': 'absent'
+        }
+        mock_update.return_value = 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+
+        policy = {"id":"51db33be37b040f6a135abbaf989e36a","name":"alert1","actions":[{"action":"email","settings":{"recipients":["test1@centurylink.com","test2@centurylink.com"]}}],"links":[{"rel":"self","href":"/v2/alertPolicies/wfad/51db33be37b040f6a135abbaf989e36a","verbs":["GET","DELETE","PUT"]}],"triggers":[{"metric":"disk","duration":"00:05:00","threshold":5.0}]}
+
+        under_test = ClcAlertPolicy(self.module)
+        changed, policy_res = under_test._ensure_alert_policy_is_updated(policy)
+        self.assertEqual(changed, True)
+        self.assertEqual(policy_res,'success')
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcAlertPolicy, '_update_alert_policy')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_ensure_alert_policy_is_updated_diff_recipients(self, mock_set_clc_creds, mock_update):
+        test_params = {
+            'name': 'testname'
+            , 'alias': 'testalias'
+            , 'alert_recipients': ['test']
+            , 'metric': 'disk'
+            , 'duration': '00:05:00'
+            , 'threshold': 5
+            , 'state': 'absent'
+        }
+        mock_update.return_value = 'success'
+        self.module.params = test_params
+        self.module.check_mode = False
+
+        policy = {"id":"51db33be37b040f6a135abbaf989e36a","name":"alert1","actions":[{"action":"email","settings":{"recipients":["test1@centurylink.com","test2@centurylink.com"]}}],"links":[{"rel":"self","href":"/v2/alertPolicies/wfad/51db33be37b040f6a135abbaf989e36a","verbs":["GET","DELETE","PUT"]}],"triggers":[{"metric":"disk","duration":"00:05:00","threshold":5.0}]}
+
+        under_test = ClcAlertPolicy(self.module)
+        changed, policy_res = under_test._ensure_alert_policy_is_updated(policy)
+        self.assertEqual(changed, True)
+        self.assertEqual(policy_res,'success')
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_get_alert_policy_id(self, mock_set_clc_creds):
+        test_params = {
+            'alias': 'testalias'
+            , 'state': 'absent'
+        }
+        self.module.params = test_params
+        self.module.check_mode = False
+        under_test = ClcAlertPolicy(self.module)
+        under_test.policy_dict = {'12345': {'id': '12345', 'name': 'test1'},
+                                  '23456': {'id': '23456', 'name': 'test2'}}
+        policy_id = under_test._get_alert_policy_id(self.module, 'test2')
+        self.assertEqual(policy_id, '23456')
+
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_get_alert_policy_id_fail_duplicate_names(self, mock_set_clc_creds):
+        test_params = {
+            'alias': 'testalias'
+            , 'state': 'absent'
+        }
+        self.module.params = test_params
+        self.module.check_mode = False
+        under_test = ClcAlertPolicy(self.module)
+        under_test.policy_dict = {'12345': {'id': '12345', 'name': 'test1'},
+                                  '23456': {'id': '23456', 'name': 'test1'}}
+        policy_id = under_test._get_alert_policy_id(self.module, 'test1')
+        self.module.fail_json.assert_called_once_with(msg='mutiple alert policies were found with policy name : test1')
+
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_alert_policy_exists_true(self, mock_set_clc_creds):
+        test_params = {
+            'alias': 'testalias'
+            , 'state': 'absent'
+        }
+        self.module.params = test_params
+        self.module.check_mode = False
+        under_test = ClcAlertPolicy(self.module)
+        under_test.policy_dict = {'12345': {'id': '12345', 'name': 'test1'},
+                                  '23456': {'id': '23456', 'name': 'test2'}}
+        res = under_test._alert_policy_exists('testalias', 'test1')
+        self.assertEqual(res, {'id': '12345', 'name': 'test1'})
+
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_alert_policy_exists_false(self, mock_set_clc_creds):
+        test_params = {
+            'alias': 'testalias'
+            , 'state': 'absent'
+        }
+        self.module.params = test_params
+        self.module.check_mode = False
+        under_test = ClcAlertPolicy(self.module)
+        under_test.policy_dict = {'12345': {'id': '12345', 'name': 'test1'},
+                                  '23456': {'id': '23456', 'name': 'test2'}}
+        res = under_test._alert_policy_exists('testalias', 'notfound')
+        self.assertEqual(res, False)
+
 
 if __name__ == '__main__':
     unittest.main()
