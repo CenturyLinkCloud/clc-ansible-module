@@ -106,6 +106,36 @@ options:
 '''
 
 EXAMPLES = '''
+---
+- name: Create Firewall Policy
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create / Verify an Firewall Policy at CenturyLink Cloud
+      clc_firewall:
+        name: 'Test Firewall'
+        source_account_alias: WFAD
+        location: VA1
+        state: present
+        source: 10.128.216.0/24
+        destination: 10.128.216.0/24
+        ports: Any
+        destination_account_alias: WFAD
+
+---
+- name: Delete Firewall Policy
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete an Firewall Policy at CenturyLink Cloud
+      clc_firewall:
+        name: 'Test Firewall'
+        source_account_alias: WFAD
+        location: VA1
+        state: present
+        firewall_policy: c62105233d7a4231bd2e91b9c791eaae
 '''
 
 import socket
@@ -162,6 +192,7 @@ class ClcFirewall():
             destination=dict(defualt=None),
             wait=dict(default=True),
             state=dict(default='present', choices=['present', 'absent']),
+            enabled=dict(defualt=None)
         )
         return argument_spec
 
@@ -181,6 +212,7 @@ class ClcFirewall():
         destination = self.module.params.get('destination')
         wait = self.module.params.get('wait')
         state = self.module.params.get('state')
+        enabled = self.module.params.get('enabled')
 
         self.firewall_dict = {'name': name,
                               'location': location,
@@ -191,7 +223,8 @@ class ClcFirewall():
                               'source': source,
                               'destination': destination,
                               'wait': wait,
-                              'state': state
+                              'state': state,
+                              'enabled': enabled
                               }
 
         self._set_clc_credentials_from_env()
@@ -204,7 +237,15 @@ class ClcFirewall():
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
 
+        # if not self.module.check_mode:
+        #     self._wait_for_requests_to_complete(response)
+
         return self.module.exit_json(changed=changed, firewall_policy=firewall_policy_id)
+
+    def _wait_for_requests_to_complete(self, request):
+        if self.module.params['wait']:
+            request_object = self.clc.v2.Requests(request)
+            request_object.WaitUntilComplete()
 
     def _get_policy_id_from_response(self, response):
         url =  response.get('links')[0]['href']
@@ -293,8 +334,12 @@ class ClcFirewall():
         response = []
         firewall_policy_id = None
         if not self.module.check_mode:
-            response = self._create_firewall_policy(source_account_alias, location, firewall_dict)
-            firewall_policy_id = self._get_policy_id_from_response(response)
+            try:
+                response = self.clc.v2.API.Call('PUT', '/v2-experimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, self.firewall_dict.get('firewall_policy')), firewall_dict)
+                firewall_policy_id = self.firewall_dict.get('firewall_policy')
+            except:
+                response = self._create_firewall_policy(source_account_alias, location, firewall_dict)
+                firewall_policy_id = self._get_policy_id_from_response(response)
         changed = True
         return changed, firewall_policy_id, response
 
