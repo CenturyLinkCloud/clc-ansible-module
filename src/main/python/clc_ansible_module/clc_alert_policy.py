@@ -305,7 +305,7 @@ class ClcAlertPolicy():
             if set(email_list) != set(t_email_list):
                 changed = True
         if changed and not self.module.check_mode:
-            policy = self._update_alert_policy(p, alert_policy_id)
+            policy = self._update_alert_policy(alert_policy_id)
         return changed, policy
 
 
@@ -357,12 +357,13 @@ class ClcAlertPolicy():
         ClcAlertPolicy._push_metric(ClcAlertPolicy.STATS_ALERTPOLICY_CREATE, 1)
         return result
 
-    def _update_alert_policy(self, p, alert_policy_id):
+    def _update_alert_policy(self, alert_policy_id):
         """
         Update alert policy using the CLC API.
         :param alert_policy_id: The clc alert policy id
         :return: response dictionary from the CLC API.
         """
+        p = self.module.params
         alias = p['alias']
         email_list = p['alert_recipients']
         metric = p['metric']
@@ -465,30 +466,6 @@ def main():
     module = AnsibleModule(supports_check_mode=True, **argument_dict)
     clc_alert_policy = ClcAlertPolicy(module)
     clc_alert_policy.process_request()
-
-def main_test():
-    policy_name = 'test1'
-    alias = 'wfad'
-    p = {
-        'name': policy_name,
-        'alias': alias,
-        'alert_recipients': 'test1@centurylink.com,test2@centurylink.com',
-        'metric' : 'disk',
-        'duration' : '00:05:00',
-        'threshold': '5'
-    }
-    module = ClcAlertPolicy(None)
-    module._set_clc_credentials_from_env()
-    alert_pol = ClcAlertPolicy(module)
-    alert_pol.policy_dict = alert_pol._get_alert_policies(alias)
-    alert_pol._set_clc_credentials_from_env()
-    changed, policy = alert_pol._ensure_alert_policy_is_updated(alert_pol.policy_dict.get('51db33be37b040f6a135abbaf989e36a'), p)
-    list = alert_pol._ensure_alert_policy_is_present(p)
-    if policy_name in list:
-        print 'present'
-    else:
-        print 'no'
-    print('finish')
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
