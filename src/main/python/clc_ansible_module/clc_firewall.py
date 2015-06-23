@@ -28,9 +28,9 @@
 
 DOCUMENTATION = '''
 module: clc_firewall
-short_desciption: Create/delete firewall policies
+short_desciption: Create/delete/update firewall policies
 description:
-  - Create or delete firewall polices on Centurylink Centurylink Cloud
+  - Create or delete or updated firewall polices on Centurylink Centurylink Cloud
 options:
   name:
     description:
@@ -99,9 +99,15 @@ options:
       - Whether to wait for the provisioning tasks to finish before returning.
     default: True
     required: False
-    choices: [ True, False]
+    choices: [ True, False ]
     aliases: []
-
+  enabled:
+    description:
+      - If the firewall policy is enabled or disabled
+    default: true
+    required: False
+    choices: [ true, false ]
+    aliases: []
 
 '''
 
@@ -237,15 +243,24 @@ class ClcFirewall():
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
 
-        # if not self.module.check_mode:
-        #     self._wait_for_requests_to_complete(response)
+        if not self.module.check_mode:
+            self._wait_for_requests_to_complete(response)
 
         return self.module.exit_json(changed=changed, firewall_policy=firewall_policy_id)
 
-    def _wait_for_requests_to_complete(self, request):
+    def _wait_for_requests_to_complete(self, requests_lst):
+        """
+        Waits until the CLC requests are complete if the wait argument is True
+        :param requests_lst: The list of CLC request objects
+        :return: none
+        """
         if self.module.params['wait']:
-            request_object = self.clc.v2.Requests(request)
-            request_object.WaitUntilComplete()
+            for request in requests_lst:
+                request.WaitUntilComplete()
+                for request_details in request.requests:
+                    if request_details.Status() != 'succeeded':
+                        self.module.fail_json(
+                            msg='Unable to process package install request')
 
     def _get_policy_id_from_response(self, response):
         url =  response.get('links')[0]['href']
