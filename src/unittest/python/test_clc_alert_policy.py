@@ -450,6 +450,21 @@ class TestClcAlertPolicy(unittest.TestCase):
 
     @patch.object(clc_alert_policy, 'clc_sdk')
     @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_delete_alert_policy_exception(self, mock_set_clc_creds, mock_clc_sdk):
+        test_params = {
+            'alias': 'testalias'
+            , 'state': 'absent'
+        }
+        self.module.params = test_params
+        self.module.check_mode = False
+        under_test = ClcAlertPolicy(self.module)
+        under_test.clc = mock_clc_sdk
+        error = OSError('Failed')
+        mock_clc_sdk.v2.API.Call.side_effect = error
+        self.assertRaises(OSError, under_test._delete_alert_policy, 'testalias', '12345')
+
+    @patch.object(clc_alert_policy, 'clc_sdk')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
     def test_update_alert_policy(self, mock_set_clc_creds, mock_clc_sdk):
         mock_clc_sdk.v2.API.Call.side_effect = ['success']
         test_params = {
@@ -470,6 +485,26 @@ class TestClcAlertPolicy(unittest.TestCase):
 
     @patch.object(clc_alert_policy, 'clc_sdk')
     @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_update_alert_policy_exception(self, mock_set_clc_creds, mock_clc_sdk):
+        test_params = {
+            'name': 'testname'
+            , 'alias': 'testalias'
+            , 'alert_recipients': ['test']
+            , 'metric': 'disk'
+            , 'duration': '00:05:00'
+            , 'threshold': 5
+            , 'state': 'absent'
+        }
+        self.module.params = test_params
+        self.module.check_mode = False
+        under_test = ClcAlertPolicy(self.module)
+        under_test.clc = mock_clc_sdk
+        error = OSError('Failed')
+        mock_clc_sdk.v2.API.Call.side_effect = error
+        self.assertRaises(OSError, under_test._update_alert_policy, '12345')
+
+    @patch.object(clc_alert_policy, 'clc_sdk')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
     def test_create_alert_policy(self, mock_set_clc_creds, mock_clc_sdk):
         mock_clc_sdk.v2.API.Call.side_effect = ['success']
         test_params = {
@@ -487,6 +522,26 @@ class TestClcAlertPolicy(unittest.TestCase):
         under_test.clc = mock_clc_sdk
         res = under_test._create_alert_policy()
         self.assertEqual(res, 'success')
+
+    @patch.object(clc_alert_policy, 'clc_sdk')
+    @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
+    def test_create_alert_policy_exception(self, mock_set_clc_creds, mock_clc_sdk):
+        test_params = {
+            'name': 'testname'
+            , 'alias': 'testalias'
+            , 'alert_recipients': ['test']
+            , 'metric': 'disk'
+            , 'duration': '00:05:00'
+            , 'threshold': 5
+            , 'state': 'absent'
+        }
+        self.module.params = test_params
+        self.module.check_mode = False
+        under_test = ClcAlertPolicy(self.module)
+        under_test.clc = mock_clc_sdk
+        error = OSError('Failed')
+        mock_clc_sdk.v2.API.Call.side_effect = error
+        self.assertRaises(OSError, under_test._create_alert_policy)
 
     @patch.object(clc_alert_policy, 'clc_sdk')
     @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')

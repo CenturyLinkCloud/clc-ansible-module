@@ -353,8 +353,11 @@ class ClcAlertPolicy():
                 }]
             }
         )
-        result = self.clc.v2.API.Call('POST', '/v2/alertPolicies/%s' % (alias), arguments)
-        ClcAlertPolicy._push_metric(ClcAlertPolicy.STATS_ALERTPOLICY_CREATE, 1)
+        try:
+            result = self.clc.v2.API.Call('POST', '/v2/alertPolicies/%s' % (alias), arguments)
+            ClcAlertPolicy._push_metric(ClcAlertPolicy.STATS_ALERTPOLICY_CREATE, 1)
+        except self.clc.APIFailedResponse, e:
+            return self.module.fail_json(msg='Unable to create alert policy. %s' % str(e.response_text))
         return result
 
     def _update_alert_policy(self, alert_policy_id):
@@ -386,10 +389,13 @@ class ClcAlertPolicy():
                 }]
             }
         )
-        result = self.clc.v2.API.Call('PUT',
-                                      '/v2/alertPolicies/%s/%s' % (alias, alert_policy_id),
-                                      arguments)
-        ClcAlertPolicy._push_metric(ClcAlertPolicy.STATS_ALERTPOLICY_MODIFY, 1)
+        try:
+            result = self.clc.v2.API.Call('PUT',
+                                          '/v2/alertPolicies/%s/%s' % (alias, alert_policy_id),
+                                          arguments)
+            ClcAlertPolicy._push_metric(ClcAlertPolicy.STATS_ALERTPOLICY_MODIFY, 1)
+        except self.clc.APIFailedResponse, e:
+            return self.module.fail_json(msg='Unable to update alert policy. %s' % str(e.response_text))
         return result
 
     def _delete_alert_policy(self, alias, policy_id):
@@ -399,8 +405,11 @@ class ClcAlertPolicy():
         :param policy_id: the alert policy id
         :return: response dictionary from the CLC API.
         """
-        result = self.clc.v2.API.Call('DELETE', '/v2/alertPolicies/%s/%s' % (alias, policy_id), None)
-        ClcAlertPolicy._push_metric(ClcAlertPolicy.STATS_ALERTPOLICY_DELETE, 1)
+        try:
+            result = self.clc.v2.API.Call('DELETE', '/v2/alertPolicies/%s/%s' % (alias, policy_id), None)
+            ClcAlertPolicy._push_metric(ClcAlertPolicy.STATS_ALERTPOLICY_DELETE, 1)
+        except self.clc.APIFailedResponse, e:
+            return self.module.fail_json(msg='Unable to delete alert policy. %s' % str(e.response_text))
         return result
 
     def _alert_policy_exists(self, alias, policy_name):
