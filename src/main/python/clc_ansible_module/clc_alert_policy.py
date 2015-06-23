@@ -295,12 +295,9 @@ class ClcAlertPolicy():
         duration = p.get('duration')
         threshold = p.get('threshold')
         policy = alert_policy
-        if metric and metric != str(
-                alert_policy.get('triggers')[0].get('metric')):
-            changed = True
-        elif duration and duration != str(alert_policy.get('triggers')[0].get('duration')):
-            changed = True
-        elif threshold and float(threshold) != float(alert_policy.get('triggers')[0].get('threshold')):
+        if (metric and metric != str(alert_policy.get('triggers')[0].get('metric'))) or \
+                (duration and duration != str(alert_policy.get('triggers')[0].get('duration'))) or \
+                (threshold and float(threshold) != float(alert_policy.get('triggers')[0].get('threshold'))):
             changed = True
         elif email_list:
             t_email_list = list(
