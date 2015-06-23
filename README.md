@@ -597,7 +597,7 @@ Create/Update/Delete an alert policy in CLC
 | `metric` | N |  | `cpu`, `memory`, `disk` | The metric on which to measure the condition that will trigger the alert. This is required when state is `present` |
 | `duration` | N |  |  | The length of time in minutes that the condition must exceed the threshold. This is required when state is `present` |
 | `threshold` | N |  |  | The threshold that will trigger the alert when the metric equals or exceeds it. This number represents a percentage and must be a value between 5.0 - 95.0 that is a multiple of 5.0. This is required when state is `present` |
-| `state` | N | present | present, absent | Determine whether to create or delete alert policy. If `present` module will not create another alert policy with the same name. If `absent` module will delete the alert policy.|
+| `state` | N | `present` | `present`, `absent` | Determine whether to create or delete alert policy. If `present` module will not create another alert policy with the same name. If `absent` module will delete the alert policy.|
 
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script
 

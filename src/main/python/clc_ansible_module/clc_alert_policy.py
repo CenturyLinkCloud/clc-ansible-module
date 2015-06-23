@@ -267,7 +267,8 @@ class ClcAlertPolicy():
         alert_policy_name = p.get('name')
         alias = p.get('alias')
         if not alert_policy_id and not alert_policy_name:
-            self.module.fail_json(msg='Either alert policy id or policy name is required')
+            self.module.fail_json(
+                msg='Either alert policy id or policy name is required')
         if not alert_policy_id and alert_policy_name:
             alert_policy_id = self._get_alert_policy_id(
                 self.module,
@@ -291,23 +292,24 @@ class ClcAlertPolicy():
         alert_policy_id = alert_policy.get('id')
         email_list = p.get('alert_recipients')
         metric = p.get('metric')
-        duration=p.get('duration')
-        threshold=p.get('threshold')
+        duration = p.get('duration')
+        threshold = p.get('threshold')
         policy = alert_policy
-        if metric and metric != str(alert_policy.get('triggers')[0].get('metric')):
+        if metric and metric != str(
+                alert_policy.get('triggers')[0].get('metric')):
             changed = True
         elif duration and duration != str(alert_policy.get('triggers')[0].get('duration')):
             changed = True
         elif threshold and float(threshold) != float(alert_policy.get('triggers')[0].get('threshold')):
             changed = True
         elif email_list:
-            t_email_list = list(alert_policy.get('actions')[0].get('settings').get('recipients'))
+            t_email_list = list(
+                alert_policy.get('actions')[0].get('settings').get('recipients'))
             if set(email_list) != set(t_email_list):
                 changed = True
         if changed and not self.module.check_mode:
             policy = self._update_alert_policy(alert_policy_id)
         return changed, policy
-
 
     def _get_alert_policies(self, alias):
         """
@@ -318,8 +320,8 @@ class ClcAlertPolicy():
         response = {}
 
         policies = self.clc.v2.API.Call('GET',
-                                      '/v2/alertPolicies/%s'
-                                      % (alias))
+                                        '/v2/alertPolicies/%s'
+                                        % (alias))
 
         for policy in policies.get('items'):
             response[policy.get('id')] = policy
@@ -334,8 +336,8 @@ class ClcAlertPolicy():
         alias = p['alias']
         email_list = p['alert_recipients']
         metric = p['metric']
-        duration=p['duration']
-        threshold=p['threshold']
+        duration = p['duration']
+        threshold = p['threshold']
         name = p['name']
         arguments = json.dumps(
             {
@@ -343,7 +345,7 @@ class ClcAlertPolicy():
                 'actions': [{
                     'action': 'email',
                     'settings': {
-                        'recipients' : email_list
+                        'recipients': email_list
                     }
                 }],
                 'triggers': [{
@@ -354,10 +356,18 @@ class ClcAlertPolicy():
             }
         )
         try:
-            result = self.clc.v2.API.Call('POST', '/v2/alertPolicies/%s' % (alias), arguments)
-            ClcAlertPolicy._push_metric(ClcAlertPolicy.STATS_ALERTPOLICY_CREATE, 1)
-        except self.clc.APIFailedResponse, e:
-            return self.module.fail_json(msg='Unable to create alert policy. %s' % str(e.response_text))
+            result = self.clc.v2.API.Call(
+                'POST',
+                '/v2/alertPolicies/%s' %
+                (alias),
+                arguments)
+            ClcAlertPolicy._push_metric(
+                ClcAlertPolicy.STATS_ALERTPOLICY_CREATE,
+                1)
+        except self.clc.APIFailedResponse as e:
+            return self.module.fail_json(
+                msg='Unable to create alert policy. %s' % str(
+                    e.response_text))
         return result
 
     def _update_alert_policy(self, alert_policy_id):
@@ -370,8 +380,8 @@ class ClcAlertPolicy():
         alias = p['alias']
         email_list = p['alert_recipients']
         metric = p['metric']
-        duration=p['duration']
-        threshold=p['threshold']
+        duration = p['duration']
+        threshold = p['threshold']
         name = p['name']
         arguments = json.dumps(
             {
@@ -379,7 +389,7 @@ class ClcAlertPolicy():
                 'actions': [{
                     'action': 'email',
                     'settings': {
-                        'recipients' : email_list
+                        'recipients': email_list
                     }
                 }],
                 'triggers': [{
@@ -390,12 +400,16 @@ class ClcAlertPolicy():
             }
         )
         try:
-            result = self.clc.v2.API.Call('PUT',
-                                          '/v2/alertPolicies/%s/%s' % (alias, alert_policy_id),
-                                          arguments)
-            ClcAlertPolicy._push_metric(ClcAlertPolicy.STATS_ALERTPOLICY_MODIFY, 1)
-        except self.clc.APIFailedResponse, e:
-            return self.module.fail_json(msg='Unable to update alert policy. %s' % str(e.response_text))
+            result = self.clc.v2.API.Call(
+                'PUT', '/v2/alertPolicies/%s/%s' %
+                (alias, alert_policy_id), arguments)
+            ClcAlertPolicy._push_metric(
+                ClcAlertPolicy.STATS_ALERTPOLICY_MODIFY,
+                1)
+        except self.clc.APIFailedResponse as e:
+            return self.module.fail_json(
+                msg='Unable to update alert policy. %s' % str(
+                    e.response_text))
         return result
 
     def _delete_alert_policy(self, alias, policy_id):
@@ -406,10 +420,16 @@ class ClcAlertPolicy():
         :return: response dictionary from the CLC API.
         """
         try:
-            result = self.clc.v2.API.Call('DELETE', '/v2/alertPolicies/%s/%s' % (alias, policy_id), None)
-            ClcAlertPolicy._push_metric(ClcAlertPolicy.STATS_ALERTPOLICY_DELETE, 1)
-        except self.clc.APIFailedResponse, e:
-            return self.module.fail_json(msg='Unable to delete alert policy. %s' % str(e.response_text))
+            result = self.clc.v2.API.Call(
+                'DELETE', '/v2/alertPolicies/%s/%s' %
+                (alias, policy_id), None)
+            ClcAlertPolicy._push_metric(
+                ClcAlertPolicy.STATS_ALERTPOLICY_DELETE,
+                1)
+        except self.clc.APIFailedResponse as e:
+            return self.module.fail_json(
+                msg='Unable to delete alert policy. %s' % str(
+                    e.response_text))
         return result
 
     def _alert_policy_exists(self, alias, policy_name):
