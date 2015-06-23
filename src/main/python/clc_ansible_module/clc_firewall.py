@@ -110,6 +110,8 @@ EXAMPLES = '''
 
 import socket
 import os
+import urlparse
+import os.path
 
 try:
     import clc as clc_sdk
@@ -198,12 +200,19 @@ class ClcFirewall():
             changed, firewall_policy, response = self._ensure_firewall_policy_is_absent(source_account_alias, location, self.firewall_dict)
 
         elif state == "present":
-            changed, firewall_policy, response = self._ensure_firewall_policy_is_present(source_account_alias, location, self.firewall_dict)
+            changed, response = self._ensure_firewall_policy_is_present(source_account_alias, location, self.firewall_dict)
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
 
+        firewall_policy_id = self._get_policy_id_from_response(response)
+        return self.module.exit_json(changed=changed, firewall_policy=firewall_policy_id)
 
-        return self.module.exit_json(changed=changed, firewall_policy=firewall_policy)
+    def _get_policy_id_from_response(self, response):
+        url =  response.get('links')[0]['href']
+        path = urlparse.urlparse(url).path
+        path_list =  os.path.split(path)
+        policy_id =  path_list[-1]
+        return policy_id
 
     def _set_clc_credentials_from_env(self):
         """
@@ -283,11 +292,10 @@ class ClcFirewall():
         """
         changed = False
         response = []
-        firewall_policy = None
         if not self.module.check_mode:
             response = self._create_firewall_policy(source_account_alias, location, firewall_dict)
         changed = True
-        return changed, firewall_policy, response
+        return changed, response
 
     def _ensure_firewall_policy_is_absent(self, source_account_alias, location, firewall_dict):
         """
