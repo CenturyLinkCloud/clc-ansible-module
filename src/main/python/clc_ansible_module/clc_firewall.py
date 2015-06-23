@@ -61,13 +61,13 @@ options:
     description:
       - Source addresses for traffic on the originating firewall
     default: None
-    required: False
+    required: For Creation
     aliases: []
   destination:
     description:
       - Destination addresses for traffic on the terminating firewall
     default: None
-    required: False
+    required: For Creation
     aliases: []
   ports:
     description:
@@ -175,6 +175,12 @@ class ClcFirewall():
         firewall_policy = self.module.params.get('firewall_policy')
         state = self.module.params.get('state')
         wait = self.module.params.get('wait')
+        self.firewall_dict = {'destination_account_alias': destination_account_alias,
+                              'location': location,
+                              'source_account_alias': source_account_alias,
+                              'firewall_policy': firewall_policy,
+                              'state': state,
+                              'wait': wait}
 
         self._set_clc_credentials_from_env()
 
@@ -232,8 +238,11 @@ class ClcFirewall():
             'destination': firewall_dict.get('destination'),
             'ports': firewall_dict.get('ports')
         }
-        response = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (source_account_alias, location), payload)
-        ClcFirewall._push_metric(ClcFirewall.STATS_FIREWALL_CREATE, 1)
+        try:
+            response = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (source_account_alias, location), payload)
+            ClcFirewall._push_metric(ClcFirewall.STATS_FIREWALL_CREATE, 1)
+        except:
+            return self.module.fail_json(msg="Failed to properly create new firewall policy in account alias %s in the %s datacenter" % (source_account_alias, location))
         return response
 
     def _delete_firewall_policy(self, source_account_alias, location, firewall_policy):
@@ -244,8 +253,11 @@ class ClcFirewall():
         :param firewall_policy: firewall policy to delete
         :return: response from CLC API call
         """
-        response = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s/%s' % (source_account_alias, location, firewall_policy))
-        ClcFirewall._push_metric(ClcFirewall.STATS_FIREWALL_DELETE, 1)
+        try:
+            response = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s/%s' % (source_account_alias, location, firewall_policy))
+            ClcFirewall._push_metric(ClcFirewall.STATS_FIREWALL_DELETE, 1)
+        except:
+            return self.module.fail_json(msg="Failed to properly delete firewall policy %s in account alias %s in the %s datacenter" % (firewall_policy, source_account_alias, location))
         return response
 
     def _ensure_firewall_policy_is_present(self, source_account_alias, location, firewall_dict):
@@ -295,10 +307,13 @@ class ClcFirewall():
         :param firewall_policy: id of the firewall policy to get
         :return: response from CLC API call
         """
-        response = self.clc.v2.API.Call('GET', '/v2-experimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, firewall_policy))
+        try:
+            response = self.clc.v2.API.Call('GET', '/v2-experimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, firewall_policy))
+        except:
+            return self.module.fail_json(msg="Failed to get policy from the %s datacenter" % location)
         return response
 
-    def _get_firewall_policy_list(self, source_account_alias, location, destination_account_alias):
+    def _get_firewall_policy_list(self, source_account_alias, location, destination_account_alias=None):
         """
         Get back a list of firewall policies from a certain datacenter
         :param source_account_alias: the source account alias for the firewall policy
@@ -306,7 +321,13 @@ class ClcFirewall():
         :param destination_account_alias: the destination account alias for the firewall policy
         :return: response from CLC API call
         """
-        response = self.clc.v2.API.Call('GET', '/v2-experimental/firewallPolicies/%s/%s?destinationAccount=%s' % (source_account_alias, location, destination_account_alias))
+        try:
+            if destination_account_alias is None:
+                response = self.clc.v2.API.Call('GET', '/v2-experimental/firewallPolicies/%s/%s' % (source_account_alias, location))
+            else:
+                response = self.clc.v2.API.Call('GET', '/v2-experimental/firewallPolicies/%s/%s?destinationAccount=%s' % (source_account_alias, location, destination_account_alias))
+        except:
+            return self.module.fail_json(msg="Failed to get polices from the %s datacenter" % location)
         return response
 
     def _policy_exists(self, source_account_alias, location, firewall_policy):
