@@ -148,6 +148,8 @@ import socket
 import os
 import urlparse
 import os.path
+from time import sleep
+
 
 try:
     import clc as clc_sdk
@@ -234,6 +236,7 @@ class ClcFirewall():
             'enabled': enabled}
 
         self._set_clc_credentials_from_env()
+        requests = []
 
         if state == "absent":
             changed, firewall_policy_id, response = self._ensure_firewall_policy_is_absent(
@@ -245,26 +248,10 @@ class ClcFirewall():
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
 
-        # if not self.module.check_mode:
-        #     self._wait_for_requests_to_complete(response)
-
         return self.module.exit_json(
             changed=changed,
             firewall_policy=firewall_policy_id)
 
-    def _wait_for_requests_to_complete(self, requests_lst):
-        """
-        Waits until the CLC requests are complete if the wait argument is True
-        :param requests_lst: The list of CLC request objects
-        :return: none
-        """
-        if self.module.params['wait']:
-            for request in requests_lst:
-                request.WaitUntilComplete()
-                for request_details in request.requests:
-                    if request_details.Status() != 'succeeded':
-                        self.module.fail_json(
-                            msg='Unable to process package install request')
 
     def _get_policy_id_from_response(self, response):
         url = response.get('links')[0]['href']
@@ -387,6 +374,7 @@ class ClcFirewall():
                     firewall_dict)
                 firewall_policy_id = self._get_policy_id_from_response(
                     response)
+            self._wait_for_requests_to_complete(firewall_dict.get('wait'), source_account_alias, location, firewall_policy_id)
         changed = True
         return changed, firewall_policy_id, response
 
@@ -399,7 +387,7 @@ class ClcFirewall():
         Ensures that a given firewall policy is removed if present
         :param source_account_alias: the source account alias for the firewall policy
         :param location: datacenter of the firewall policy
-        :param firewall_policy: firewall policy to delete
+        :param firewall_dict: firewall policy to delete
         :return: (changed, firewall_policy, response)
             changed: flag for if a change occurred
             firewall_policy: policy that was changed
@@ -441,6 +429,18 @@ class ClcFirewall():
         except:
             pass
         return response, success
+
+    def _wait_for_requests_to_complete(self, wait, source_account_alias, location, firewall_policy):
+        """
+        Waits until the CLC requests are complete if the wait argument is True
+        :param requests_lst: The list of CLC request objects
+        :return: none
+        """
+        if wait == True:
+            response, success = self._get_firewall_policy(source_account_alias, location, firewall_policy)
+            if response.get('status') == 'pending':
+                sleep(2)
+                self._wait_for_requests_to_complete(wait, source_account_alias, location, firewall_policy)
 
     def _get_firewall_policy_list(
             self,
