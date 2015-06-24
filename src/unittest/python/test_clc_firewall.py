@@ -191,17 +191,20 @@ class TestClcFirewall(unittest.TestCase):
         location = 'VA1'
         firewall_dict = {'firewall_policy': 'something'}
 
-        test = ClcFirewall(self.module)
-
-        mock_create_firewall_policy.return_value = {'this works'}
+        mock_firewall_response =[{'name': 'test', 'id': 'test'}]
         mock_get_policy_id_from_response.return_value = 'fake_policy'
-        changed, policy_id, response = test._ensure_firewall_policy_is_present(source_account_alias, location, firewall_dict)
+        mock_create_firewall_policy.return_value = mock_firewall_response
+
+        self.module.check_mode = False
+        test_firewall = ClcFirewall(self.module)
+
+        changed, policy_id, response = test_firewall._ensure_firewall_policy_is_present(source_account_alias, location, firewall_dict)
 
         self.assertFalse(self.module.fail_json.called)
-        self.assertEqual(changed, True)
-        self.assertIsNotNone(policy_id)
-        mock_create_firewall_policy.assert_called_once_with()
-        mock_get_policy_id_from_response.assert_called_once_with()
+        self.assertTrue(changed)
+        self.assertEqual(policy_id, 'fake_policy')
+        mock_create_firewall_policy.assert_called_once_with(source_account_alias, location, firewall_dict)
+        mock_get_policy_id_from_response.assert_called_once_with(mock_firewall_response)
 
     @patch.object(clc_firewall, 'clc_sdk')
     def test_update_firewall_policy_pass(self, mock_clc_sdk):
@@ -221,7 +224,6 @@ class TestClcFirewall(unittest.TestCase):
         test_firewall = ClcFirewall(self.module)
         changed, policy_id, response = test_firewall._ensure_firewall_policy_is_present(source_account_alias, location, firewall_dict)
         self.assertFalse(self.module.fail_json.called)
-        print changed, policy_id, response
         self.assertEqual(response, mock_firewall_response)
         test_firewall.clc.v2.API.Call.assert_called_once_with('PUT', '/v2-experimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, test_firewall_policy), firewall_dict)
 
