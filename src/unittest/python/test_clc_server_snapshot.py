@@ -28,6 +28,13 @@ class TestClcServerSnapshotFunctions(unittest.TestCase):
         self.assertFalse(mock_clc_sdk.v2.SetCredentials.called)
         self.assertEqual(self.module.fail_json.called, False)
 
+    @patch.object(clc_server_snapshot, 'clc_sdk')
+    def test_set_user_agent(self, mock_clc_sdk):
+        clc_server_snapshot.__version__ = "1"
+        ClcSnapshot._set_user_agent(mock_clc_sdk)
+
+        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
+
     @patch.object(ClcSnapshot, 'clc')
     def test_set_clc_credentials_w_creds(self, mock_clc_sdk):
         with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'dummyuser', 'CLC_V2_API_PASSWD': 'dummypwd'}):

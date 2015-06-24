@@ -38,6 +38,13 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         # Reset clc_group
         reload(clc_modify_server)
 
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_set_user_agent(self, mock_clc_sdk):
+        clc_modify_server.__version__ = "1"
+        ClcModifyServer._set_user_agent(mock_clc_sdk)
+
+        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
+
     @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
     @patch.object(clc_modify_server, 'clc_sdk')
     def test_process_request_state_update_cpu_memory(self,

@@ -68,6 +68,13 @@ class TestClcServerFunctions(unittest.TestCase):
 
         clc_sdk.defaults.ENDPOINT_URL_V2 = original_url
 
+    @patch.object(clc_group, 'clc_sdk')
+    def test_set_user_agent(self, mock_clc_sdk):
+        clc_group.__version__ = "1"
+        ClcGroup._set_user_agent(mock_clc_sdk)
+
+        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
+
     @patch.object(ClcGroup, 'clc')
     def test_set_clc_credentials_from_env(self, mock_clc_sdk):
         with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',

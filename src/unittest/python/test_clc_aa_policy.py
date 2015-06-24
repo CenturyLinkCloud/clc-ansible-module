@@ -48,6 +48,13 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
 
         self.policy.clc.v2.SetCredentials.assert_called_once_with(api_username='passWORD',api_passwd='UsErnaME')
 
+    @patch.object(clc_aa_policy, 'clc_sdk')
+    def test_set_user_agent(self, mock_clc_sdk):
+        clc_aa_policy.__version__ = "1"
+        ClcAntiAffinityPolicy._set_user_agent(mock_clc_sdk)
+
+        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
+
     def testArgumentSpecContract(self):
         args = ClcAntiAffinityPolicy._define_module_argument_spec()
         self.assertEqual(args, dict(

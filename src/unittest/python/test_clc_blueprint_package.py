@@ -72,6 +72,12 @@ class TestClcBluePrintPackageFunctions(unittest.TestCase):
         # Assert Expected Behavior
         self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
 
+    @patch.object(clc_blueprint_package, 'clc_sdk')
+    def test_set_user_agent(self, mock_clc_sdk):
+        clc_blueprint_package.__version__ = "1"
+        ClcBlueprintPackage._set_user_agent(mock_clc_sdk)
+
+        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
 
     @patch.object(ClcBlueprintPackage, 'clc')
     def test_set_clc_creds_w_token(self, mock_clc_sdk):
