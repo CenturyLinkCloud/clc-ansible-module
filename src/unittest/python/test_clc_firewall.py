@@ -163,7 +163,9 @@ class TestClcFirewall(unittest.TestCase):
         changed, policy, response =test_firewall_policy._ensure_firewall_policy_is_absent(source_account_alias, location, payload)
         self.assertFalse(changed)
 
-    def test_ensure_firewall_policy_absent_pass(self):
+    @patch.object(ClcFirewall, '_get_firewall_policy')
+    @patch.object(ClcFirewall, '_delete_firewall_policy')
+    def test_ensure_firewall_policy_absent_pass(self, mock_get_firewall_policy, mock_delete_firewall_policy):
         test = ClcFirewall(self.module)
         test._ensure_firewall_policy_is_absent()
 
@@ -201,15 +203,47 @@ class TestClcFirewall(unittest.TestCase):
         mock_create_firewall_policy.assert_called_once_with()
         mock_get_policy_id_from_response.assert_called_once_with()
 
-    def test_update_firewall_policy_pass(self):
-        test = ClcFirewall(self.module)
-        test._create_firewall_policy()
-
-
+    @patch.object(clc_firewall, 'clc_sdk')
+    def test_update_firewall_policy_pass(self, mock_clc_sdk):
+        mock_firewall_response = [{'name': 'test', 'id': 'test'}]
+        mock_clc_sdk.v2.API.Call.return_value = mock_firewall_response
+        source_account_alias = 'WFAD'
+        location = 'WA1'
+        test_firewall_policy = 'test_firewall_policy'
+        firewall_dict = {
+            'source': '12345',
+            'destination': '12345',
+            'ports': 'any',
+            'destination_account_alias': 'wfas',
+            'firewall_policy': test_firewall_policy
+        }
+        self.module.check_mode = False
+        test_firewall = ClcFirewall(self.module)
+        changed, policy_id, response = test_firewall._ensure_firewall_policy_is_present(source_account_alias, location, firewall_dict)
+        self.assertFalse(self.module.fail_json.called)
+        print changed, policy_id, response
+        self.assertEqual(response, mock_firewall_response)
+        test_firewall.clc.v2.API.Call.assert_called_once_with('PUT', '/v2-experimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, test_firewall_policy), firewall_dict)
 
     def test_get_policy_id_from_response(self):
-        test = ClcFirewall(self.module)
-        test._get_policy_id_from_response()
+        test_policy_id = 'test_policy_id'
+        test_response = {
+            "links": [
+                {
+                    "rel": "self",
+                    "href": "http://api.ctl.io/v2-experimental/firewallPolicies/wfad/va1/" + test_policy_id,
+                    "verbs": [
+                        "GET",
+                        "PUT",
+                        "DELETE"
+                    ]
+                }
+            ]
+        }
+        test_firewall = ClcFirewall(self.module)
+        policy_id = test_firewall._get_policy_id_from_response(test_response)
+        self.assertEqual(policy_id, test_policy_id)
+
 
     def test_define_argument_spec(self):
         result = ClcFirewall._define_module_argument_spec()

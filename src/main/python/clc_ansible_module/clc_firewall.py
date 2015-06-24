@@ -350,8 +350,8 @@ class ClcFirewall():
         firewall_policy_id = None
         if not self.module.check_mode:
             try:
-                response = self.clc.v2.API.Call('PUT', '/v2-experimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, self.firewall_dict.get('firewall_policy')), firewall_dict)
-                firewall_policy_id = self.firewall_dict.get('firewall_policy')
+                response = self.clc.v2.API.Call('PUT', '/v2-experimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, firewall_dict.get('firewall_policy')), firewall_dict)
+                firewall_policy_id = firewall_dict.get('firewall_policy')
             except:
                 response = self._create_firewall_policy(source_account_alias, location, firewall_dict)
                 firewall_policy_id = self._get_policy_id_from_response(response)
