@@ -41,16 +41,19 @@ class TestClcFirewall(unittest.TestCase):
         response, success = test_firewall_policy._get_firewall_policy(source_account_alias, location, firewall_policy)
         self.assertFalse(success)
 
-    # def test_get_firewall_policy_pass(self):
-    #     source_account_alias = 'WFAD'
-    #     location = 'wa1'
-    #     firewall_policy = '4d6e52d872754e12a71d672b2b50ec19'
-    #
-    #
-    #     test_firewall_policy = ClcFirewall(self.module)
-    #     response, success = test_firewall_policy._get_firewall_policy(source_account_alias, location, firewall_policy)
-    #     self.assertTrue(success)
+    @patch.object(clc_firewall, 'clc_sdk')
+    def test_get_firewall_policy_pass(self, mock_clc_sdk):
+        mock_firewall_response = [{'name': 'test', 'id': 'test'}]
+        mock_clc_sdk.v2.API.Call.return_value = mock_firewall_response
+        source_account_alias = 'WFAD'
+        location = 'WA1'
+        firewall_policy = 'test_policy'
 
+        test_firewall = ClcFirewall(self.module)
+        response, success = test_firewall._get_firewall_policy(source_account_alias, location, firewall_policy)
+        self.assertTrue(success)
+        self.assertEqual(response, mock_firewall_response)
+        test_firewall.clc.v2.API.Call.assert_called_once_with('GET', '/v2-experimental/firewallPolicies/WFAD/WA1/test_policy')
 
     def test_get_firewall_policy_list_fail(self):
         source_account_alias = 'WFAD'
@@ -62,11 +65,32 @@ class TestClcFirewall(unittest.TestCase):
         test_firewall_policy._get_firewall_policy_list(source_account_alias, location)
         self.assertTrue(self.module.fail_json.called)
 
-    def test_get_firewall_policy_list_pass_w_destination_pass(self):
-        pass
+    @patch.object(clc_firewall, 'clc_sdk')
+    def test_get_firewall_policy_list_pass_w_destination_pass(self, mock_clc_sdk):
+        mock_firewall_response = [{'name': 'test', 'id': 'test'}]
+        mock_clc_sdk.v2.API.Call.return_value = mock_firewall_response
+        source_account_alias = 'WFAD'
+        location = 'WA1'
+        destination_account_alias = 'WAX'
 
-    def test_get_firewall_policy_list_pass_wo_destination_pass(self):
-        pass
+        test_firewall = ClcFirewall(self.module)
+        response = test_firewall._get_firewall_policy_list(source_account_alias, location, destination_account_alias)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(response, mock_firewall_response)
+        test_firewall.clc.v2.API.Call.assert_called_once_with('GET', '/v2-experimental/firewallPolicies/WFAD/WA1?destinationAccount=WAX')
+
+    @patch.object(clc_firewall, 'clc_sdk')
+    def test_get_firewall_policy_list_pass_w_no_destination_pass(self, mock_clc_sdk):
+        mock_firewall_response = [{'name': 'test', 'id': 'test'}]
+        mock_clc_sdk.v2.API.Call.return_value = mock_firewall_response
+        source_account_alias = 'WFAD'
+        location = 'WA1'
+
+        test_firewall = ClcFirewall(self.module)
+        response = test_firewall._get_firewall_policy_list(source_account_alias, location)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(response, mock_firewall_response)
+        test_firewall.clc.v2.API.Call.assert_called_once_with('GET', '/v2-experimental/firewallPolicies/WFAD/WA1')
 
     def test_create_firewall_policy_fail(self):
         source_account_alias = 'WFAD'
@@ -82,11 +106,25 @@ class TestClcFirewall(unittest.TestCase):
         test_firewall_policy._create_firewall_policy(source_account_alias, location, payload)
         self.assertTrue(self.module.fail_json.called)
 
-    def test_create_firewall_policy_pass(self):
-        pass
 
-    def test_update_firewall_policy_pass(self):
-        pass
+    @patch.object(clc_firewall, 'clc_sdk')
+    def test_create_firewall_policy_pass(self, mock_clc_sdk):
+        mock_firewall_response = [{'name': 'test', 'id': 'test'}]
+        mock_clc_sdk.v2.API.Call.return_value = mock_firewall_response
+        firewall_dict = {
+            'source': '12345',
+            'destination': '12345',
+            'ports': 'any',
+            'destination_account_alias': 'wfas'
+        }
+
+        test_firewall = ClcFirewall(self.module)
+        response = test_firewall._create_firewall_policy(source_account_alias='WFAD', location='WA1', firewall_dict=firewall_dict)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(response, mock_firewall_response)
+        test_firewall.clc.v2.API.Call.assert_called_once
+
+
 
     def test_delete_firewall_policy_fail(self):
         source_account_alias = 'WFAD'
@@ -97,8 +135,19 @@ class TestClcFirewall(unittest.TestCase):
         test_firewall_policy._delete_firewall_policy(source_account_alias, location, firewall_policy)
         self.assertTrue(self.module.fail_json.called)
 
-    def test_delete_firewall_policy_pass(self):
-        pass
+    @patch.object(clc_firewall, 'clc_sdk')
+    def test_delete_firewall_policy_pass(self, mock_clc_sdk):
+        mock_firewall_response = [{'name': 'test', 'id': 'test'}]
+        mock_clc_sdk.v2.API.Call.return_value = mock_firewall_response
+        source_account_alias = 'WFAD'
+        location = 'wa1'
+        firewall_policy = 'this_is_not_a_real_policy'
+
+        test_firewall = ClcFirewall(self.module)
+        response = test_firewall._delete_firewall_policy(source_account_alias, location, firewall_policy)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(response, mock_firewall_response)
+        test_firewall.clc.v2.API.Call.assert_called_once_with('DELETE', '/v2-experimental/firewallPolicies/%s/%s/%s' % (source_account_alias, location, firewall_policy))
 
     def test_ensure_firewall_policy_absent_fail(self):
         source_account_alias = 'WFAD'
@@ -115,7 +164,8 @@ class TestClcFirewall(unittest.TestCase):
         self.assertFalse(changed)
 
     def test_ensure_firewall_policy_absent_pass(self):
-        pass
+        test = ClcFirewall(self.module)
+        test._ensure_firewall_policy_is_absent()
 
     def test_ensure_firewall_policy_present_fail(self):
         source_account_alias = 'WFAD'
@@ -132,11 +182,34 @@ class TestClcFirewall(unittest.TestCase):
         changed, policy, response = test_firewall_policy._ensure_firewall_policy_is_present(source_account_alias, location, payload)
         self.assertTrue(self.module.fail_json.called)
 
-    def test_ensure_firewall_policy_present_pass(self):
-        pass
+    @mock.patch.object(ClcFirewall, '_create_firewall_policy')
+    @mock.patch.object(ClcFirewall, '_get_policy_id_from_response')
+    def test_ensure_firewall_policy_present_pass(self, mock_create_firewall_policy, mock_get_policy_id_from_response):
+        source_account_alias = 'WFAD'
+        location = 'VA1'
+        firewall_dict = {'firewall_policy': 'something'}
+
+        test = ClcFirewall(self.module)
+
+        mock_create_firewall_policy.return_value = {'this works'}
+        mock_get_policy_id_from_response.return_value = 'fake_policy'
+        changed, policy_id, response = test._ensure_firewall_policy_is_present(source_account_alias, location, firewall_dict)
+
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(changed, True)
+        self.assertIsNotNone(policy_id)
+        mock_create_firewall_policy.assert_called_once_with()
+        mock_get_policy_id_from_response.assert_called_once_with()
+
+    def test_update_firewall_policy_pass(self):
+        test = ClcFirewall(self.module)
+        test._create_firewall_policy()
+
+
 
     def test_get_policy_id_from_response(self):
-        pass
+        test = ClcFirewall(self.module)
+        test._get_policy_id_from_response()
 
     def test_define_argument_spec(self):
         result = ClcFirewall._define_module_argument_spec()
