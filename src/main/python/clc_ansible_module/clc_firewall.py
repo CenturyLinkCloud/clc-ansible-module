@@ -254,6 +254,11 @@ class ClcFirewall():
 
 
     def _get_policy_id_from_response(self, response):
+        """
+        Method to parse out the policy id from creation response
+        :param response: response from firewall creation control
+        :return: policy_id: firewall policy id from creation call
+        """
         url = response.get('links')[0]['href']
         path = urlparse.urlparse(url).path
         path_list = os.path.split(path)
@@ -441,6 +446,7 @@ class ClcFirewall():
             if response.get('status') == 'pending':
                 sleep(2)
                 self._wait_for_requests_to_complete(wait, source_account_alias, location, firewall_policy)
+            return None
 
     def _get_firewall_policy_list(
             self,
