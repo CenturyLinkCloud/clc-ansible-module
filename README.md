@@ -602,7 +602,7 @@ Create/Delete a Firewall Policy
 | `source_account_alias` | Y |  |  | CLC alias for the source account |
 | `destination_account_alias` | N |  |  | CLC alias for the destination account |
 | `firewall_policy` | N |  |  | Id of the firewall policy |
-| `wait` | N |  True  | [ True, False | Whether to wait for the provisioning tasks to finish before returning. |
+| `wait` | N |  True  |  True, False | Whether to wait for the provisioning tasks to finish before returning. |
 | `state` | Y | present | present, absent | Whether to create or delete the firewall policy
 | `enabled` | F| true | true, false | If the firewall policy is enabled or disabled
 
