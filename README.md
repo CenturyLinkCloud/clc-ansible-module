@@ -550,6 +550,63 @@ Create/Delete a loadbalancer
 | `status` | N | enabled | enabled, disabled | The status of your loadbalancer |
 | `state` | N | present | present, absent, port_absent, nodes_present, nodes_absent | Determine whether to create or delete your loadbalancer. If `present` module will not create another loadbalancer with the same name. If `absent` module will delete the entire loadbalancer. If `port_absent` module will delete the loadbalancer port and associated nodes only. If `nodes_present` module will ensure the provided nodes are added to the load balancer pool. If `nodes_absent` module will ensure the provided nodes are removed from the load balancer pool.|
 
+## clc_firewall Module
+Create/Delete a Firewall Policy
+
+### Example Playbook
+
+```yaml
+---
+- name: Create Firewall Policy
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create / Verify an Firewall Policy at CenturyLink Cloud
+      clc_firewall:
+        name: 'Test Firewall'
+        source_account_alias: WFAD
+        location: VA1
+        state: present
+        source: 10.128.216.0/24
+        destination: 10.128.216.0/24
+        ports: Any
+        destination_account_alias: WFAD
+```
+```yaml
+---
+- name: Delete Firewall Policy
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete an Firewall Policy at CenturyLink Cloud
+      clc_firewall:
+        name: 'Test Firewall'
+        source_account_alias: WFAD
+        location: VA1
+        state: present
+        firewall_policy: c62105233d7a4231bd2e91b9c791eaae
+```
+
+### Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `name:` | N |  |  | The name of the firewall policy |
+| `description` | N |  |  | A description of the firewall policy |
+| `location` | Y |  |  | Target datacenter for the firewall policy |
+| `ports` | N |  | any, icmp, TCP/123, UDP/123, TCP/123-456, UDP/123-456'| types of ports associated with the policy. TCP & UDP can take in single ports or port ranges. |
+| `source` | For Create |  |  | Source addresses for traffic on the originating firewall |
+| `destination` | For Create |  |  | Destination addresses for traffic on the terminating firewall |
+| `source_account_alias` | Y |  |  | CLC alias for the source account |
+| `destination_account_alias` | N |  |  | CLC alias for the destination account |
+| `firewall_policy` | N |  |  | Id of the firewall policy |
+| `wait` | N |  True  | [ True, False | Whether to wait for the provisioning tasks to finish before returning. |
+| `state` | Y | present | present, absent | Whether to create or delete the firewall policy
+| `enabled` | F| true | true, false | If the firewall policy is enabled or disabled
+
+
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script
 
 Scans all datacenters and returns an inventory of servers and server groups to Ansible.  This script returns all information about hosts in the inventory _meta dictionary.

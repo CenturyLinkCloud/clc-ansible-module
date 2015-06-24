@@ -78,7 +78,7 @@ options:
     aliases: []
   firewall_policy:
     description:
-      - id of the firewall policy
+      - Id of the firewall policy
     default: None
     required: False
     aliases: []
