@@ -136,7 +136,7 @@ import os
 import urlparse
 import os.path
 from time import sleep
-
+import json
 
 try:
     import clc as clc_sdk
@@ -345,27 +345,90 @@ class ClcFirewallPolicy():
         """
         changed = False
         response = []
-        firewall_policy_id = None
-        if not self.module.check_mode:
-            try:
-                response = self.clc.v2.API.Call(
-                    'PUT',
-                    '/v2-experimental/firewallPolicies/%s/%s/%s' %
-                    (source_account_alias,
-                     location,
-                     firewall_dict.get('firewall_policy')),
-                    firewall_dict)
-                firewall_policy_id = firewall_dict.get('firewall_policy_id')
-            except:
-                response = self._create_firewall_policy(
-                    source_account_alias,
-                    location,
-                    firewall_dict)
-                firewall_policy_id = self._get_policy_id_from_response(
-                    response)
-            self._wait_for_requests_to_complete(firewall_dict.get('wait'), source_account_alias, location, firewall_policy_id)
-        changed = True
+        firewall_policy_id = firewall_dict.get('firewall_policy_id')
+
+        if firewall_policy_id is None:
+            if not self.module.check_mode:
+                response = self._create_firewall_policy(source_account_alias, location, firewall_dict)
+                firewall_policy_id = self._get_policy_id_from_response(response)
+                self._wait_for_requests_to_complete(firewall_dict.get('wait'), source_account_alias, location, firewall_policy_id)
+            changed = True
+        else:
+                get_before_response, success = self._get_firewall_policy(source_account_alias, location, firewall_policy_id)
+                changed = self._compare_get_request_with_dict(get_before_response, firewall_dict)
+                if not self.module.check_mode:
+                    if changed is not False:
+                        response = self._update_firewall_policy(source_account_alias, location, firewall_policy_id, firewall_dict)
+                        self._wait_for_requests_to_complete(firewall_dict.get('wait'), source_account_alias, location, firewall_policy_id)
+
         return changed, firewall_policy_id, response
+
+    def _compare_get_request_with_dict(self, response, firewall_dict):
+
+        changed = False
+
+        response_dest_account_alias = response.get('destination_account_alias')
+        response_enabled = response.get('enabled')
+        response_source = response.get('source')
+        response_dest = response.get('destination')
+        response_ports = response.get('ports')
+
+        request_dest_account_alias = firewall_dict.get('destination_account_alias')
+        request_enabled = firewall_dict.get('enabled')
+        request_source = firewall_dict.get('source')
+        request_dest = firewall_dict.get('destination')
+        request_ports = firewall_dict.get('ports')
+
+
+        if response_dest_account_alias is not None:
+            if response_dest_account_alias != request_dest_account_alias:
+                changed = True
+                return changed
+
+        if response_enabled is not None:
+            if response_enabled != request_enabled:
+                changed = True
+                return changed
+
+        if response_source is not None:
+            if response_source[0] != request_source:
+                changed = True
+                return changed
+
+        if response_dest is not None:
+            if response_dest[0] != request_dest:
+                changed = True
+                return changed
+
+        if response_ports is not None:
+            if response_ports[0] != request_ports:
+                changed = True
+                return changed
+
+        return changed
+
+    def _update_firewall_policy(self, source_account_alias, location, firewall_policy_id, firewall_dict):
+        """
+        Updates a firewall policy for a given datacenter and account alias
+        :param source_account_alias:
+        :param location:
+        :param firewall_policy_id:
+        :param firewall_dict:
+        :return:
+        """
+        try:
+            response = self.clc.v2.API.Call(
+                'PUT',
+                '/v2-experimental/firewallPolicies/%s/%s/%s' %
+                (source_account_alias,
+                 location,
+                 firewall_policy_id),
+                firewall_dict)
+        except self.clc.APIFailedResponse as e:
+            return self.module.fail_json(
+                msg="Unable to successfully update firewall policy. %s" %
+                    str(e.response_text))
+        return response
 
     def _ensure_firewall_policy_is_absent(
             self,
@@ -385,7 +448,7 @@ class ClcFirewallPolicy():
         changed = False
         response = []
         firewall_policy_id = firewall_dict.get('firewall_policy_id')
-        result, success = self._get_firewall_policy_id(
+        result, success = self._get_firewall_policy(
             source_account_alias, location, firewall_policy_id)
         if success:
             if not self.module.check_mode:
@@ -396,7 +459,7 @@ class ClcFirewallPolicy():
             changed = True
         return changed, firewall_policy_id, response
 
-    def _get_firewall_policy_id(
+    def _get_firewall_policy(
             self,
             source_account_alias,
             location,
@@ -426,7 +489,7 @@ class ClcFirewallPolicy():
         :return: none
         """
         if wait == True:
-            response, success = self._get_firewall_policy_id(source_account_alias, location, firewall_policy_id)
+            response, success = self._get_firewall_policy(source_account_alias, location, firewall_policy_id)
             if response.get('status') == 'pending':
                 sleep(2)
                 self._wait_for_requests_to_complete(wait, source_account_alias, location, firewall_policy_id)

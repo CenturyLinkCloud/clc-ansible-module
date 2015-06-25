@@ -29,7 +29,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             api_username='hansolo',
             api_passwd='falcon')
 
-    def test_get_firewall_policy_id_fail(self):
+    def test_get_firewall_policy_fail(self):
         source_account_alias = 'WFAD'
         location = 'VA1'
         firewall_policy = 'fake_policy'
@@ -37,12 +37,12 @@ class TestClcFirewallPolicy(unittest.TestCase):
         mock_policy = mock.MagicMock()
         # mock_policy.return_value =
         test_firewall_policy = ClcFirewallPolicy(self.module)
-        response, success = test_firewall_policy._get_firewall_policy_id(
+        response, success = test_firewall_policy._get_firewall_policy(
             source_account_alias, location, firewall_policy)
         self.assertFalse(success)
 
     @patch.object(clc_firewall_policy, 'clc_sdk')
-    def test_get_firewall_policy_id_pass(self, mock_clc_sdk):
+    def test_get_firewall_policy_pass(self, mock_clc_sdk):
         mock_firewall_response = [{'name': 'test', 'id': 'test'}]
         mock_clc_sdk.v2.API.Call.return_value = mock_firewall_response
         source_account_alias = 'WFAD'
@@ -50,7 +50,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
         firewall_policy = 'test_policy'
 
         test_firewall = ClcFirewallPolicy(self.module)
-        response, success = test_firewall._get_firewall_policy_id(
+        response, success = test_firewall._get_firewall_policy(
             source_account_alias, location, firewall_policy)
         self.assertTrue(success)
         self.assertEqual(response, mock_firewall_response)
@@ -139,18 +139,18 @@ class TestClcFirewallPolicy(unittest.TestCase):
             source_account_alias, location, payload)
         self.assertFalse(changed)
 
-    @patch.object(ClcFirewallPolicy, '_get_firewall_policy_id')
+    @patch.object(ClcFirewallPolicy, '_get_firewall_policy')
     @patch.object(ClcFirewallPolicy, '_delete_firewall_policy')
     def test_ensure_firewall_policy_absent_pass(
             self,
             mock_delete_firewall_policy,
-            mock_get_firewall_policy_id):
+            mock_get_firewall_policy):
         source_account_alias = 'WFAD'
         location = 'WA1'
         firewall_dict = {'firewall_policy_id': 'something'}
         mock_firewall_response = [{'name': 'test', 'id': 'test'}]
 
-        mock_get_firewall_policy_id.return_value = 'result', True
+        mock_get_firewall_policy.return_value = 'result', True
         mock_delete_firewall_policy.return_value = mock_firewall_response
         self.module.check_mode = False
 
@@ -160,7 +160,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
         self.assertTrue(changed, True)
         self.assertEqual(policy_id, 'something')
         self.assertEqual(response, mock_firewall_response)
-        mock_get_firewall_policy_id.assert_called_once_with(
+        mock_get_firewall_policy.assert_called_once_with(
             source_account_alias,
             location,
             'something')
