@@ -11,6 +11,7 @@
 # Copyright 2015 CenturyLink Cloud
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
+
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -425,7 +426,7 @@ class ClcFirewallPolicy():
         :return: none
         """
         if wait == True:
-            response, success = self._get_firewall_policy(source_account_alias, location, firewall_policy_id)
+            response, success = self._get_firewall_policy_id(source_account_alias, location, firewall_policy_id)
             if response.get('status') == 'pending':
                 sleep(2)
                 self._wait_for_requests_to_complete(wait, source_account_alias, location, firewall_policy_id)
