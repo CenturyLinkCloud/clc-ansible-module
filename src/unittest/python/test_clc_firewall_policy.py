@@ -360,5 +360,94 @@ class TestClcFirewallPolicy(unittest.TestCase):
             mock_AnsibleModule_instance)
         mock_ClcFirewallPolicy_instance.process_request.assert_called_once
 
+    @patch.object(ClcFirewallPolicy, '_ensure_firewall_policy_is_present')
+    @patch.object(ClcFirewallPolicy, '_set_clc_credentials_from_env')
+    @patch.object(clc_firewall_policy, 'clc_sdk')
+    def test_process_request_state_present(self,
+                                           mock_clc_sdk,
+                                           mock_set_clc_creds,
+                                           mock_ensure_present):
+        # Setup Test
+        self.module.params = {
+            'state': 'present',
+            'location': 'test',
+            'source': ['1','2'],
+            'destination': ['1','2'],
+            'source_account_alias': 'alias',
+            'destination_account_alias': 'alias',
+            'wait': True
+        }
+        changed = False
+        policy_id = None
+
+        mock_ensure_present.return_value = True, '123', {}
+        # Test
+        under_test = ClcFirewallPolicy(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.assertTrue(self.module.exit_json.called)
+        self.module.exit_json.assert_called_once_with(changed=True, firewall_policy_id='123')
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcFirewallPolicy, '_ensure_firewall_policy_is_present')
+    @patch.object(ClcFirewallPolicy, '_set_clc_credentials_from_env')
+    @patch.object(clc_firewall_policy, 'clc_sdk')
+    def test_process_request_state_absent(self,
+                                           mock_clc_sdk,
+                                           mock_set_clc_creds,
+                                           mock_ensure_absent):
+        # Setup Test
+        self.module.params = {
+            'state': 'absent',
+            'location': 'test',
+            'source': ['1','2'],
+            'destination': ['1','2'],
+            'source_account_alias': 'alias',
+            'destination_account_alias': 'alias',
+            'wait': True
+        }
+        changed = False
+        policy_id = None
+
+        mock_ensure_absent.return_value = True, '123', {}
+        # Test
+        under_test = ClcFirewallPolicy(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.assertTrue(self.module.exit_json.called)
+        self.module.exit_json.assert_called_once_with(changed=True, firewall_policy_id=None)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcFirewallPolicy, '_ensure_firewall_policy_is_present')
+    @patch.object(ClcFirewallPolicy, '_set_clc_credentials_from_env')
+    @patch.object(clc_firewall_policy, 'clc_sdk')
+    def test_process_request_state_unknown(self,
+                                           mock_clc_sdk,
+                                           mock_set_clc_creds,
+                                           mock_ensure_unknown):
+        # Setup Test
+        self.module.params = {
+            'state': 'invalid',
+            'location': 'test',
+            'source': ['1','2'],
+            'destination': ['1','2'],
+            'source_account_alias': 'alias',
+            'destination_account_alias': 'alias',
+            'wait': True
+        }
+        changed = False
+        policy_id = None
+
+        mock_ensure_unknown.return_value = True, '123', {}
+        # Test
+        under_test = ClcFirewallPolicy(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.assertFalse(self.module.exit_json.called)
+        self.assertTrue(self.module.fail_json.called)
+
 if __name__ == '__main__':
     unittest.main()

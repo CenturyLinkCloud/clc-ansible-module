@@ -232,7 +232,7 @@ class ClcFirewallPolicy():
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
 
-        self.module.exit_json(
+        return self.module.exit_json(
             changed=changed,
             firewall_policy_id=firewall_policy_id)
 

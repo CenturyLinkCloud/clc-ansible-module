@@ -567,9 +567,9 @@ Create/Delete a Firewall Policy
         source_account_alias: WFAD
         location: VA1
         state: present
-        source: 10.128.216.0/24
-        destination: 10.128.216.0/24
-        ports: Any
+        source: ['10.128.216.0/24']
+        destination: [10.128.216.0/24']
+        ports: ['any']
         destination_account_alias: WFAD
 ```
 ```yaml
@@ -583,8 +583,8 @@ Create/Delete a Firewall Policy
       clc_firewall_policy:
         source_account_alias: WFAD
         location: VA1
-        state: present
-        firewall_policy_id: c62105233d7a4231bd2e91b9c791eaae
+        state: absent
+        firewall_policy_id: 'c62105233d7a4231bd2e91b9c791eaae'
 ```
 
 ### Available Parameters
