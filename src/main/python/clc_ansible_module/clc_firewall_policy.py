@@ -236,7 +236,6 @@ class ClcFirewallPolicy():
             changed=changed,
             firewall_policy_id=firewall_policy_id)
 
-
     def _get_policy_id_from_response(self, response):
         """
         Method to parse out the policy id from creation response
@@ -277,57 +276,6 @@ class ClcFirewallPolicy():
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
 
-    def _create_firewall_policy(
-            self,
-            source_account_alias,
-            location,
-            firewall_dict):
-        """
-        Ensures that a given firewall policy is present
-        :param source_account_alias: the source account alias for the firewall policy
-        :param location: datacenter of the firewall policy
-        :param firewall_dict: dictionary or request parameters for firewall policy creation
-        :return: response from CLC API call
-        """
-        payload = {
-            'destinationAccount': firewall_dict.get('destination_account_alias'),
-            'source': firewall_dict.get('source'),
-            'destination': firewall_dict.get('destination'),
-            'ports': firewall_dict.get('ports')}
-        try:
-            response = self.clc.v2.API.Call(
-                'POST', '/v2-experimental/firewallPolicies/%s/%s' %
-                (source_account_alias, location), payload)
-            ClcFirewallPolicy._push_metric(ClcFirewallPolicy.STATS_FIREWALL_CREATE, 1)
-        except self.clc.APIFailedResponse as e:
-            return self.module.fail_json(
-                msg="Unable to successfully create firewall policy. %s" %
-                    str(e.response_text))
-        return response
-
-    def _delete_firewall_policy(
-            self,
-            source_account_alias,
-            location,
-            firewall_policy_id):
-        """
-        Deletes a given firewall policy for an account alias in a datacenter
-        :param source_account_alias: the source account alias for the firewall policy
-        :param location: datacenter of the firewall policy
-        :param firewall_policy_id: firewall policy to delete
-        :return: response from CLC API call
-        """
-        try:
-            response = self.clc.v2.API.Call(
-                'DELETE', '/v2-experimental/firewallPolicies/%s/%s/%s' %
-                (source_account_alias, location, firewall_policy_id))
-            ClcFirewallPolicy._push_metric(ClcFirewallPolicy.STATS_FIREWALL_DELETE, 1)
-        except self.clc.APIFailedResponse as e:
-            return self.module.fail_json(
-                msg="Unable to successfully delete firewall policy. %s" %
-                    str(e.response_text))
-        return response
-
     def _ensure_firewall_policy_is_present(
             self,
             source_account_alias,
@@ -349,86 +297,38 @@ class ClcFirewallPolicy():
 
         if firewall_policy_id is None:
             if not self.module.check_mode:
-                response = self._create_firewall_policy(source_account_alias, location, firewall_dict)
-                firewall_policy_id = self._get_policy_id_from_response(response)
-                self._wait_for_requests_to_complete(firewall_dict.get('wait'), source_account_alias, location, firewall_policy_id)
+                response = self._create_firewall_policy(
+                    source_account_alias,
+                    location,
+                    firewall_dict)
+                firewall_policy_id = self._get_policy_id_from_response(
+                    response)
+                self._wait_for_requests_to_complete(
+                    firewall_dict.get('wait'),
+                    source_account_alias,
+                    location,
+                    firewall_policy_id)
             changed = True
         else:
-                get_before_response, success = self._get_firewall_policy(source_account_alias, location, firewall_policy_id)
-                changed = self._compare_get_request_with_dict(get_before_response, firewall_dict)
-                if not self.module.check_mode:
-                    if changed is not False:
-                        response = self._update_firewall_policy(source_account_alias, location, firewall_policy_id, firewall_dict)
-                        self._wait_for_requests_to_complete(firewall_dict.get('wait'), source_account_alias, location, firewall_policy_id)
+            get_before_response, success = self._get_firewall_policy(
+                source_account_alias, location, firewall_policy_id)
+            changed = self._compare_get_request_with_dict(
+                get_before_response,
+                firewall_dict)
+            if not self.module.check_mode:
+                if changed is not False:
+                    response = self._update_firewall_policy(
+                        source_account_alias,
+                        location,
+                        firewall_policy_id,
+                        firewall_dict)
+                    self._wait_for_requests_to_complete(
+                        firewall_dict.get('wait'),
+                        source_account_alias,
+                        location,
+                        firewall_policy_id)
 
         return changed, firewall_policy_id, response
-
-    def _compare_get_request_with_dict(self, response, firewall_dict):
-
-        changed = False
-
-        response_dest_account_alias = response.get('destination_account_alias')
-        response_enabled = response.get('enabled')
-        response_source = response.get('source')
-        response_dest = response.get('destination')
-        response_ports = response.get('ports')
-
-        request_dest_account_alias = firewall_dict.get('destination_account_alias')
-        request_enabled = firewall_dict.get('enabled')
-        request_source = firewall_dict.get('source')
-        request_dest = firewall_dict.get('destination')
-        request_ports = firewall_dict.get('ports')
-
-
-        if response_dest_account_alias is not None:
-            if response_dest_account_alias != request_dest_account_alias:
-                changed = True
-                return changed
-
-        if response_enabled is not None:
-            if response_enabled != request_enabled:
-                changed = True
-                return changed
-
-        if response_source is not None:
-            if response_source[0] != request_source:
-                changed = True
-                return changed
-
-        if response_dest is not None:
-            if response_dest[0] != request_dest:
-                changed = True
-                return changed
-
-        if response_ports is not None:
-            if response_ports[0] != request_ports:
-                changed = True
-                return changed
-
-        return changed
-
-    def _update_firewall_policy(self, source_account_alias, location, firewall_policy_id, firewall_dict):
-        """
-        Updates a firewall policy for a given datacenter and account alias
-        :param source_account_alias:
-        :param location:
-        :param firewall_policy_id:
-        :param firewall_dict:
-        :return:
-        """
-        try:
-            response = self.clc.v2.API.Call(
-                'PUT',
-                '/v2-experimental/firewallPolicies/%s/%s/%s' %
-                (source_account_alias,
-                 location,
-                 firewall_policy_id),
-                firewall_dict)
-        except self.clc.APIFailedResponse as e:
-            return self.module.fail_json(
-                msg="Unable to successfully update firewall policy. %s" %
-                    str(e.response_text))
-        return response
 
     def _ensure_firewall_policy_is_absent(
             self,
@@ -459,6 +359,139 @@ class ClcFirewallPolicy():
             changed = True
         return changed, firewall_policy_id, response
 
+    def _create_firewall_policy(
+            self,
+            source_account_alias,
+            location,
+            firewall_dict):
+        """
+        Ensures that a given firewall policy is present
+        :param source_account_alias: the source account alias for the firewall policy
+        :param location: datacenter of the firewall policy
+        :param firewall_dict: dictionary or request parameters for firewall policy creation
+        :return: response from CLC API call
+        """
+        payload = {
+            'destinationAccount': firewall_dict.get('destination_account_alias'),
+            'source': firewall_dict.get('source'),
+            'destination': firewall_dict.get('destination'),
+            'ports': firewall_dict.get('ports')}
+        try:
+            response = self.clc.v2.API.Call(
+                'POST', '/v2-experimental/firewallPolicies/%s/%s' %
+                        (source_account_alias, location), payload)
+            ClcFirewallPolicy._push_metric(
+                ClcFirewallPolicy.STATS_FIREWALL_CREATE,
+                1)
+        except self.clc.APIFailedResponse as e:
+            return self.module.fail_json(
+                msg="Unable to successfully create firewall policy. %s" %
+                    str(e.response_text))
+        return response
+
+    def _delete_firewall_policy(
+            self,
+            source_account_alias,
+            location,
+            firewall_policy_id):
+        """
+        Deletes a given firewall policy for an account alias in a datacenter
+        :param source_account_alias: the source account alias for the firewall policy
+        :param location: datacenter of the firewall policy
+        :param firewall_policy_id: firewall policy to delete
+        :return: response: response from CLC API call
+        """
+        try:
+            response = self.clc.v2.API.Call(
+                'DELETE', '/v2-experimental/firewallPolicies/%s/%s/%s' %
+                          (source_account_alias, location, firewall_policy_id))
+            ClcFirewallPolicy._push_metric(
+                ClcFirewallPolicy.STATS_FIREWALL_DELETE,
+                1)
+        except self.clc.APIFailedResponse as e:
+            return self.module.fail_json(
+                msg="Unable to successfully delete firewall policy. %s" %
+                    str(e.response_text))
+        return response
+
+    def _update_firewall_policy(
+            self,
+            source_account_alias,
+            location,
+            firewall_policy_id,
+            firewall_dict):
+        """
+        Updates a firewall policy for a given datacenter and account alias
+        :param source_account_alias: the source account alias for the firewall policy
+        :param location: datacenter of the firewall policy
+        :param firewall_policy_id: firewall policy to delete
+        :param firewall_dict: dictionary or request parameters for firewall policy creation
+        :return: response: response from CLC API call
+        """
+        try:
+            response = self.clc.v2.API.Call(
+                'PUT',
+                '/v2-experimental/firewallPolicies/%s/%s/%s' %
+                (source_account_alias,
+                 location,
+                 firewall_policy_id),
+                firewall_dict)
+        except self.clc.APIFailedResponse as e:
+            return self.module.fail_json(
+                msg="Unable to successfully update firewall policy. %s" %
+                    str(e.response_text))
+        return response
+
+    def _compare_get_request_with_dict(self, response, firewall_dict):
+        """
+        Helper method to compare the json response for getting the firewall policy with the request parameters
+        :param response: response from the get method
+        :param firewall_dict: dictionary or request parameters for firewall policy creation
+        :return: changed: Boolean that returns true if there are differences between the response parameters and the playbook parameters
+        """
+
+        changed = False
+
+        response_dest_account_alias = response.get('destination_account_alias')
+        response_enabled = response.get('enabled')
+        response_source = response.get('source')
+        response_dest = response.get('destination')
+        response_ports = response.get('ports')
+
+        request_dest_account_alias = firewall_dict.get(
+            'destination_account_alias')
+        request_enabled = firewall_dict.get('enabled')
+        request_source = firewall_dict.get('source')
+        request_dest = firewall_dict.get('destination')
+        request_ports = firewall_dict.get('ports')
+
+        if response_dest_account_alias is not None:
+            if response_dest_account_alias != request_dest_account_alias:
+                changed = True
+                return changed
+
+        if response_enabled is not None:
+            if response_enabled != request_enabled:
+                changed = True
+                return changed
+
+        if response_source is not None:
+            if response_source[0] != request_source:
+                changed = True
+                return changed
+
+        if response_dest is not None:
+            if response_dest[0] != request_dest:
+                changed = True
+                return changed
+
+        if response_ports is not None:
+            if response_ports[0] != request_ports:
+                changed = True
+                return changed
+
+        return changed
+
     def _get_firewall_policy(
             self,
             source_account_alias,
@@ -482,17 +515,27 @@ class ClcFirewallPolicy():
             pass
         return response, success
 
-    def _wait_for_requests_to_complete(self, wait, source_account_alias, location, firewall_policy_id):
+    def _wait_for_requests_to_complete(
+            self,
+            wait,
+            source_account_alias,
+            location,
+            firewall_policy_id):
         """
         Waits until the CLC requests are complete if the wait argument is True
         :param requests_lst: The list of CLC request objects
         :return: none
         """
-        if wait == True:
-            response, success = self._get_firewall_policy(source_account_alias, location, firewall_policy_id)
+        if wait:
+            response, success = self._get_firewall_policy(
+                source_account_alias, location, firewall_policy_id)
             if response.get('status') == 'pending':
                 sleep(2)
-                self._wait_for_requests_to_complete(wait, source_account_alias, location, firewall_policy_id)
+                self._wait_for_requests_to_complete(
+                    wait,
+                    source_account_alias,
+                    location,
+                    firewall_policy_id)
             return None
 
     @staticmethod
@@ -506,7 +549,9 @@ class ClcFirewallPolicy():
         try:
             sock = socket.socket()
             sock.settimeout(ClcFirewallPolicy.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect((ClcFirewallPolicy.STATSD_HOST, ClcFirewallPolicy.STATSD_PORT))
+            sock.connect(
+                (ClcFirewallPolicy.STATSD_HOST,
+                 ClcFirewallPolicy.STATSD_PORT))
             sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
             sock.close()
         except socket.gaierror:
