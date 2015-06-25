@@ -181,9 +181,9 @@ class ClcFirewallPolicy():
             source_account_alias=dict(required=True, default=None),
             destination_account_alias=dict(default=None),
             firewall_policy_id=dict(default=None),
-            ports=dict(default=None),
-            source=dict(defualt=None),
-            destination=dict(defualt=None),
+            ports=dict(default=None, type='list'),
+            source=dict(defualt=None, type='list'),
+            destination=dict(defualt=None, type='list'),
             wait=dict(default=True),
             state=dict(default='present', choices=['present', 'absent']),
             enabled=dict(defualt=None)
@@ -222,17 +222,17 @@ class ClcFirewallPolicy():
         self._set_clc_credentials_from_env()
         requests = []
 
-        if state == "absent":
+        if state == 'absent':
             changed, firewall_policy_id, response = self._ensure_firewall_policy_is_absent(
                 source_account_alias, location, self.firewall_dict)
 
-        elif state == "present":
+        elif state == 'present':
             changed, firewall_policy_id, response = self._ensure_firewall_policy_is_present(
                 source_account_alias, location, self.firewall_dict)
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
 
-        return self.module.exit_json(
+        self.module.exit_json(
             changed=changed,
             firewall_policy_id=firewall_policy_id)
 
@@ -292,7 +292,7 @@ class ClcFirewallPolicy():
             response: response from CLC API call
         """
         changed = False
-        response = []
+        response = {}
         firewall_policy_id = firewall_dict.get('firewall_policy_id')
 
         if firewall_policy_id is None:
@@ -316,7 +316,7 @@ class ClcFirewallPolicy():
                 get_before_response,
                 firewall_dict)
             if not self.module.check_mode:
-                if changed is not False:
+                if changed:
                     response = self._update_firewall_policy(
                         source_account_alias,
                         location,
@@ -327,7 +327,6 @@ class ClcFirewallPolicy():
                         source_account_alias,
                         location,
                         firewall_policy_id)
-
         return changed, firewall_policy_id, response
 
     def _ensure_firewall_policy_is_absent(
@@ -452,7 +451,7 @@ class ClcFirewallPolicy():
 
         changed = False
 
-        response_dest_account_alias = response.get('destination_account_alias')
+        response_dest_account_alias = response.get('destinationAccount')
         response_enabled = response.get('enabled')
         response_source = response.get('source')
         response_dest = response.get('destination')
@@ -466,7 +465,7 @@ class ClcFirewallPolicy():
         request_ports = firewall_dict.get('ports')
 
         if response_dest_account_alias is not None:
-            if response_dest_account_alias != request_dest_account_alias:
+            if str(response_dest_account_alias) != str(request_dest_account_alias):
                 changed = True
                 return changed
 
@@ -476,17 +475,17 @@ class ClcFirewallPolicy():
                 return changed
 
         if response_source is not None:
-            if response_source[0] != request_source:
+            if response_source != request_source:
                 changed = True
                 return changed
 
         if response_dest is not None:
-            if response_dest[0] != request_dest:
+            if response_dest != request_dest:
                 changed = True
                 return changed
 
         if response_ports is not None:
-            if response_ports[0] != request_ports:
+            if response_ports != request_ports:
                 changed = True
                 return changed
 
@@ -573,6 +572,24 @@ def main():
 
     clc_firewall = ClcFirewallPolicy(module)
     clc_firewall.process_request()
+
+def main_test():
+    module = ClcFirewallPolicy(None)
+    module.check_mode = False
+    firewall_pol = ClcFirewallPolicy(module)
+    firewall_pol._set_clc_credentials_from_env()
+    firewall_dict = {
+        'firewall_policy_id': '16f7f71065154adb91570bdbfbf3f5da',
+        'source_account_alias': 'wfad',
+        'destination_account_alias': 'wfad',
+        'source': ['10.121.41.0/24', '10.122.124.0/24'],
+        'destination': ['10.121.41.0/24', '10.122.124.0/24'],
+        'enabled': False,
+        'wait': True,
+        'ports': ['any'],
+        'state': 'present'
+    }
+    res = firewall_pol._ensure_firewall_policy_is_present('wfad', 'uc1', firewall_dict)
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
