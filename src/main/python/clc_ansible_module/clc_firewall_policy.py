@@ -298,10 +298,10 @@ class ClcFirewallPolicy():
                 'POST', '/v2-experimental/firewallPolicies/%s/%s' %
                 (source_account_alias, location), payload)
             ClcFirewallPolicy._push_metric(ClcFirewallPolicy.STATS_FIREWALL_CREATE, 1)
-        except:
+        except self.clc.APIFailedResponse as e:
             return self.module.fail_json(
-                msg="Failed to properly create new firewall policy in %s account in the %s datacenter" %
-                (source_account_alias, location))
+                msg="Unable to successfully create firewall policy. %s" %
+                    str(e.response_text))
         return response
 
     def _delete_firewall_policy(
@@ -321,10 +321,10 @@ class ClcFirewallPolicy():
                 'DELETE', '/v2-experimental/firewallPolicies/%s/%s/%s' %
                 (source_account_alias, location, firewall_policy_id))
             ClcFirewallPolicy._push_metric(ClcFirewallPolicy.STATS_FIREWALL_DELETE, 1)
-        except:
+        except self.clc.APIFailedResponse as e:
             return self.module.fail_json(
-                msg="Failed to properly delete firewall policy %s in account alias %s in the %s datacenter" %
-                (firewall_policy_id, source_account_alias, location))
+                msg="Unable to successfully delete firewall policy. %s" %
+                    str(e.response_text))
         return response
 
     def _ensure_firewall_policy_is_present(
@@ -395,7 +395,7 @@ class ClcFirewallPolicy():
             changed = True
         return changed, firewall_policy_id, response
 
-    def _get_firewall_policy(
+    def _get_firewall_policy_id(
             self,
             source_account_alias,
             location,
