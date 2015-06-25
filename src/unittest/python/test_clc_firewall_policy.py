@@ -69,13 +69,10 @@ class TestClcFirewallPolicy(unittest.TestCase):
             'destination': '12345',
             'ports': 'any'
         }
-        mock_clc_sdk.APIFailedResponse.return_value = 'test_exception'
+        mock_clc_sdk.v2.API.Call.side_effect = OSError('Failed')
         test_firewall_policy = ClcFirewallPolicy(self.module)
-        test_firewall_policy._create_firewall_policy(
-            source_account_alias,
-            location,
-            payload)
-        self.assertTrue(self.module.fail_json.called)
+
+        self.assertRaises(OSError, test_firewall_policy._create_firewall_policy, source_account_alias, location, payload)
 
     @patch.object(clc_firewall_policy, 'clc_sdk')
     def test_create_firewall_policy_pass(self, mock_clc_sdk):
@@ -101,14 +98,12 @@ class TestClcFirewallPolicy(unittest.TestCase):
     def test_delete_firewall_policy_fail(self, mock_clc_sdk):
         source_account_alias = 'WFAD'
         location = 'wa1'
-        firewall_policy = 'this_is_not_a_real_policy'
+        firewall_policy_id = 'this_is_not_a_real_policy'
 
+        mock_clc_sdk.v2.API.Call.side_effect = OSError('Failed')
         test_firewall_policy = ClcFirewallPolicy(self.module)
-        test_firewall_policy._delete_firewall_policy(
-            source_account_alias,
-            location,
-            firewall_policy)
-        self.assertTrue(self.module.fail_json.called)
+
+        self.assertRaises(OSError, test_firewall_policy._delete_firewall_policy, source_account_alias, location, firewall_policy_id)
 
     @patch.object(clc_firewall_policy, 'clc_sdk')
     def test_delete_firewall_policy_pass(self, mock_clc_sdk):
@@ -186,10 +181,11 @@ class TestClcFirewallPolicy(unittest.TestCase):
             'firewall_policy_id': 'this_is_not_a_real_policy'
         }
         self.module.check_mode = False
+
+        mock_clc_sdk.v2.API.Call.side_effect = OSError('Failed')
         test_firewall_policy = ClcFirewallPolicy(self.module)
-        changed, policy, response = test_firewall_policy._ensure_firewall_policy_is_present(
-            source_account_alias, location, payload)
-        self.assertTrue(self.module.fail_json.called)
+
+        self.assertRaises(OSError, test_firewall_policy._ensure_firewall_policy_is_present, source_account_alias, location, payload)
 
     @mock.patch.object(ClcFirewallPolicy, '_create_firewall_policy')
     @mock.patch.object(ClcFirewallPolicy, '_get_policy_id_from_response')
