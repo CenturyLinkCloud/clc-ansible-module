@@ -12,7 +12,7 @@ from mock import create_autospec
 import unittest
 
 
-class TestClcFirewallPolicyPolicy(unittest.TestCase):
+class TestClcFirewallPolicy(unittest.TestCase):
 
     def setUp(self):
         self.clc = mock.MagicMock()
@@ -234,13 +234,13 @@ class TestClcFirewallPolicyPolicy(unittest.TestCase):
             'firewall_policy': 'this_is_not_a_real_policy'
         }
         self.module.check_mode = False
-        test_firewall_policy = ClcFirewallPolicyPolicy(self.module)
+        test_firewall_policy = ClcFirewallPolicy(self.module)
         changed, policy, response = test_firewall_policy._ensure_firewall_policy_is_present(
             source_account_alias, location, payload)
         self.assertTrue(self.module.fail_json.called)
 
-    @mock.patch.object(ClcFirewallPolicyPolicy, '_create_firewall_policy')
-    @mock.patch.object(ClcFirewallPolicyPolicy, '_get_policy_id_from_response')
+    @mock.patch.object(ClcFirewallPolicy, '_create_firewall_policy')
+    @mock.patch.object(ClcFirewallPolicy, '_get_policy_id_from_response')
     def test_ensure_firewall_policy_present_pass(
             self,
             mock_get_policy_id_from_response,
@@ -254,7 +254,7 @@ class TestClcFirewallPolicyPolicy(unittest.TestCase):
         mock_create_firewall_policy.return_value = mock_firewall_response
 
         self.module.check_mode = False
-        test_firewall = ClcFirewallPolicyPolicy(self.module)
+        test_firewall = ClcFirewallPolicy(self.module)
 
         changed, policy_id, response = test_firewall._ensure_firewall_policy_is_present(
             source_account_alias, location, firewall_dict)
@@ -284,7 +284,7 @@ class TestClcFirewallPolicyPolicy(unittest.TestCase):
             'firewall_policy': test_firewall_policy
         }
         self.module.check_mode = False
-        test_firewall = ClcFirewallPolicyPolicy(self.module)
+        test_firewall = ClcFirewallPolicy(self.module)
         changed, policy_id, response = test_firewall._ensure_firewall_policy_is_present(
             source_account_alias, location, firewall_dict)
         self.assertFalse(self.module.fail_json.called)
@@ -305,7 +305,7 @@ class TestClcFirewallPolicyPolicy(unittest.TestCase):
                         "GET",
                         "PUT",
                         "DELETE"]}]}
-        test_firewall = ClcFirewallPolicyPolicy(self.module)
+        test_firewall = ClcFirewallPolicy(self.module)
         policy_id = test_firewall._get_policy_id_from_response(test_response)
         self.assertEqual(policy_id, test_policy_id)
 
