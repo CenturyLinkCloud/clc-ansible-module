@@ -550,7 +550,7 @@ Create/Delete a loadbalancer
 | `status` | N | enabled | enabled, disabled | The status of your loadbalancer |
 | `state` | N | present | present, absent, port_absent, nodes_present, nodes_absent | Determine whether to create or delete your loadbalancer. If `present` module will not create another loadbalancer with the same name. If `absent` module will delete the entire loadbalancer. If `port_absent` module will delete the loadbalancer port and associated nodes only. If `nodes_present` module will ensure the provided nodes are added to the load balancer pool. If `nodes_absent` module will ensure the provided nodes are removed from the load balancer pool.|
 
-## clc_firewall Module
+## clc_firewall_policy Module
 Create/Delete a Firewall Policy
 
 ### Example Playbook
@@ -563,8 +563,7 @@ Create/Delete a Firewall Policy
   connection: local
   tasks:
     - name: Create / Verify an Firewall Policy at CenturyLink Cloud
-      clc_firewall:
-        name: 'Test Firewall'
+      clc_firewall_policy:
         source_account_alias: WFAD
         location: VA1
         state: present
@@ -581,30 +580,27 @@ Create/Delete a Firewall Policy
   connection: local
   tasks:
     - name: Delete an Firewall Policy at CenturyLink Cloud
-      clc_firewall:
-        name: 'Test Firewall'
+      clc_firewall_policy:
         source_account_alias: WFAD
         location: VA1
         state: present
-        firewall_policy: c62105233d7a4231bd2e91b9c791eaae
+        firewall_policy_id: c62105233d7a4231bd2e91b9c791eaae
 ```
 
 ### Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
-| `name:` | N |  |  | The name of the firewall policy |
-| `description` | N |  |  | A description of the firewall policy |
 | `location` | Y |  |  | Target datacenter for the firewall policy |
 | `ports` | N |  | any, icmp, TCP/123, UDP/123, TCP/123-456, UDP/123-456'| types of ports associated with the policy. TCP & UDP can take in single ports or port ranges. |
 | `source` | For Create |  |  | Source addresses for traffic on the originating firewall |
 | `destination` | For Create |  |  | Destination addresses for traffic on the terminating firewall |
 | `source_account_alias` | Y |  |  | CLC alias for the source account |
 | `destination_account_alias` | N |  |  | CLC alias for the destination account |
-| `firewall_policy` | N |  |  | Id of the firewall policy |
+| `firewall_policy_id` | N |  |  | Id of the firewall policy |
 | `wait` | N |  True  |  True, False | Whether to wait for the provisioning tasks to finish before returning. |
 | `state` | Y | present | present, absent | Whether to create or delete the firewall policy
-| `enabled` | F| true | true, false | If the firewall policy is enabled or disabled
+| `enabled` | N | True | True, False | If the firewall policy is enabled or disabled
 
 
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script

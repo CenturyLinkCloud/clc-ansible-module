@@ -108,7 +108,6 @@ EXAMPLES = '''
   tasks:
     - name: Create / Verify an Firewall Policy at CenturyLink Cloud
       clc_firewall:
-        name: 'Test Firewall'
         source_account_alias: WFAD
         location: VA1
         state: present
@@ -125,7 +124,6 @@ EXAMPLES = '''
   tasks:
     - name: Delete an Firewall Policy at CenturyLink Cloud
       clc_firewall:
-        name: 'Test Firewall'
         source_account_alias: WFAD
         location: VA1
         state: present
