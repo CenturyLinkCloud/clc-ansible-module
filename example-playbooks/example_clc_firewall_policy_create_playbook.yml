@@ -1,0 +1,20 @@
+---
+- name: Create firewall Policy
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create a Firewall Policy at CenturyLink Cloud
+      clc_firewall_policy:
+        source_account_alias: 'wfad'
+        destination_account_alias: 'wfad'
+        location: uc1
+        source: ['10.121.41.0/24', '10.122.124.0/24']
+        destination: ['10.121.41.0/24', '10.122.124.0/24']
+        ports: ['any']
+        wait: True
+        state: present
+      register: clc
+
+    - name: debug
+      debug: var=clc

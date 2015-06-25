@@ -312,6 +312,8 @@ class ClcFirewallPolicy():
         else:
             get_before_response, success = self._get_firewall_policy(
                 source_account_alias, location, firewall_policy_id)
+            if not success:
+                return self.module.fail_json(msg='Unable to find the firewall policy id : %s' %firewall_policy_id)
             changed = self._compare_get_request_with_dict(
                 get_before_response,
                 firewall_dict)
@@ -460,6 +462,8 @@ class ClcFirewallPolicy():
         request_dest_account_alias = firewall_dict.get(
             'destination_account_alias')
         request_enabled = firewall_dict.get('enabled')
+        if not request_enabled:
+            request_enabled = True
         request_source = firewall_dict.get('source')
         request_dest = firewall_dict.get('destination')
         request_ports = firewall_dict.get('ports')
@@ -579,12 +583,11 @@ def main_test():
     firewall_pol = ClcFirewallPolicy(module)
     firewall_pol._set_clc_credentials_from_env()
     firewall_dict = {
-        'firewall_policy_id': '16f7f71065154adb91570bdbfbf3f5da',
+        'firewall_policy_id': '61a18d1e3498408d8d20a486c1a47178',
         'source_account_alias': 'wfad',
         'destination_account_alias': 'wfad',
         'source': ['10.121.41.0/24', '10.122.124.0/24'],
         'destination': ['10.121.41.0/24', '10.122.124.0/24'],
-        'enabled': False,
         'wait': True,
         'ports': ['any'],
         'state': 'present'
