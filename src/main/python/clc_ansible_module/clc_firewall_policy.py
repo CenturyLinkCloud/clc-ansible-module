@@ -316,7 +316,9 @@ class ClcFirewallPolicy():
             get_before_response, success = self._get_firewall_policy(
                 source_account_alias, location, firewall_policy_id)
             if not success:
-                return self.module.fail_json(msg='Unable to find the firewall policy id : %s' %firewall_policy_id)
+                return self.module.fail_json(
+                    msg='Unable to find the firewall policy id : %s' %
+                    firewall_policy_id)
             changed = self._compare_get_request_with_dict(
                 get_before_response,
                 firewall_dict)
@@ -471,11 +473,12 @@ class ClcFirewallPolicy():
         request_dest = firewall_dict.get('destination')
         request_ports = firewall_dict.get('ports')
 
-        if (response_dest_account_alias and str(response_dest_account_alias) != str(request_dest_account_alias)) or \
-            (response_enabled != request_enabled) or \
-            (response_source and response_source != request_source) or \
-            (response_dest and response_dest != request_dest) or\
-            (response_ports and response_ports != request_ports):
+        if (
+            response_dest_account_alias and str(response_dest_account_alias) != str(request_dest_account_alias)) or (
+            response_enabled != request_enabled) or (
+            response_source and response_source != request_source) or (
+                response_dest and response_dest != request_dest) or (
+                    response_ports and response_ports != request_ports):
             changed = True
         return changed
 
