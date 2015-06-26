@@ -472,12 +472,13 @@ class TestClcFirewallPolicy(unittest.TestCase):
         response_dict = {
             'firewall_policy_id': '61a18d1e3498408d8d20a486c1a47178',
             'source_account_alias': 'wfad',
-            'destination_account_alias': 'wfad',
+            'destinationAccount': 'wfad',
             'source': ['10.121.41.0/24', '10.122.124.0/24'],
             'destination': ['10.121.41.0/24', '10.122.124.0/24'],
             'wait': True,
             'ports': ['any'],
-            'state': 'present'
+            'state': 'present',
+            'enabled': True
         }
         # Test
         under_test = ClcFirewallPolicy(self.module)
@@ -509,12 +510,13 @@ class TestClcFirewallPolicy(unittest.TestCase):
         response_dict = {
             'firewall_policy_id': '61a18d1e3498408d8d20a486c1a47178',
             'source_account_alias': 'wfad',
-            'destination_account_alias': 'wfad',
+            'destinationAccount': 'wfad',
             'source': ['10.121.41.0/22', '10.122.124.0/24'],
             'destination': ['10.121.41.0/24', '10.122.124.0/24'],
             'wait': True,
             'ports': ['any'],
-            'state': 'present'
+            'state': 'present',
+            'enabled': True
         }
         # Test
         under_test = ClcFirewallPolicy(self.module)
@@ -546,18 +548,133 @@ class TestClcFirewallPolicy(unittest.TestCase):
         response_dict = {
             'firewall_policy_id': '61a18d1e3498408d8d20a486c1a47178',
             'source_account_alias': 'wfad',
-            'destination_account_alias': 'wfad',
+            'destinationAccount': 'wfad',
             'source': ['10.121.41.0/24', '10.122.124.0/24'],
             'destination': ['10.121.41.0/22', '10.122.124.0/24'],
             'wait': True,
             'ports': ['any'],
-            'state': 'present'
+            'state': 'present',
+            'enabled': True
         }
         # Test
         under_test = ClcFirewallPolicy(self.module)
         res = under_test._compare_get_request_with_dict(response_dict, firewall_dict)
         self.assertEqual(res, True)
 
+    def test_compare_get_request_with_dict_true_ports(self):
+        under_test = ClcFirewallPolicy
+        # Setup Test
+        self.module.params = {
+            'state': 'invalid',
+            'location': 'test',
+            'source': ['1','2'],
+            'destination': ['1','2'],
+            'source_account_alias': 'alias',
+            'destination_account_alias': 'alias',
+            'wait': True
+        }
+        firewall_dict = {
+            'firewall_policy_id': '61a18d1e3498408d8d20a486c1a47178',
+            'source_account_alias': 'wfad',
+            'destination_account_alias': 'wfad',
+            'source': ['10.121.41.0/24', '10.122.124.0/24'],
+            'destination': ['10.121.41.0/24', '10.122.124.0/24'],
+            'wait': True,
+            'ports': ['any'],
+            'state': 'present'
+        }
+        response_dict = {
+            'firewall_policy_id': '61a18d1e3498408d8d20a486c1a47178',
+            'source_account_alias': 'wfad',
+            'destinationAccount': 'wfad',
+            'source': ['10.121.41.0/24', '10.122.124.0/24'],
+            'destination': ['10.121.41.0/24', '10.122.124.0/24'],
+            'wait': True,
+            'ports': ['none'],
+            'state': 'present',
+            'enabled': True
+        }
+        # Test
+        under_test = ClcFirewallPolicy(self.module)
+        res = under_test._compare_get_request_with_dict(response_dict, firewall_dict)
+        self.assertEqual(res, True)
+
+    def test_compare_get_request_with_dict_true_acct_alias(self):
+        under_test = ClcFirewallPolicy
+        # Setup Test
+        self.module.params = {
+            'state': 'invalid',
+            'location': 'test',
+            'source': ['1','2'],
+            'destination': ['1','2'],
+            'source_account_alias': 'alias',
+            'destination_account_alias': 'alias',
+            'wait': True
+        }
+        firewall_dict = {
+            'firewall_policy_id': '61a18d1e3498408d8d20a486c1a47178',
+            'source_account_alias': 'wfad',
+            'destination_account_alias': 'wfad',
+            'source': ['10.121.41.0/24', '10.122.124.0/24'],
+            'destination': ['10.121.41.0/24', '10.122.124.0/24'],
+            'wait': True,
+            'ports': ['any'],
+            'state': 'present'
+        }
+        response_dict = {
+            'firewall_policy_id': '61a18d1e3498408d8d20a486c1a47178',
+            'source_account_alias': 'wfad',
+            'destinationAccount': 'nothing',
+            'source': ['10.121.41.0/24', '10.122.124.0/24'],
+            'destination': ['10.121.41.0/24', '10.122.124.0/24'],
+            'wait': True,
+            'ports': ['any'],
+            'state': 'present',
+            'enabled': True
+        }
+        # Test
+        under_test = ClcFirewallPolicy(self.module)
+        res = under_test._compare_get_request_with_dict(response_dict, firewall_dict)
+        self.assertEqual(res, True)
+
+    def test_compare_get_request_with_dict_true_enabled(self):
+        under_test = ClcFirewallPolicy
+        # Setup Test
+        self.module.params = {
+            'state': 'invalid',
+            'location': 'test',
+            'source': ['1','2'],
+            'destination': ['1','2'],
+            'source_account_alias': 'alias',
+            'destination_account_alias': 'alias',
+            'wait': True
+        }
+        firewall_dict = {
+            'firewall_policy_id': '61a18d1e3498408d8d20a486c1a47178',
+            'source_account_alias': 'wfad',
+            'destination_account_alias': 'wfad',
+            'source': ['10.121.41.0/24', '10.122.124.0/24'],
+            'destination': ['10.121.41.0/24', '10.122.124.0/24'],
+            'wait': True,
+            'ports': ['any'],
+            'state': 'present',
+            'enabled': True
+        }
+        response_dict = {
+            'firewall_policy_id': '61a18d1e3498408d8d20a486c1a47178',
+            'sourceAccount': 'wfad',
+            'destinationAccount': 'wfad',
+            'source': ['10.121.41.0/24', '10.122.124.0/24'],
+            'destination': ['10.121.41.0/24', '10.122.124.0/24'],
+            'wait': True,
+            'ports': ['any'],
+            'state': 'present',
+            'enabled': False
+        }
+        # Test
+        under_test = ClcFirewallPolicy(self.module)
+        res = under_test._compare_get_request_with_dict(response_dict, firewall_dict)
+        self.assertEqual(res, True)
 
 if __name__ == '__main__':
     unittest.main()

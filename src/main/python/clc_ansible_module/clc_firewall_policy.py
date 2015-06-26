@@ -468,28 +468,23 @@ class ClcFirewallPolicy():
         request_dest = firewall_dict.get('destination')
         request_ports = firewall_dict.get('ports')
 
-        if response_dest_account_alias is not None:
-            if str(response_dest_account_alias) != str(request_dest_account_alias):
+        if response_dest_account_alias and str(response_dest_account_alias) != str(request_dest_account_alias):
                 changed = True
                 return changed
 
-        if response_enabled is not None:
-            if response_enabled != request_enabled:
+        if response_enabled != request_enabled:
                 changed = True
                 return changed
 
-        if response_source is not None:
-            if response_source != request_source:
+        if response_source and response_source != request_source:
                 changed = True
                 return changed
 
-        if response_dest is not None:
-            if response_dest != request_dest:
+        if response_dest and response_dest != request_dest:
                 changed = True
                 return changed
 
-        if response_ports is not None:
-            if response_ports != request_ports:
+        if response_ports and response_ports != request_ports:
                 changed = True
                 return changed
 
@@ -576,23 +571,6 @@ def main():
 
     clc_firewall = ClcFirewallPolicy(module)
     clc_firewall.process_request()
-
-def main_test():
-    module = ClcFirewallPolicy(None)
-    module.check_mode = False
-    firewall_pol = ClcFirewallPolicy(module)
-    firewall_pol._set_clc_credentials_from_env()
-    firewall_dict = {
-        'firewall_policy_id': '61a18d1e3498408d8d20a486c1a47178',
-        'source_account_alias': 'wfad',
-        'destination_account_alias': 'wfad',
-        'source': ['10.121.41.0/24', '10.122.124.0/24'],
-        'destination': ['10.121.41.0/24', '10.122.124.0/24'],
-        'wait': True,
-        'ports': ['any'],
-        'state': 'present'
-    }
-    res = firewall_pol._ensure_firewall_policy_is_present('wfad', 'uc1', firewall_dict)
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
