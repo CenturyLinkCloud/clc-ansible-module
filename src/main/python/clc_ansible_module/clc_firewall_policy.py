@@ -462,7 +462,7 @@ class ClcFirewallPolicy():
         request_dest_account_alias = firewall_dict.get(
             'destination_account_alias')
         request_enabled = firewall_dict.get('enabled')
-        if not request_enabled:
+        if request_enabled is None:
             request_enabled = True
         request_source = firewall_dict.get('source')
         request_dest = firewall_dict.get('destination')
