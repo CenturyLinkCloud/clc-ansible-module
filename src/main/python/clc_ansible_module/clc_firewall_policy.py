@@ -236,7 +236,8 @@ class ClcFirewallPolicy():
             changed=changed,
             firewall_policy_id=firewall_policy_id)
 
-    def _get_policy_id_from_response(self, response):
+    @staticmethod
+    def _get_policy_id_from_response(response):
         """
         Method to parse out the policy id from creation response
         :param response: response from firewall creation control
@@ -317,18 +318,17 @@ class ClcFirewallPolicy():
             changed = self._compare_get_request_with_dict(
                 get_before_response,
                 firewall_dict)
-            if not self.module.check_mode:
-                if changed:
-                    response = self._update_firewall_policy(
-                        source_account_alias,
-                        location,
-                        firewall_policy_id,
-                        firewall_dict)
-                    self._wait_for_requests_to_complete(
-                        firewall_dict.get('wait'),
-                        source_account_alias,
-                        location,
-                        firewall_policy_id)
+            if not self.module.check_mode and changed:
+                response = self._update_firewall_policy(
+                    source_account_alias,
+                    location,
+                    firewall_policy_id,
+                    firewall_dict)
+                self._wait_for_requests_to_complete(
+                    firewall_dict.get('wait'),
+                    source_account_alias,
+                    location,
+                    firewall_policy_id)
         return changed, firewall_policy_id, response
 
     def _ensure_firewall_policy_is_absent(
@@ -443,7 +443,8 @@ class ClcFirewallPolicy():
                     str(e.response_text))
         return response
 
-    def _compare_get_request_with_dict(self, response, firewall_dict):
+    @staticmethod
+    def _compare_get_request_with_dict(response, firewall_dict):
         """
         Helper method to compare the json response for getting the firewall policy with the request parameters
         :param response: response from the get method
@@ -468,26 +469,12 @@ class ClcFirewallPolicy():
         request_dest = firewall_dict.get('destination')
         request_ports = firewall_dict.get('ports')
 
-        if response_dest_account_alias and str(response_dest_account_alias) != str(request_dest_account_alias):
-                changed = True
-                return changed
-
-        if response_enabled != request_enabled:
-                changed = True
-                return changed
-
-        if response_source and response_source != request_source:
-                changed = True
-                return changed
-
-        if response_dest and response_dest != request_dest:
-                changed = True
-                return changed
-
-        if response_ports and response_ports != request_ports:
-                changed = True
-                return changed
-
+        if (response_dest_account_alias and str(response_dest_account_alias) != str(request_dest_account_alias)) or \
+            (response_enabled != request_enabled) or \
+            (response_source and response_source != request_source) or \
+            (response_dest and response_dest != request_dest) or\
+            (response_ports and response_ports != request_ports):
+            changed = True
         return changed
 
     def _get_firewall_policy(
