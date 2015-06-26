@@ -676,5 +676,12 @@ class TestClcFirewallPolicy(unittest.TestCase):
         res = under_test._compare_get_request_with_dict(response_dict, firewall_dict)
         self.assertEqual(res, True)
 
+    @patch.object(clc_firewall_policy, 'clc_sdk')
+    def test_set_user_agent(self, mock_clc_sdk):
+        clc_firewall_policy.__version__ = "1"
+        ClcFirewallPolicy._set_user_agent(mock_clc_sdk)
+
+        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
+
 if __name__ == '__main__':
     unittest.main()
