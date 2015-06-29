@@ -114,12 +114,6 @@ class ClcAntiAffinityPolicy():
     clc = clc_sdk
     module = None
 
-    STATSD_HOST = '64.94.114.218'
-    STATSD_PORT = 2003
-    STATS_AAPOLICY_CREATE = 'stats_counts.wfaas.clc.ansible.aapolicy.create'
-    STATS_AAPOLICY_DELETE = 'stats_counts.wfaas.clc.ansible.aapolicy.delete'
-    SOCKET_CONNECTION_TIMEOUT = 3
-
     def __init__(self, module):
         """
         Construct module
@@ -223,9 +217,6 @@ class ClcAntiAffinityPolicy():
         :param p: datacenter to create policy in
         :return: response dictionary from the CLC API.
         """
-        ClcAntiAffinityPolicy._push_metric(
-            ClcAntiAffinityPolicy.STATS_AAPOLICY_CREATE,
-            1)
         return self.clc.v2.AntiAffinity.Create(
             name=p['name'],
             location=p['location'])
@@ -238,9 +229,6 @@ class ClcAntiAffinityPolicy():
         """
         policy = self.policy_dict[p['name']]
         policy.Delete()
-        ClcAntiAffinityPolicy._push_metric(
-            ClcAntiAffinityPolicy.STATS_AAPOLICY_DELETE,
-            1)
 
     def _policy_exists(self, policy_name):
         """
@@ -280,29 +268,6 @@ class ClcAntiAffinityPolicy():
             if not self.module.check_mode:
                 policy = self._create_policy(p)
         return changed, policy
-
-    @staticmethod
-    def _push_metric(path, count):
-        """
-        Sends the usage metric to statsd
-        :param path: The metric path
-        :param count: The number of ticks to record to the metric
-        :return None
-        """
-        try:
-            sock = socket.socket()
-            sock.settimeout(ClcAntiAffinityPolicy.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect(
-                (ClcAntiAffinityPolicy.STATSD_HOST,
-                 ClcAntiAffinityPolicy.STATSD_PORT))
-            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
-            sock.close()
-        except socket.gaierror:
-            # do nothing, ignore and move forward
-            error = ''
-        except socket.error:
-            # nothing, ignore and move forward
-            error = ''
 
     @staticmethod
     def _set_user_agent(clc):

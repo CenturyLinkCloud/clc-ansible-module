@@ -152,12 +152,6 @@ class ClcFirewallPolicy():
 
     clc = None
 
-    STATSD_HOST = '64.94.114.218'
-    STATSD_PORT = 2003
-    STATS_FIREWALL_CREATE = 'stats_counts.wfaas.clc.ansible.firewall.create'
-    STATS_FIREWALL_DELETE = 'stats_counts.wfaas.clc.ansible.firewall.delete'
-    SOCKET_CONNECTION_TIMEOUT = 3
-
     def __init__(self, module):
         """
         Construct module
@@ -385,9 +379,6 @@ class ClcFirewallPolicy():
             response = self.clc.v2.API.Call(
                 'POST', '/v2-experimental/firewallPolicies/%s/%s' %
                         (source_account_alias, location), payload)
-            ClcFirewallPolicy._push_metric(
-                ClcFirewallPolicy.STATS_FIREWALL_CREATE,
-                1)
         except self.clc.APIFailedResponse as e:
             return self.module.fail_json(
                 msg="Unable to successfully create firewall policy. %s" %
@@ -410,9 +401,6 @@ class ClcFirewallPolicy():
             response = self.clc.v2.API.Call(
                 'DELETE', '/v2-experimental/firewallPolicies/%s/%s/%s' %
                           (source_account_alias, location, firewall_policy_id))
-            ClcFirewallPolicy._push_metric(
-                ClcFirewallPolicy.STATS_FIREWALL_DELETE,
-                1)
         except self.clc.APIFailedResponse as e:
             return self.module.fail_json(
                 msg="Unable to successfully delete firewall policy. %s" %
@@ -527,29 +515,6 @@ class ClcFirewallPolicy():
                     location,
                     firewall_policy_id)
             return None
-
-    @staticmethod
-    def _push_metric(path, count):
-        """
-        Sends the usage metric to statsd
-        :param path: The metric path
-        :param count: The number of ticks to record to the metric
-        :return None
-        """
-        try:
-            sock = socket.socket()
-            sock.settimeout(ClcFirewallPolicy.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect(
-                (ClcFirewallPolicy.STATSD_HOST,
-                 ClcFirewallPolicy.STATSD_PORT))
-            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
-            sock.close()
-        except socket.gaierror:
-            # do nothing, ignore and move forward
-            error = ''
-        except socket.error:
-            # nothing, ignore and move forward
-            error = ''
 
     @staticmethod
     def _set_user_agent(clc):

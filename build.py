@@ -57,30 +57,3 @@ def initialize( project ):
 	# project.get_property('copy_resources_glob').append('**/example-playbooks/__init__.py')
 	# project.include_file('clc-ansible-module-0.0.4','deploy-servers-to-maint-grp-size.yml')
 	# ----------------
-
-@before('publish')
-def write_register_action( project ):
-	STATSD_HOST = '64.94.114.218'
-	STATSD_PORT = '2003'
-	STATS_PKG_INSTALL = 'stats_counts.wfaas.clc.ansible.install'	
-	f = open('%s/setup.py' % project.expand_path("$dir_dist"),'a')
-	f.write("    # ------ ctl.io -----\n" )
-	f.write("    \"\"\"\n" )
-	f.write("    Custom enhancement to register each installation attempt\n" )
-	f.write("    \"\"\"\n" )
-	f.write("    import time\n" )
-	f.write("    from socket import *\n" )
-	f.write("    setdefaulttimeout(3)\n" )
-	f.write("    try:\n")
-	f.write("        s = socket()\n")
-	f.write("        s.connect(('" + STATSD_HOST + "'," + STATSD_PORT + "))\n")
-	f.write("        s.sendall('%s %s %d\\n' %('" + STATS_PKG_INSTALL + "', 1, int(time.time())))\n")
-	f.write("        s.close()\n")
-	f.write("    except gaierror as ge:\n")
-	f.write("        print( ge )\n")
-	f.write("    except error as e:\n")
-	f.write("        print( e )\n")
-	f.write("    # ------ ctl.io -----\n" )
-	f.close()
-	pass
-

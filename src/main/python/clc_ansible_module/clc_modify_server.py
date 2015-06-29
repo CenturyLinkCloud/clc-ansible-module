@@ -132,11 +132,6 @@ else:
 class ClcModifyServer():
     clc = clc_sdk
 
-    STATSD_HOST = '64.94.114.218'
-    STATSD_PORT = 2003
-    STATS_SERVER_MODIFY = 'stats_counts.wfaas.clc.ansible.server.modify'
-    SOCKET_CONNECTION_TIMEOUT = 3
-
     def __init__(self, module):
         """
         Construct module
@@ -379,10 +374,6 @@ class ClcModifyServer():
                                                    "member": "cpu",
                                                    "value": cpu}]))
             result = clc.v2.Requests(job_obj)
-            # Push the server modify count metric to statsd
-            ClcModifyServer._push_metric(
-                ClcModifyServer.STATS_SERVER_MODIFY,
-                1)
         return result
 
     @staticmethod
@@ -429,11 +420,6 @@ class ClcModifyServer():
                 server.id,
                 aa_policy_id)
             changed = True
-
-            # Push the server modify count metric to statsd
-            ClcModifyServer._push_metric(
-                ClcModifyServer.STATS_SERVER_MODIFY,
-                1)
         return changed, result
 
     @staticmethod
@@ -503,29 +489,6 @@ class ClcModifyServer():
             if e.response_status_code != 404:
                 raise e
         return aa_policy_id
-
-    @staticmethod
-    def _push_metric(path, count):
-        """
-        Sends the usage metric to statsd
-        :param path: The metric path
-        :param count: The number of ticks to record to the metric
-        :return None
-        """
-        try:
-            sock = socket.socket()
-            sock.settimeout(ClcModifyServer.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect(
-                (ClcModifyServer.STATSD_HOST,
-                 ClcModifyServer.STATSD_PORT))
-            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
-            sock.close()
-        except socket.gaierror:
-            # do nothing, ignore and move forward
-            error = ''
-        except socket.error:
-            # nothing, ignore and move forward
-            error = ''
 
     @staticmethod
     def _set_user_agent(clc):

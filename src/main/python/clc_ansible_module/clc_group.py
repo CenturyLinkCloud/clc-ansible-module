@@ -116,12 +116,6 @@ class ClcGroup(object):
     clc = None
     root_group = None
 
-    STATSD_HOST = '64.94.114.218'
-    STATSD_PORT = 2003
-    STATS_GROUP_CREATE = 'stats_counts.wfaas.clc.ansible.group.create'
-    STATS_GROUP_DELETE = 'stats_counts.wfaas.clc.ansible.group.delete'
-    SOCKET_CONNECTION_TIMEOUT = 3
-
     def __init__(self, module):
         """
         Construct module
@@ -244,7 +238,6 @@ class ClcGroup(object):
         """
         group, parent = self.group_dict.get(group_name)
         response = group.Delete()
-        ClcGroup._push_metric(ClcGroup.STATS_GROUP_DELETE, 1)
         return response
 
     def _ensure_group_is_present(
@@ -303,7 +296,6 @@ class ClcGroup(object):
         """
 
         (parent, grandparent) = self.group_dict[parent]
-        ClcGroup._push_metric(ClcGroup.STATS_GROUP_CREATE, 1)
         return parent.Create(name=group, description=description)
 
     #
@@ -353,27 +345,6 @@ class ClcGroup(object):
 
                 result.update(self._walk_groups_recursive(child_group, group))
         return result
-
-    @staticmethod
-    def _push_metric(path, count):
-        """
-        Sends the usage metric to statsd
-        :param path: The metric path
-        :param count: The number of ticks to record to the metric
-        :return None
-        """
-        try:
-            sock = socket.socket()
-            sock.settimeout(ClcGroup.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect((ClcGroup.STATSD_HOST, ClcGroup.STATSD_PORT))
-            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
-            sock.close()
-        except socket.gaierror:
-            # do nothing, ignore and move forward
-            error = ''
-        except socket.error:
-            # nothing, ignore and move forward
-            error = ''
 
     @staticmethod
     def _set_user_agent(clc):

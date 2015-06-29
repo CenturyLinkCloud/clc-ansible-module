@@ -292,12 +292,6 @@ else:
 class ClcServer():
     clc = clc_sdk
 
-    STATSD_HOST = '64.94.114.218'
-    STATSD_PORT = 2003
-    STATS_SERVER_CREATE = 'stats_counts.wfaas.clc.ansible.server.create'
-    STATS_SERVER_DELETE = 'stats_counts.wfaas.clc.ansible.server.delete'
-    SOCKET_CONNECTION_TIMEOUT = 3
-
     def __init__(self, module):
         """
         Construct module
@@ -909,9 +903,6 @@ class ClcServer():
         for server in servers:
             terminated_server_ids.append(server.id)
 
-        # Push the server delete count metric to statsd
-        ClcServer._push_metric(ClcServer.STATS_SERVER_DELETE, len(servers))
-
         return changed, server_dict_array, terminated_server_ids
 
     @staticmethod
@@ -1114,9 +1105,6 @@ class ClcServer():
 
         result = clc.v2.Requests(res)
 
-        # Push the server create count metric to statsd
-        ClcServer._push_metric(ClcServer.STATS_SERVER_CREATE, 1)
-
         #
         # Patch the Request object so that it returns a valid server
 
@@ -1206,27 +1194,6 @@ class ClcServer():
 
                 sleep(backout)
                 backout = backout * 2
-
-    @staticmethod
-    def _push_metric(path, count):
-        """
-        Sends the usage metric to statsd
-        :param path: The metric path
-        :param count: The number of ticks to record to the metric
-        :return None
-        """
-        try:
-            sock = socket.socket()
-            sock.settimeout(ClcServer.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect((ClcServer.STATSD_HOST, ClcServer.STATSD_PORT))
-            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
-            sock.close()
-        except socket.gaierror:
-            # do nothing, ignore and move forward
-            error = ''
-        except socket.error:
-            # nothing, ignore and move forward
-            error = ''
 
     @staticmethod
     def _set_user_agent(clc):

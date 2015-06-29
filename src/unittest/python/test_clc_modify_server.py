@@ -279,11 +279,6 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         mock_ClcModifyServer.assert_called_once_with(mock_AnsibleModule_instance)
         mock_ClcModifyServer_instance.process_request.assert_called_once
 
-    def test_push_metric(self):
-        ClcModifyServer.STATSD_HOST = '1.1.1.1'
-        ClcModifyServer._push_metric('dummy',0)
-        pass
-
     @patch.object(clc_modify_server, 'clc_sdk')
     def test_modify_clc_server_with_empty_server_id(self, mock_clc_sdk):
         # Test
