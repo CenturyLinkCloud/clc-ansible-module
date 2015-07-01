@@ -88,11 +88,6 @@ class ClcBlueprintPackage():
     clc = clc_sdk
     module = None
 
-    STATSD_HOST = '64.94.114.218'
-    STATSD_PORT = 2003
-    STATS_PACKAGE_DEPLOY = 'stats_counts.wfaas.clc.ansible.package.deploy'
-    SOCKET_CONNECTION_TIMEOUT = 3
-
     def __init__(self, module):
         """
         Construct module
@@ -187,7 +182,6 @@ class ClcBlueprintPackage():
             result = server.ExecutePackage(
                 package_id=package_id,
                 parameters=package_params)
-            ClcBlueprintPackage._push_metric(ClcBlueprintPackage.STATS_PACKAGE_DEPLOY, 1)
         return result
 
     def _wait_for_requests_to_complete(self, requests_lst):
@@ -243,27 +237,6 @@ class ClcBlueprintPackage():
             return self.module.fail_json(
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
-
-    @staticmethod
-    def _push_metric(path, count):
-        """
-        Sends the usage metric to statsd
-        :param path: The metric path
-        :param count: The number of ticks to record to the metric
-        :return None
-        """
-        try:
-            sock = socket.socket()
-            sock.settimeout(ClcBlueprintPackage.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect((ClcBlueprintPackage.STATSD_HOST, ClcBlueprintPackage.STATSD_PORT))
-            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
-            sock.close()
-        except socket.gaierror:
-            # do nothing, ignore and move forward
-            error = ''
-        except socket.error:
-            # nothing, ignore and move forward
-            error = ''
 
     @staticmethod
     def _set_user_agent(clc):

@@ -179,16 +179,6 @@ class ClcLoadBalancer():
 
     clc = None
 
-    STATSD_HOST = '64.94.114.218'
-    STATSD_PORT = 2003
-    STATS_LB_CREATE = 'stats_counts.wfaas.clc.ansible.loadbalancer.create'
-    STATS_LB_DELETE = 'stats_counts.wfaas.clc.ansible.loadbalancer.delete'
-    STATS_LB_MODIFY = 'stats_counts.wfaas.clc.ansible.loadbalancer.modify'
-    STATS_LBPOOL_CREATE = 'stats_counts.wfaas.clc.ansible.loadbalancer.pool.create'
-    STATS_LBPOOL_DELETE = 'stats_counts.wfaas.clc.ansible.loadbalancer.pool.delete'
-    STATS_LBPOOL_MODIFY = 'stats_counts.wfaas.clc.ansible.loadbalancer.pool.modify'
-    SOCKET_CONNECTION_TIMEOUT = 3
-
     def __init__(self, module):
         """
         Construct module
@@ -496,7 +486,6 @@ class ClcLoadBalancer():
         """
         result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (alias, location), json.dumps({"name":name,"description":description,"status":status}))
         sleep(1)
-        ClcLoadBalancer._push_metric(ClcLoadBalancer.STATS_LB_CREATE, 1);
         return result
 
     def create_loadbalancerpool(self, alias, location, lb_id, method, persistence, port):
@@ -511,7 +500,6 @@ class ClcLoadBalancer():
         :return: result: The result from the create API call
         """
         result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s/%s/pools' % (alias, location, lb_id), json.dumps({"port":port, "method":method, "persistence":persistence}))
-        ClcLoadBalancer._push_metric(ClcLoadBalancer.STATS_LBPOOL_CREATE, 1);
         return result
 
     def delete_loadbalancer(self,alias,location,name):
@@ -524,7 +512,6 @@ class ClcLoadBalancer():
         """
         lb_id = self._get_loadbalancer_id(name=name)
         result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, lb_id))
-        ClcLoadBalancer._push_metric(ClcLoadBalancer.STATS_LB_DELETE, 1);
         return result
 
     def delete_loadbalancerpool(self, alias, location, lb_id, pool_id):
@@ -537,7 +524,6 @@ class ClcLoadBalancer():
         :return: result: The result from the delete API call
         """
         result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s' % (alias, location, lb_id, pool_id))
-        ClcLoadBalancer._push_metric(ClcLoadBalancer.STATS_LBPOOL_DELETE, 1);
         return result
 
     def _get_loadbalancer_id(self, name):
@@ -629,7 +615,6 @@ class ClcLoadBalancer():
             result = self.clc.v2.API.Call('PUT',
                                           '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s/nodes'
                                           % (alias, location, lb_id, pool_id), json.dumps(nodes))
-            ClcLoadBalancer._push_metric(ClcLoadBalancer.STATS_LBPOOL_MODIFY, 1)
         return result
 
     def add_lbpool_nodes(self, alias, location, lb_id, pool_id, nodes_to_add):
@@ -749,27 +734,6 @@ class ClcLoadBalancer():
             return self.module.fail_json(
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
-
-    @staticmethod
-    def _push_metric(path, count):
-        """
-        Sends the usage metric to statsd
-        :param path: The metric path
-        :param count: The number of ticks to record to the metric
-        :return None
-        """
-        try:
-            sock = socket.socket()
-            sock.settimeout(ClcLoadBalancer.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect((ClcLoadBalancer.STATSD_HOST, ClcLoadBalancer.STATSD_PORT))
-            sock.sendall('%s %s %d\n' %(path, count, int(time.time())))
-            sock.close()
-        except socket.gaierror:
-            # do nothing, ignore and move forward
-            error = ''
-        except socket.error:
-            #nothing, ignore and move forward
-            error = ''
 
     @staticmethod
     def _set_user_agent(clc):

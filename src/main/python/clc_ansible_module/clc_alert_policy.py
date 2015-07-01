@@ -144,13 +144,6 @@ class ClcAlertPolicy():
     clc = clc_sdk
     module = None
 
-    STATSD_HOST = '64.94.114.218'
-    STATSD_PORT = 2003
-    STATS_ALERTPOLICY_CREATE = 'stats_counts.wfaas.clc.ansible.alertpolicy.create'
-    STATS_ALERTPOLICY_MODIFY = 'stats_counts.wfaas.clc.ansible.alertpolicy.modify'
-    STATS_ALERTPOLICY_DELETE = 'stats_counts.wfaas.clc.ansible.alertpolicy.delete'
-    SOCKET_CONNECTION_TIMEOUT = 3
-
     def __init__(self, module):
         """
         Construct module
@@ -364,9 +357,6 @@ class ClcAlertPolicy():
                 '/v2/alertPolicies/%s' %
                 (alias),
                 arguments)
-            ClcAlertPolicy._push_metric(
-                ClcAlertPolicy.STATS_ALERTPOLICY_CREATE,
-                1)
         except self.clc.APIFailedResponse as e:
             return self.module.fail_json(
                 msg='Unable to create alert policy. %s' % str(
@@ -406,9 +396,6 @@ class ClcAlertPolicy():
             result = self.clc.v2.API.Call(
                 'PUT', '/v2/alertPolicies/%s/%s' %
                 (alias, alert_policy_id), arguments)
-            ClcAlertPolicy._push_metric(
-                ClcAlertPolicy.STATS_ALERTPOLICY_MODIFY,
-                1)
         except self.clc.APIFailedResponse as e:
             return self.module.fail_json(
                 msg='Unable to update alert policy. %s' % str(
@@ -426,9 +413,6 @@ class ClcAlertPolicy():
             result = self.clc.v2.API.Call(
                 'DELETE', '/v2/alertPolicies/%s/%s' %
                 (alias, policy_id), None)
-            ClcAlertPolicy._push_metric(
-                ClcAlertPolicy.STATS_ALERTPOLICY_DELETE,
-                1)
         except self.clc.APIFailedResponse as e:
             return self.module.fail_json(
                 msg='Unable to delete alert policy. %s' % str(
@@ -464,29 +448,6 @@ class ClcAlertPolicy():
                         msg='mutiple alert policies were found with policy name : %s' %
                         (alert_policy_name))
         return alert_policy_id
-
-    @staticmethod
-    def _push_metric(path, count):
-        """
-        Sends the usage metric to statsd
-        :param path: The metric path
-        :param count: The number of ticks to record to the metric
-        :return None
-        """
-        try:
-            sock = socket.socket()
-            sock.settimeout(ClcAlertPolicy.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect(
-                (ClcAlertPolicy.STATSD_HOST,
-                 ClcAlertPolicy.STATSD_PORT))
-            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
-            sock.close()
-        except socket.gaierror:
-            # do nothing, ignore and move forward
-            error = ''
-        except socket.error:
-            # nothing, ignore and move forward
-            error = ''
 
     @staticmethod
     def _set_user_agent(clc):

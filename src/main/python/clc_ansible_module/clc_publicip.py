@@ -123,12 +123,6 @@ class ClcPublicIp(object):
     module = None
     group_dict = {}
 
-    STATSD_HOST = '64.94.114.218'
-    STATSD_PORT = 2003
-    STATS_PUBLICIP_CREATE = 'stats_counts.wfaas.clc.ansible.publicip.create'
-    STATS_PUBLICIP_DELETE = 'stats_counts.wfaas.clc.ansible.publicip.delete'
-    SOCKET_CONNECTION_TIMEOUT = 3
-
     def __init__(self, module):
         """
         Construct module
@@ -209,8 +203,6 @@ class ClcPublicIp(object):
             if not self.module.check_mode:
                 result = server.PublicIPs().Add(ports_to_expose)
                 results.append(result)
-                ClcPublicIp._push_metric(
-                    ClcPublicIp.STATS_PUBLICIP_CREATE, 1)
             changed_server_ids.append(server.id)
             changed = True
         return changed, changed_server_ids, results
@@ -242,8 +234,6 @@ class ClcPublicIp(object):
                 for ip in ips_to_delete:
                     result = ip.Delete()
                     results.append(result)
-                ClcPublicIp._push_metric(
-                    ClcPublicIp.STATS_PUBLICIP_DELETE, 1)
             changed_server_ids.append(server.id)
             changed = True
         return changed, changed_server_ids, results
@@ -299,24 +289,6 @@ class ClcPublicIp(object):
             return self.clc.v2.Servers(server_ids).servers
         except CLCException as exception:
             self.module.fail_json(msg=message + ': %s' % exception)
-
-    @staticmethod
-    def _push_metric(path, count):
-        """
-        Pushes out metrics of when module is run
-        """
-        try:
-            sock = socket.socket()
-            sock.settimeout(ClcPublicIp.SOCKET_CONNECTION_TIMEOUT)
-            sock.connect((ClcPublicIp.STATSD_HOST, ClcPublicIp.STATSD_PORT))
-            sock.sendall('%s %s %d\n' % (path, count, int(time.time())))
-            sock.close()
-        except socket.gaierror:
-            # do nothing, ignore and move forward
-            error = ''
-        except socket.error:
-            # nothing, ignore and move forward
-            error = ''
 
     @staticmethod
     def _set_user_agent(clc):
