@@ -83,7 +83,7 @@ options:
       - The state to insure that the provided resources are in.
     default: 'present'
     required: False
-    choices: ['present']
+    choices: ['present', 'absent']
     aliases: []
   wait:
     description:
@@ -316,7 +316,7 @@ class ClcModifyServer():
                 requests.append(server_result)
             aa_changed, aa_result = ClcModifyServer._ensure_aa_policy(
                 clc, module, None, server, server_params, changed_servers)
-            ap_changed, ap_result = ClcModifyServer._ensure_alert_policy(
+            ap_changed, ap_result = ClcModifyServer._ensure_alert_policy_present(
                 clc, module, None, server, server_params, changed_servers)
             if server_changed or aa_changed or ap_changed:
                 changed = True
@@ -518,7 +518,7 @@ class ClcModifyServer():
         return aa_policy_id
 
     @staticmethod
-    def _ensure_alert_policy(
+    def _ensure_alert_policy_present(
             clc, module, acct_alias, server, server_params, changed_servers):
         """
         ensures the server is updated with the provided alert policy
@@ -549,7 +549,7 @@ class ClcModifyServer():
         if alert_policy_id and not ClcModifyServer._alert_policy_exists(server, alert_policy_id):
             if server not in changed_servers:
                 changed_servers.append(server)
-            ClcModifyServer._modify_alert_policy(
+            ClcModifyServer._add_alert_policy(
                 clc,
                 module,
                 acct_alias,
@@ -559,7 +559,7 @@ class ClcModifyServer():
         return changed, result
 
     @staticmethod
-    def _modify_alert_policy(clc, module, acct_alias, server_id, alert_policy_id):
+    def _add_alert_policy(clc, module, acct_alias, server_id, alert_policy_id):
         """
         modifies the alert policy of the CLC server
         :param clc: the clc-sdk instance to use

@@ -435,11 +435,11 @@ class TestClcModifyServerFunctions(unittest.TestCase):
             self.fail('Caught an unexpected exception')
 
     @patch.object(ClcModifyServer, '_alert_policy_exists')
-    @patch.object(ClcModifyServer, '_modify_alert_policy')
+    @patch.object(ClcModifyServer, '_add_alert_policy')
     @patch.object(ClcModifyServer, '_get_alert_policy_id_by_name')
     @patch.object(clc_modify_server, 'AnsibleModule')
     @patch.object(clc_modify_server, 'clc_sdk')
-    def test_ensure_alert_policy(self,
+    def test_ensure_alert_policy_present(self,
                                   mock_clc_sdk,
                                   mock_ansible_module,
                                   mock_get_alert_pol,
@@ -453,7 +453,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
             'alert_policy_name': 'test'
         }
         server = mock.MagicMock()
-        changed, res = under_test._ensure_alert_policy(mock_clc_sdk,
+        changed, res = under_test._ensure_alert_policy_present(mock_clc_sdk,
                                                        mock_ansible_module,
                                                        'alias',
                                                        server,
@@ -464,21 +464,21 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
     @patch.object(clc_modify_server, 'AnsibleModule')
     @patch.object(clc_modify_server, 'clc_sdk')
-    def test_modify_alert_policy(self, mock_clc_sdk, mock_ansible_module):
+    def test_add_alert_policy(self, mock_clc_sdk, mock_ansible_module):
         mock_clc_sdk.v2.API.Call.side_effect = {'success'}
         mock_ansible_module.check_mode = False
         under_test = ClcModifyServer(mock_ansible_module)
-        res = under_test._modify_alert_policy(mock_clc_sdk, mock_ansible_module, 'alias', 'server_id', 'alert_pol_id')
+        res = under_test._add_alert_policy(mock_clc_sdk, mock_ansible_module, 'alias', 'server_id', 'alert_pol_id')
         self.assertEqual(res, 'success')
 
     @patch.object(clc_modify_server, 'AnsibleModule')
     @patch.object(clc_modify_server, 'clc_sdk')
-    def test_modify_alert_policy_exception(self, mock_clc_sdk, mock_ansible_module):
+    def test_add_alert_policy_exception(self, mock_clc_sdk, mock_ansible_module):
         mock_clc_sdk.v2.API.Call.side_effect = Exception('failed')
         mock_ansible_module.check_mode = False
         under_test = ClcModifyServer(mock_ansible_module)
         self.assertRaises(Exception,
-                          under_test._modify_alert_policy,
+                          under_test._add_alert_policy,
                           mock_clc_sdk,
                           mock_ansible_module,
                           'alias',
