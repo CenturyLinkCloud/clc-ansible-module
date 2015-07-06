@@ -403,6 +403,7 @@ class ClcServer():
             cpu_autoscale_policy_id=dict(default=None),
             anti_affinity_policy_id=dict(default=None),
             anti_affinity_policy_name=dict(default=None),
+            alert_policy_id=dict(default=None),
             packages=dict(type='list', default=[]),
             state=dict(
             default='present',
@@ -720,6 +721,9 @@ class ClcServer():
                         public_ip_protocol=public_ip_protocol,
                         public_ip_ports=public_ip_ports,
                         wait=wait)
+                    ClcServer._add_alert_policy_to_servers(clc=clc,
+                                                           module=module,
+                                                           servers=servers)
 
             for server in servers:
                 # reload server details
@@ -867,6 +871,53 @@ class ClcServer():
             if wait:
                 for r in requests:
                     r.WaitUntilComplete()
+
+    @staticmethod
+    def _add_alert_policy_to_servers(clc, module, servers):
+        """
+        Associate an alert policy to servers
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param servers: List of servers to add alert policy to
+        :return: none
+        """
+        p = module.params
+        alert_policy_id = p.get('alert_policy_id')
+        if alert_policy_id:
+            alias = p.get('alias')
+            for server in servers:
+                ClcServer._add_alert_policy_to_server(
+                    clc=clc,
+                    module=module,
+                    alias=alias,
+                    server_id=server.id,
+                    alert_policy_id=alert_policy_id)
+
+    @staticmethod
+    def _add_alert_policy_to_server(clc, module, alias, server_id, alert_policy_id):
+        """
+        Associate an alert policy to a clc server
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param alias: the clc account alias
+        :param serverid: The clc server id
+        :param alert_policy_id: the alert policy id to be associated to the server
+        :return: none
+        """
+        try:
+            clc.v2.API.Call(
+                method='POST',
+                url='servers/%s/%s/alertPolicies' % (alias, server_id),
+                payload=json.dumps(
+                    {
+                        'id': alert_policy_id
+                    }))
+        except clc.APIFailedResponse as e:
+            return module.fail_json(
+                msg='Failed to associate alert policy to the server : %s with Error %s'
+                    % (server_id, str(e.response_text)))
+
+
 
     @staticmethod
     def _delete_servers(module, clc, server_ids):
