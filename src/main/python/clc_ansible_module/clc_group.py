@@ -94,7 +94,6 @@ EXAMPLES = '''
 
 __version__ = '${version}'
 
-import socket
 import requests
 
 #
