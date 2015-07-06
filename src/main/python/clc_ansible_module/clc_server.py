@@ -404,6 +404,7 @@ class ClcServer():
             anti_affinity_policy_id=dict(default=None),
             anti_affinity_policy_name=dict(default=None),
             alert_policy_id=dict(default=None),
+            alert_policy_name=dict(default=None),
             packages=dict(type='list', default=[]),
             state=dict(
             default='present',
@@ -424,8 +425,8 @@ class ClcServer():
         mutually_exclusive = [
             ['exact_count', 'count'],
             ['exact_count', 'state'],
-            ['anti_affinity_policy_id',
-             'anti_affinity_policy_name'],
+            ['anti_affinity_policy_id', 'anti_affinity_policy_name'],
+            ['alert_policy_id', 'alert_policy_name'],
         ]
         return {"argument_spec": argument_spec,
                 "mutually_exclusive": mutually_exclusive}
@@ -883,15 +884,26 @@ class ClcServer():
         """
         p = module.params
         alert_policy_id = p.get('alert_policy_id')
-        if alert_policy_id:
-            alias = p.get('alias')
-            for server in servers:
-                ClcServer._add_alert_policy_to_server(
-                    clc=clc,
-                    module=module,
-                    alias=alias,
-                    server_id=server.id,
-                    alert_policy_id=alert_policy_id)
+        alert_policy_name = p.get('alert_policy_name')
+        alias = p.get('alias')
+        if not alert_policy_id and alert_policy_name:
+            alert_policy_id = ClcServer._get_alert_policy_id_by_name(
+                clc=clc,
+                module=module,
+                alias=alias,
+                alert_policy_name=alert_policy_name
+            )
+            if not alert_policy_id:
+                module.fail_json(
+                    msg='No alert policy exist with name : %s'
+                        % (alert_policy_name))
+        for server in servers:
+            ClcServer._add_alert_policy_to_server(
+                clc=clc,
+                module=module,
+                alias=alias,
+                server_id=server.id,
+                alert_policy_id=alert_policy_id)
 
     @staticmethod
     def _add_alert_policy_to_server(clc, module, alias, server_id, alert_policy_id):
@@ -917,6 +929,20 @@ class ClcServer():
                 msg='Failed to associate alert policy to the server : %s with Error %s'
                     % (server_id, str(e.response_text)))
 
+    @staticmethod
+    def _get_alert_policy_id_by_name(clc, module, alias, alert_policy_name):
+        alert_policy_id = None
+        policies = clc.v2.API.Call('GET', '/v2/alertPolicies/%s' % (alias))
+
+        for policy in policies.get('items'):
+            if policy.get('name') == alert_policy_name:
+                if not alert_policy_id:
+                    alert_policy_id = policy.get('id')
+                else:
+                    return module.fail_json(
+                        msg='mutiple alert policies were found with policy name : %s' %
+                        (alert_policy_name))
+        return alert_policy_id
 
 
     @staticmethod
