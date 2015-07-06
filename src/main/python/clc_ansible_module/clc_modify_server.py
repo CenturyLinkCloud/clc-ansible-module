@@ -571,11 +571,15 @@ class ClcModifyServer():
         """
         result = None
         if not module.check_mode:
-            result = clc.v2.API.Call('POST',
-                                     'servers/%s/%s/alertPolicies' % (
-                                         acct_alias,
-                                         server_id),
-                                     json.dumps({"id": alert_policy_id}))
+            try:
+                result = clc.v2.API.Call('POST',
+                                         'servers/%s/%s/alertPolicies' % (
+                                             acct_alias,
+                                             server_id),
+                                         json.dumps({"id": alert_policy_id}))
+            except clc.APIFailedResponse as e:
+                return module.fail_json(
+                    msg='Unable to set alert policy to the server : %s. %s' % (server_id, str(e.response_text)))
         return result
 
     @staticmethod
@@ -641,19 +645,6 @@ def main():
     module = AnsibleModule(supports_check_mode=True, **argument_dict)
     clc_modify_server = ClcModifyServer(module)
     clc_modify_server.process_request()
-
-def main_test():
-    module = ClcModifyServer(None)
-    module.params = {
-        'check_mode': False,
-        'state': 'present',
-        'server_ids': ['UC1WFADUBUSVR32'],
-        'alert_policy_name': 'alert1'
-    }
-    module.check_mode = False
-    mod_server = ClcModifyServer(module)
-    mod_server._set_clc_credentials_from_env()
-    mod_server.process_request()
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
