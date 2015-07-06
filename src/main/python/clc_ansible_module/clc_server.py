@@ -949,6 +949,14 @@ class ClcServer():
 
     @staticmethod
     def _get_alert_policy_id_by_name(clc, module, alias, alert_policy_name):
+        """
+        Returns the alert policy id for the given alert policy name
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param alias: the clc account alias
+        :param alert_policy_name: the name of the alert policy
+        :return: the alert policy id
+        """
         alert_policy_id = None
         policies = clc.v2.API.Call('GET', '/v2/alertPolicies/%s' % (alias))
         if not policies:
