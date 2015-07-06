@@ -55,10 +55,29 @@ options:
     aliases: []
   anti_affinity_policy_id:
     description:
-      - The anti-affinity policy to assign to the server
+      - The anti-affinity policy to assign to the server. This is mutually exclusive with 'anti_affinity_policy_name'.
     required: False
     default: None
     aliases: []
+  anti_affinity_policy_name:
+    description:
+      - The anti-affinity policy to assign to the server. This is mutually exclusive with 'anti_affinity_policy_id'.
+    required: False
+    default: None
+    aliases: []
+  alert_policy_id:
+    description:
+      - The alert policy to assign to the server. This is mutually exclusive with 'alert_policy_name'.
+    required: False
+    default: None
+    aliases: []
+  alert_policy_name:
+    description:
+      - The alert policy to assign to the server. This is mutually exclusive with 'alert_policy_id'.
+    required: False
+    default: None
+    aliases: []
+
   count:
     description:
       - The number of servers to build (mutually exclusive with exact_count)
@@ -733,10 +752,9 @@ class ClcServer():
                 server.data['ipaddress'] = server.details[
                     'ipAddresses'][0]['internal']
 
-                if add_public_ip:
-                    if len(server.PublicIPs().public_ips) > 0:
-                        server.data['publicip'] = str(
-                            server.PublicIPs().public_ips[0])
+                if add_public_ip and len(server.PublicIPs().public_ips) > 0:
+                    server.data['publicip'] = str(
+                        server.PublicIPs().public_ips[0])
 
                 server_dict_array.append(server.data)
                 created_server_ids.append(server.id)
