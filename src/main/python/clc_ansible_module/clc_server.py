@@ -55,10 +55,29 @@ options:
     aliases: []
   anti_affinity_policy_id:
     description:
-      - The anti-affinity policy to assign to the server
+      - The anti-affinity policy to assign to the server. This is mutually exclusive with 'anti_affinity_policy_name'.
     required: False
     default: None
     aliases: []
+  anti_affinity_policy_name:
+    description:
+      - The anti-affinity policy to assign to the server. This is mutually exclusive with 'anti_affinity_policy_id'.
+    required: False
+    default: None
+    aliases: []
+  alert_policy_id:
+    description:
+      - The alert policy to assign to the server. This is mutually exclusive with 'alert_policy_name'.
+    required: False
+    default: None
+    aliases: []
+  alert_policy_name:
+    description:
+      - The alert policy to assign to the server. This is mutually exclusive with 'alert_policy_id'.
+    required: False
+    default: None
+    aliases: []
+
   count:
     description:
       - The number of servers to build (mutually exclusive with exact_count)
@@ -403,6 +422,8 @@ class ClcServer():
             cpu_autoscale_policy_id=dict(default=None),
             anti_affinity_policy_id=dict(default=None),
             anti_affinity_policy_name=dict(default=None),
+            alert_policy_id=dict(default=None),
+            alert_policy_name=dict(default=None),
             packages=dict(type='list', default=[]),
             state=dict(
             default='present',
@@ -423,8 +444,8 @@ class ClcServer():
         mutually_exclusive = [
             ['exact_count', 'count'],
             ['exact_count', 'state'],
-            ['anti_affinity_policy_id',
-             'anti_affinity_policy_name'],
+            ['anti_affinity_policy_id', 'anti_affinity_policy_name'],
+            ['alert_policy_id', 'alert_policy_name'],
         ]
         return {"argument_spec": argument_spec,
                 "mutually_exclusive": mutually_exclusive}
@@ -720,6 +741,9 @@ class ClcServer():
                         public_ip_protocol=public_ip_protocol,
                         public_ip_ports=public_ip_ports,
                         wait=wait)
+                    ClcServer._add_alert_policy_to_servers(clc=clc,
+                                                           module=module,
+                                                           servers=servers)
 
             for server in servers:
                 # reload server details
@@ -728,10 +752,9 @@ class ClcServer():
                 server.data['ipaddress'] = server.details[
                     'ipAddresses'][0]['internal']
 
-                if add_public_ip:
-                    if len(server.PublicIPs().public_ips) > 0:
-                        server.data['publicip'] = str(
-                            server.PublicIPs().public_ips[0])
+                if add_public_ip and len(server.PublicIPs().public_ips) > 0:
+                    server.data['publicip'] = str(
+                        server.PublicIPs().public_ips[0])
 
                 server_dict_array.append(server.data)
                 created_server_ids.append(server.id)
@@ -867,6 +890,87 @@ class ClcServer():
             if wait:
                 for r in requests:
                     r.WaitUntilComplete()
+
+    @staticmethod
+    def _add_alert_policy_to_servers(clc, module, servers):
+        """
+        Associate an alert policy to servers
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param servers: List of servers to add alert policy to
+        :return: none
+        """
+        p = module.params
+        alert_policy_id = p.get('alert_policy_id')
+        alert_policy_name = p.get('alert_policy_name')
+        alias = p.get('alias')
+        if not alert_policy_id and alert_policy_name:
+            alert_policy_id = ClcServer._get_alert_policy_id_by_name(
+                clc=clc,
+                module=module,
+                alias=alias,
+                alert_policy_name=alert_policy_name
+            )
+            if not alert_policy_id:
+                module.fail_json(
+                    msg='No alert policy exist with name : %s'
+                        % (alert_policy_name))
+        for server in servers:
+            ClcServer._add_alert_policy_to_server(
+                clc=clc,
+                module=module,
+                alias=alias,
+                server_id=server.id,
+                alert_policy_id=alert_policy_id)
+
+    @staticmethod
+    def _add_alert_policy_to_server(clc, module, alias, server_id, alert_policy_id):
+        """
+        Associate an alert policy to a clc server
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param alias: the clc account alias
+        :param serverid: The clc server id
+        :param alert_policy_id: the alert policy id to be associated to the server
+        :return: none
+        """
+        try:
+            clc.v2.API.Call(
+                method='POST',
+                url='servers/%s/%s/alertPolicies' % (alias, server_id),
+                payload=json.dumps(
+                    {
+                        'id': alert_policy_id
+                    }))
+        except clc.APIFailedResponse as e:
+            return module.fail_json(
+                msg='Failed to associate alert policy to the server : %s with Error %s'
+                    % (server_id, str(e.response_text)))
+
+    @staticmethod
+    def _get_alert_policy_id_by_name(clc, module, alias, alert_policy_name):
+        """
+        Returns the alert policy id for the given alert policy name
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param alias: the clc account alias
+        :param alert_policy_name: the name of the alert policy
+        :return: the alert policy id
+        """
+        alert_policy_id = None
+        policies = clc.v2.API.Call('GET', '/v2/alertPolicies/%s' % (alias))
+        if not policies:
+            return alert_policy_id
+        for policy in policies.get('items'):
+            if policy.get('name') == alert_policy_name:
+                if not alert_policy_id:
+                    alert_policy_id = policy.get('id')
+                else:
+                    return module.fail_json(
+                        msg='mutiple alert policies were found with policy name : %s' %
+                        (alert_policy_name))
+        return alert_policy_id
+
 
     @staticmethod
     def _delete_servers(module, clc, server_ids):
