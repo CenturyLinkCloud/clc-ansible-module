@@ -933,7 +933,8 @@ class ClcServer():
     def _get_alert_policy_id_by_name(clc, module, alias, alert_policy_name):
         alert_policy_id = None
         policies = clc.v2.API.Call('GET', '/v2/alertPolicies/%s' % (alias))
-
+        if not policies:
+            return alert_policy_id
         for policy in policies.get('items'):
             if policy.get('name') == alert_policy_name:
                 if not alert_policy_id:
