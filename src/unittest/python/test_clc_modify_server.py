@@ -114,7 +114,37 @@ class TestClcModifyServerFunctions(unittest.TestCase):
             'state': 'present',
             'server_ids': ['TEST_SERVER'],
             'cpu': 2,
-            'alert_affinity_policy_name': 'test',
+            'alert_policy_name': 'test',
+            'memory': 4,
+            'wait': True
+        }
+
+        mock_server = mock.MagicMock()
+        mock_server.id = 'TEST_SERVER'
+        mock_server.cpu = 2
+        mock_server.memory= 2
+
+        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
+
+        # Test
+        under_test = ClcModifyServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.assertTrue(self.module.exit_json.called)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_process_request_state_absent_alertpolicy(self,
+                                          mock_clc_sdk,
+                                          mock_set_clc_creds):
+        # Setup Test
+        self.module.params = {
+            'state': 'absent',
+            'server_ids': ['TEST_SERVER'],
+            'cpu': 2,
+            'alert_policy_name': 'test',
             'memory': 4,
             'wait': True
         }
@@ -432,36 +462,36 @@ class TestClcModifyServerFunctions(unittest.TestCase):
             under_test._wait_for_requests(mock_clc_sdk, requests, servers, True)
         except:
             self.fail('Caught an unexpected exception')
-
+    '''
     @patch.object(ClcModifyServer, '_alert_policy_exists')
     @patch.object(ClcModifyServer, '_add_alert_policy_to_server')
     @patch.object(ClcModifyServer, '_get_alert_policy_id_by_name')
     @patch.object(clc_modify_server, 'AnsibleModule')
     @patch.object(clc_modify_server, 'clc_sdk')
-    def test_ensure_server_alert_policy_present(self,
+    def test_ensure_server_alert_policy_present_changed(self,
                                   mock_clc_sdk,
                                   mock_ansible_module,
                                   mock_get_alert_pol,
-                                  mock_update_alert_pol,
+                                  mock_add_alert_pol,
                                   mock_alert_pol_exists):
         mock_alert_pol_exists.return_value = False
-        mock_update_alert_pol.return_value = 'OK'
+        mock_add_alert_pol.return_value = 'OK'
         mock_get_alert_pol.return_value = '123'
         under_test = ClcModifyServer(mock_ansible_module)
         server_params = {
             'alert_policy_name': 'test'
         }
         server = mock.MagicMock()
-        changed_servers = []
-        changed, res = under_test._ensure_alert_policy_present(clc=mock_clc_sdk,
-                                                               module=mock_ansible_module,
-                                                               acct_alias='alias',
-                                                               server=server,
-                                                               server_params=server_params,
-                                                               changed_servers=changed_servers)
+        server.id = 'server1'
+        changed, changed_servers = under_test._ensure_alert_policy_present(
+            clc=mock_clc_sdk,
+            module=mock_ansible_module,
+            acct_alias='alias',
+            server=server,
+            server_params=server_params)
         self.assertEqual(changed, True)
-        self.assertEqual(res, None)
-
+        self.assertEqual(changed_servers[0].id, 'server1')
+    '''
     @patch.object(clc_modify_server, 'AnsibleModule')
     @patch.object(clc_modify_server, 'clc_sdk')
     def test_add_alert_policy(self, mock_clc_sdk, mock_ansible_module):
@@ -479,6 +509,33 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         under_test = ClcModifyServer(mock_ansible_module)
         self.assertRaises(Exception,
                           under_test._add_alert_policy_to_server,
+                          mock_clc_sdk,
+                          mock_ansible_module,
+                          'alias',
+                          'server_id',
+                          'alert_pol_id')
+
+    @patch.object(clc_modify_server, 'AnsibleModule')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_remove_alert_policy(self, mock_clc_sdk, mock_ansible_module):
+        mock_clc_sdk.v2.API.Call.side_effect = {'success'}
+        mock_ansible_module.check_mode = False
+        under_test = ClcModifyServer(mock_ansible_module)
+        res = under_test._remove_alert_policy_to_server(mock_clc_sdk,
+                                                        mock_ansible_module,
+                                                        'alias',
+                                                        'server_id',
+                                                        'alert_pol_id')
+        self.assertEqual(res, 'success')
+
+    @patch.object(clc_modify_server, 'AnsibleModule')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_remove_alert_policy_exception(self, mock_clc_sdk, mock_ansible_module):
+        mock_clc_sdk.v2.API.Call.side_effect = Exception('failed')
+        mock_ansible_module.check_mode = False
+        under_test = ClcModifyServer(mock_ansible_module)
+        self.assertRaises(Exception,
+                          under_test._remove_alert_policy_to_server,
                           mock_clc_sdk,
                           mock_ansible_module,
                           'alias',
