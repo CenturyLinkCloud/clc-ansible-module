@@ -462,36 +462,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
             under_test._wait_for_requests(mock_clc_sdk, requests, servers, True)
         except:
             self.fail('Caught an unexpected exception')
-    '''
-    @patch.object(ClcModifyServer, '_alert_policy_exists')
-    @patch.object(ClcModifyServer, '_add_alert_policy_to_server')
-    @patch.object(ClcModifyServer, '_get_alert_policy_id_by_name')
-    @patch.object(clc_modify_server, 'AnsibleModule')
-    @patch.object(clc_modify_server, 'clc_sdk')
-    def test_ensure_server_alert_policy_present_changed(self,
-                                  mock_clc_sdk,
-                                  mock_ansible_module,
-                                  mock_get_alert_pol,
-                                  mock_add_alert_pol,
-                                  mock_alert_pol_exists):
-        mock_alert_pol_exists.return_value = False
-        mock_add_alert_pol.return_value = 'OK'
-        mock_get_alert_pol.return_value = '123'
-        under_test = ClcModifyServer(mock_ansible_module)
-        server_params = {
-            'alert_policy_name': 'test'
-        }
-        server = mock.MagicMock()
-        server.id = 'server1'
-        changed, changed_servers = under_test._ensure_alert_policy_present(
-            clc=mock_clc_sdk,
-            module=mock_ansible_module,
-            acct_alias='alias',
-            server=server,
-            server_params=server_params)
-        self.assertEqual(changed, True)
-        self.assertEqual(changed_servers[0].id, 'server1')
-    '''
+
     @patch.object(clc_modify_server, 'AnsibleModule')
     @patch.object(clc_modify_server, 'clc_sdk')
     def test_add_alert_policy(self, mock_clc_sdk, mock_ansible_module):
