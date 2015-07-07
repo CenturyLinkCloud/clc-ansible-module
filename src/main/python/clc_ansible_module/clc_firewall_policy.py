@@ -133,7 +133,6 @@ EXAMPLES = '''
 
 __version__ = '${version}'
 
-import socket
 import urlparse
 from time import sleep
 import requests
