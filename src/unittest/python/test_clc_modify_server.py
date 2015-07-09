@@ -143,9 +143,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         self.module.params = {
             'state': 'absent',
             'server_ids': ['TEST_SERVER'],
-            'cpu': 2,
             'alert_policy_name': 'test',
-            'memory': 4,
             'wait': True
         }
 
@@ -163,6 +161,37 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         # Assert
         self.assertTrue(self.module.exit_json.called)
         self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_process_request_state_absent_alertpolicy_error(self,
+                                          mock_clc_sdk,
+                                          mock_set_clc_creds):
+        # Setup Test
+        self.module.params = {
+            'state': 'absent',
+            'server_ids': ['TEST_SERVER'],
+            'alert_policy_name': 'test',
+            'cpu': 2,
+            'wait': True
+        }
+
+        mock_server = mock.MagicMock()
+        mock_server.id = 'TEST_SERVER'
+        mock_server.cpu = 2
+        mock_server.memory= 2
+
+        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
+
+        # Test
+        under_test = ClcModifyServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.assertFalse(self.module.exit_json.called)
+        self.assertTrue(self.module.fail_json.called)
+        self.module.fail_json.assert_called_with(
+            msg='\'absent\' state is not supported for \'cpu\' and \'memory\' arguments')
 
     @patch.object(ClcModifyServer, '_set_clc_credentials_from_env')
     @patch.object(clc_modify_server, 'clc_sdk')
@@ -527,6 +556,30 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         res = under_test._alert_policy_exists(server, 111)
         self.assertEqual(res, False)
 
+    def test_refresh_servers(self):
+        under_test = ClcModifyServer(self.module)
+        server1 = mock.MagicMock()
+        servers = [server1]
+        under_test._refresh_servers(servers)
+        self.assertTrue(server1.Refresh.called)
+
+    @patch.object(ClcModifyServer, '_get_aa_policy_id_by_name')
+    @patch.object(ClcModifyServer, '_get_aa_policy_id_of_server')
+    @patch.object(ClcModifyServer, '_delete_aa_policy')
+    def test_ensure_aa_policy_absent(self, mock_delete_pol, mock_get_sever_aa_pol, mock_get_aa_pol):
+        mock_delete_pol.return_value = 'OK'
+        mock_get_sever_aa_pol.return_value = '123'
+        mock_get_aa_pol.return_value = '123'
+        under_test = ClcModifyServer(self.module)
+        server_params = {
+            'anti_affinity_policy_id': '123'
+        }
+        changed, servers = under_test._ensure_aa_policy_absent(self.clc,
+                                            self.module,
+                                            'acct_alias',
+                                            mock.MagicMock(),
+                                            server_params)
+        self.assertEqual(changed, True)
 
 if __name__ == '__main__':
     unittest.main()
