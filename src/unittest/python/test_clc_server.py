@@ -156,6 +156,163 @@ class TestClcServerFunctions(unittest.TestCase):
 
     @patch.object(ClcServer, '_set_clc_credentials_from_env')
     @patch.object(clc_server, 'clc_sdk')
+    def test_process_request_exact_count_1_server_w_no_alert_pol_name(self,
+                                                          mock_clc_sdk,
+                                                          mock_set_clc_creds):
+        # Setup Fixture
+        self.module.params = {
+            'state': 'present',
+            'name': 'TEST',
+            'location': 'UC1',
+            'type': 'standard',
+            'template': 'TEST_TEMPLATE',
+            'storage_type': 'standard',
+            'wait': True,
+            'exact_count': 1,
+            'count_group': 'Default Group',
+            'add_public_ip': False,
+            'public_ip_protocol': 'TCP',
+            'public_ip_ports': [80],
+            'alert_policy_name': 'test alert policy'
+        }
+
+        # Define Mock Objects
+        mock_server = mock.MagicMock()
+        mock_requests = mock.MagicMock()
+        mock_single_request = mock.MagicMock()
+        mock_group = mock.MagicMock()
+        mock_template = mock.MagicMock()
+        mock_network = mock.MagicMock()
+
+        # Set Mock Server Return Values
+        mock_server.id = 'TEST_SERVER'
+        mock_server.data = {'name': 'TEST_SERVER'}
+        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
+        mock_server.PublicIPs().public_ips = ['5.6.7.8']
+
+        # Set Mock Request Return Values
+        mock_single_request.Server.return_value = mock_server
+        mock_requests.WaitUntilComplete.return_value = 0
+        mock_requests.requests = [mock_single_request]
+
+        # Set Mock Template / Network Values
+        mock_template.id = 'TEST_TEMPLATE'
+        mock_network.id = '12345'
+
+        # Set Mock Group Values
+        mock_group.Defaults.return_value = 1
+        mock_group.id = '12345'
+
+        # Setup Mock API Responses
+        def _api_call_return_values(*args, **kwargs):
+            if kwargs.get('method') == 'GET':
+                return {'id': '12345','name': 'test alert policy'}
+            if kwargs.get('method') == 'POST':
+                return {'links': [{'rel': 'self', 'id': '12345'}]}
+
+        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+        mock_clc_sdk.v2.Group.return_value = mock_group
+        mock_clc_sdk.v2.Server.return_value = mock_server
+        mock_clc_sdk.v2.Account.GetAlias.return_value = 'TST'
+        mock_clc_sdk.v2.Datacenter().Templates().Search().__getitem__.return_value = mock_template
+        mock_clc_sdk.v2.Datacenter().Networks().networks.__getitem__.return_value = mock_network
+        mock_clc_sdk.v2.Requests.return_value = mock_requests
+        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
+
+        self.module.check_mode = False
+
+        # Test
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+
+        # Assert
+        self.assertTrue(self.module.fail_json.called)
+        self.module.fail_json.assert_called_with(msg='No alert policy exist with name : test alert policy')
+
+    @patch.object(ClcServer, '_get_alert_policy_id_by_name')
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_process_request_exact_count_1_server_w_alert_pol_name(self,
+                                                          mock_clc_sdk,
+                                                          mock_set_clc_creds,
+                                                          mock_get_alert_policy):
+        # Setup Fixture
+        self.module.params = {
+            'state': 'present',
+            'name': 'TEST',
+            'location': 'UC1',
+            'type': 'standard',
+            'template': 'TEST_TEMPLATE',
+            'storage_type': 'standard',
+            'wait': True,
+            'exact_count': 1,
+            'count_group': 'Default Group',
+            'add_public_ip': False,
+            'public_ip_protocol': 'TCP',
+            'public_ip_ports': [80],
+            'alert_policy_name': 'test alert policy'
+        }
+
+        # Define Mock Objects
+        mock_server = mock.MagicMock()
+        mock_requests = mock.MagicMock()
+        mock_single_request = mock.MagicMock()
+        mock_group = mock.MagicMock()
+        mock_template = mock.MagicMock()
+        mock_network = mock.MagicMock()
+
+        # Set Mock Server Return Values
+        mock_server.id = 'TEST_SERVER'
+        mock_server.data = {'name': 'TEST_SERVER'}
+        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
+
+        # Set Mock Request Return Values
+        mock_single_request.Server.return_value = mock_server
+        mock_requests.WaitUntilComplete.return_value = 0
+        mock_requests.requests = [mock_single_request]
+
+        # Set Mock Template / Network Values
+        mock_template.id = 'TEST_TEMPLATE'
+        mock_network.id = '12345'
+
+        # Set Mock Group Values
+        mock_group.Defaults.return_value = 1
+        mock_group.id = '12345'
+
+        # Setup Mock API Responses
+        def _api_call_return_values(*args, **kwargs):
+            if kwargs.get('method') == 'GET':
+                return {'id': '12345','name': 'test alert policy'}
+            if kwargs.get('method') == 'POST':
+                return {'links': [{'rel': 'self', 'id': '12345'}]}
+
+        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+        mock_clc_sdk.v2.Group.return_value = mock_group
+        mock_clc_sdk.v2.Server.return_value = mock_server
+        mock_clc_sdk.v2.Account.GetAlias.return_value = 'TST'
+        mock_clc_sdk.v2.Datacenter().Templates().Search().__getitem__.return_value = mock_template
+        mock_clc_sdk.v2.Datacenter().Networks().networks.__getitem__.return_value = mock_network
+        mock_clc_sdk.v2.Requests.return_value = mock_requests
+        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
+        mock_get_alert_policy.return_value = '12345'
+
+        self.module.check_mode = False
+
+        # Test
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+
+        #Assert
+        #self.assertFalse(self.module.fail_json.called)
+        self.assertTrue(self.module.exit_json.called)
+        self.module.exit_json.assert_called_once_with(changed=True,
+                                                      servers=[{'ipaddress': '1.2.3.4',
+                                                                'name': 'TEST_SERVER'}],
+                                                      server_ids=['TEST_SERVER'])
+
+
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_server, 'clc_sdk')
     def test_process_request_exact_count_delete_1_server(self,
                                                          mock_clc_sdk,
                                                          mock_set_clc_creds):
@@ -581,6 +738,29 @@ class TestClcServerFunctions(unittest.TestCase):
         policy_id = ClcServer._get_anti_affinity_policy_id(mock_clc_sdk, mock_ansible_module, 'alias', 'test1')
         mock_ansible_module.fail_json.assert_called_with(
             msg='mutiple anti affinity policies were found with policy name : test1')
+
+    @patch.object(clc_server, 'AnsibleModule')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_get_alert_policy_id_by_name_dup_match(self, mock_clc_sdk, mock_ansible_module):
+        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
+                                                [{'name' : 'test1', 'id' : '111'},
+                                                 {'name' : 'test2', 'id' : '222'},
+                                                 {'name' : 'test1', 'id' : '111'}]}]
+
+        ClcServer._get_alert_policy_id_by_name(mock_clc_sdk, mock_ansible_module, 'alias', 'test1')
+        mock_ansible_module.fail_json.assert_called_with(
+            msg='mutiple alert policies were found with policy name : test1')
+
+    @patch.object(clc_server, 'clc_sdk')
+    def test_get_alert_policy_id_by_name(self, mock_clc_sdk):
+        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
+                                                [{'name' : 'test1', 'id' : '111'},
+                                                 {'name' : 'test2', 'id' : '222'}]}]
+
+        policy_id = ClcServer._get_alert_policy_id_by_name(mock_clc_sdk, None, 'alias', 'test1')
+        self.assertEqual('111', policy_id)
+
+
 
 
     @patch.object(clc_server, 'AnsibleModule')

@@ -64,12 +64,26 @@ options:
     default: None
     required: False
     aliases: []
+  alert_policy_id:
+    description:
+      - The alert policy id to be associated.
+        This is mutually exclusive with 'alert_policy_name'
+    default: None
+    required: False
+    aliases: []
+  alert_policy_name:
+    description:
+      - The alert policy name to be associated.
+        This is mutually exclusive with 'alert_policy_id'
+    default: None
+    required: False
+    aliases: []
   state:
     description:
       - The state to insure that the provided resources are in.
     default: 'present'
     required: False
-    choices: ['present']
+    choices: ['present', 'absent']
     aliases: []
   wait:
     description:
@@ -101,6 +115,12 @@ EXAMPLES = '''
     anti_affinity_policy_name: 'aa_policy'
     state: present
 
+- name: set the alert policy on a server
+  clc_server:
+    server_ids: ['UC1ACCTTEST01']
+    alert_policy_name: 'alert_policy'
+    state: present
+
 - name: set the memory to 16GB and cpu to 8 core on a lust if servers
   clc_server:
     server_ids: ['UC1ACCTTEST01','UC1ACCTTEST02']
@@ -111,7 +131,6 @@ EXAMPLES = '''
 
 __version__ = '${version}'
 
-import socket
 import requests
 
 #
@@ -154,23 +173,15 @@ class ClcModifyServer():
         self._set_clc_credentials_from_env()
 
         p = self.module.params
-        state = p.get('state')
 
-        #
-        #  Handle each state
-        #
+        server_ids = p['server_ids']
+        if not isinstance(server_ids, list):
+            return self.module.fail_json(
+                msg='server_ids needs to be a list of instances to modify: %s' %
+                server_ids)
 
-        if state == 'present':
-            server_ids = p['server_ids']
-            cpu = p.get('cpu')
-            memory = p.get('memory')
-            if not isinstance(server_ids, list):
-                return self.module.fail_json(
-                    msg='server_ids needs to be a list of instances to modify: %s' %
-                    server_ids)
-
-            (changed, server_dict_array, new_server_ids) = ClcModifyServer._modify_servers(
-                module=self.module, clc=self.clc, server_ids=server_ids)
+        (changed, server_dict_array, new_server_ids) = ClcModifyServer._modify_servers(
+            module=self.module, clc=self.clc, server_ids=server_ids)
 
         self.module.exit_json(
             changed=changed,
@@ -185,15 +196,18 @@ class ClcModifyServer():
         """
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
-            state=dict(default='present', choices=['present']),
+            state=dict(default='present', choices=['present', 'absent']),
             cpu=dict(),
             memory=dict(),
             anti_affinity_policy_id=dict(),
             anti_affinity_policy_name=dict(),
+            alert_policy_id=dict(),
+            alert_policy_name=dict(),
             wait=dict(type='bool', default=True)
         )
         mutually_exclusive = [
-            ['anti_affinity_policy_id', 'anti_affinity_policy_name']
+            ['anti_affinity_policy_id', 'anti_affinity_policy_name'],
+            ['alert_policy_id', 'alert_policy_name']
         ]
         return {"argument_spec": argument_spec,
                 "mutually_exclusive": mutually_exclusive}
@@ -267,14 +281,19 @@ class ClcModifyServer():
         """
         p = module.params
         wait = p.get('wait')
+        state = p.get('state')
         server_params = {
             'cpu': p.get('cpu'),
             'memory': p.get('memory'),
             'anti_affinity_policy_id': p.get('anti_affinity_policy_id'),
-            'anti_affinity_policy_name': p.get('anti_affinity_policy_name')
+            'anti_affinity_policy_name': p.get('anti_affinity_policy_name'),
+            'alert_policy_id': p.get('alert_policy_id'),
+            'alert_policy_name': p.get('alert_policy_name'),
         }
         changed = False
-        changed_servers = []
+        server_changed = False
+        aa_changed = False
+        ap_changed = False
         server_dict_array = []
         result_server_ids = []
         requests = []
@@ -284,15 +303,22 @@ class ClcModifyServer():
                 msg='server_ids should be a list of servers, aborting')
 
         servers = clc.v2.Servers(server_ids).Servers()
-        for server in servers:
-            server_changed, server_result = ClcModifyServer._ensure_server_config(
-                clc, module, None, server, server_params, changed_servers)
-            if server_result:
-                requests.append(server_result)
-            aa_changed, aa_result = ClcModifyServer._ensure_aa_policy(
-                clc, module, None, server, server_params, changed_servers)
-            if aa_changed or server_changed:
-                changed = True
+        if state == 'present':
+            for server in servers:
+                    server_changed, server_result, changed_servers = ClcModifyServer._ensure_server_config(
+                        clc, module, None, server, server_params)
+                    if server_result:
+                        requests.append(server_result)
+                    aa_changed, changed_servers = ClcModifyServer._ensure_aa_policy(
+                        clc, module, None, server, server_params)
+                    ap_changed, changed_servers = ClcModifyServer._ensure_alert_policy_present(
+                        clc, module, None, server, server_params)
+        elif state == 'absent':
+            for server in servers:
+                ap_changed, changed_servers = ClcModifyServer._ensure_alert_policy_absent(
+                    clc, module, None, server, server_params)
+        if server_changed or aa_changed or ap_changed:
+            changed = True
 
         if wait:
             for r in requests:
@@ -308,7 +334,7 @@ class ClcModifyServer():
 
     @staticmethod
     def _ensure_server_config(
-            clc, module, alias, server, server_params, changed_servers):
+            clc, module, alias, server, server_params):
         """
         ensures the server is updated with the provided cpu and memory
         :param clc: the clc-sdk instance to use
@@ -316,7 +342,6 @@ class ClcModifyServer():
         :param alias: the CLC account alias
         :param server: the CLC server object
         :param server_params: the dictionary of server parameters
-        :param changed_servers: the changed servers list. this is updated if there is any change
         :return: (changed, group) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
@@ -325,6 +350,8 @@ class ClcModifyServer():
         memory = server_params.get('memory')
         changed = False
         result = None
+        changed_servers = []
+
         if not cpu:
             cpu = server.cpu
         if not memory:
@@ -339,7 +366,7 @@ class ClcModifyServer():
                 cpu,
                 memory)
             changed = True
-        return changed, result
+        return changed, result, changed_servers
 
     @staticmethod
     def _modify_clc_server(clc, module, acct_alias, server_id, cpu, memory):
@@ -378,7 +405,7 @@ class ClcModifyServer():
 
     @staticmethod
     def _ensure_aa_policy(
-            clc, module, acct_alias, server, server_params, changed_servers):
+            clc, module, acct_alias, server, server_params):
         """
         ensures the server is updated with the provided anti affinity policy
         :param clc: the clc-sdk instance to use
@@ -386,13 +413,13 @@ class ClcModifyServer():
         :param acct_alias: the CLC account alias
         :param server: the CLC server object
         :param server_params: the dictionary of server parameters
-        :param changed_servers: the changed servers list. this is updated if there is any change
         :return: (changed, group) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
         """
         changed = False
-        result = None
+        changed_servers = []
+
         if not acct_alias:
             acct_alias = clc.v2.Account.GetAlias()
 
@@ -420,7 +447,7 @@ class ClcModifyServer():
                 server.id,
                 aa_policy_id)
             changed = True
-        return changed, result
+        return changed, changed_servers
 
     @staticmethod
     def _modify_aa_policy(clc, module, acct_alias, server_id, aa_policy_id):
@@ -489,6 +516,173 @@ class ClcModifyServer():
             if e.response_status_code != 404:
                 raise e
         return aa_policy_id
+
+    @staticmethod
+    def _ensure_alert_policy_present(
+            clc, module, acct_alias, server, server_params):
+        """
+        ensures the server is updated with the provided alert policy
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param acct_alias: the CLC account alias
+        :param server: the CLC server object
+        :param server_params: the dictionary of server parameters
+        :return: (changed, group) -
+            changed: Boolean whether a change was made
+            result: The result from the CLC API call
+        """
+        changed = False
+        changed_servers = []
+
+        if not acct_alias:
+            acct_alias = clc.v2.Account.GetAlias()
+
+        alert_policy_id = server_params.get('alert_policy_id')
+        alert_policy_name = server_params.get('alert_policy_name')
+        if not alert_policy_id and alert_policy_name:
+            alert_policy_id = ClcModifyServer._get_alert_policy_id_by_name(
+                clc,
+                module,
+                acct_alias,
+                alert_policy_name)
+        if alert_policy_id and not ClcModifyServer._alert_policy_exists(server, alert_policy_id):
+            if server not in changed_servers:
+                changed_servers.append(server)
+            ClcModifyServer._add_alert_policy_to_server(
+                clc,
+                module,
+                acct_alias,
+                server.id,
+                alert_policy_id)
+            changed = True
+        return changed, changed_servers
+
+    @staticmethod
+    def _ensure_alert_policy_absent(
+            clc, module, acct_alias, server, server_params):
+        """
+        ensures the alert policy is removed from the server
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param acct_alias: the CLC account alias
+        :param server: the CLC server object
+        :param server_params: the dictionary of server parameters
+        :return: (changed, group) -
+            changed: Boolean whether a change was made
+            result: The result from the CLC API call
+        """
+        changed = False
+        result = None
+        changed_servers = []
+
+        if not acct_alias:
+            acct_alias = clc.v2.Account.GetAlias()
+
+        alert_policy_id = server_params.get('alert_policy_id')
+        alert_policy_name = server_params.get('alert_policy_name')
+        if not alert_policy_id and alert_policy_name:
+            alert_policy_id = ClcModifyServer._get_alert_policy_id_by_name(
+                clc,
+                module,
+                acct_alias,
+                alert_policy_name)
+
+        if alert_policy_id and ClcModifyServer._alert_policy_exists(server, alert_policy_id):
+            if server not in changed_servers:
+                changed_servers.append(server)
+            ClcModifyServer._remove_alert_policy_to_server(
+                clc,
+                module,
+                acct_alias,
+                server.id,
+                alert_policy_id)
+            changed = True
+        return changed, changed_servers
+
+    @staticmethod
+    def _add_alert_policy_to_server(clc, module, acct_alias, server_id, alert_policy_id):
+        """
+        add the alert policy to CLC server
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param acct_alias: the CLC account alias
+        :param server_id: the CLC server id
+        :param alert_policy_id: the alert policy id
+        :return: result: The result from the CLC API call
+        """
+        result = None
+        if not module.check_mode:
+            try:
+                result = clc.v2.API.Call('POST',
+                                         'servers/%s/%s/alertPolicies' % (
+                                             acct_alias,
+                                             server_id),
+                                         json.dumps({"id": alert_policy_id}))
+            except clc.APIFailedResponse as e:
+                return module.fail_json(
+                    msg='Unable to set alert policy to the server : %s. %s' % (server_id, str(e.response_text)))
+        return result
+
+    @staticmethod
+    def _remove_alert_policy_to_server(clc, module, acct_alias, server_id, alert_policy_id):
+        """
+        remove the alert policy to the CLC server
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param acct_alias: the CLC account alias
+        :param server_id: the CLC server id
+        :param alert_policy_id: the alert policy id
+        :return: result: The result from the CLC API call
+        """
+        result = None
+        if not module.check_mode:
+            try:
+                result = clc.v2.API.Call('DELETE',
+                                         'servers/%s/%s/alertPolicies/%s'
+                                         % (acct_alias, server_id, alert_policy_id))
+            except clc.APIFailedResponse as e:
+                return module.fail_json(
+                    msg='Unable to remove alert policy to the server : %s. %s' % (server_id, str(e.response_text)))
+        return result
+
+    @staticmethod
+    def _get_alert_policy_id_by_name(clc, module, alias, alert_policy_name):
+        """
+        retrieves the alert policy id of the server based on the name of the policy
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param alias: the CLC account alias
+        :param alert_policy_name: the alert policy name
+        :return: alert_policy_id: The alert policy id
+        """
+        alert_policy_id = None
+        alert_policies = clc.v2.API.Call(method='GET',
+                                      url='alertPolicies/%s' % (alias))
+        for alert_policy in alert_policies.get('items'):
+            if alert_policy.get('name') == alert_policy_name:
+                if not alert_policy_id:
+                    alert_policy_id = alert_policy.get('id')
+                else:
+                    return module.fail_json(
+                        msg='mutiple alert policies were found with policy name : %s' %
+                        (alert_policy_name))
+        return alert_policy_id
+
+    @staticmethod
+    def _alert_policy_exists(server, alert_policy_id):
+        """
+        Checks if the alert policy exists for the server
+        :param server: the clc server object
+        :param alert_policy_id: the alert policy
+        :return: True: if the given alert policy id associated to the server, False otherwise
+        """
+        result = False
+        alert_policies = server.alertPolicies
+        if alert_policies:
+            for alert_policy in alert_policies:
+                if alert_policy.get('id') == alert_policy_id:
+                    result = True
+        return result
 
     @staticmethod
     def _set_user_agent(clc):

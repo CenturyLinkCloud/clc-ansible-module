@@ -1,0 +1,13 @@
+---
+- name: Playbook to set alert policy of an existing server.
+  hosts: localhost
+  connection: local
+  tasks:
+  - name: modify server to set alert policy
+    clc_modify_server:
+      server_ids:
+        - UC1WFADUBUSVR32
+      alert_policy_name: 'alert1'
+      state: present
+    register: clc_svr_var
+  - debug: var=clc_svr_var

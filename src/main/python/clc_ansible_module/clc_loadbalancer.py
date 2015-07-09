@@ -158,7 +158,6 @@ EXAMPLES = '''
 
 __version__ = '${version}'
 
-import socket
 import requests
 from time import sleep
 
