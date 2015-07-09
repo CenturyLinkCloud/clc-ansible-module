@@ -309,12 +309,14 @@ class ClcModifyServer():
                         clc, module, None, server, server_params)
                     if server_result:
                         requests.append(server_result)
-                    aa_changed, changed_servers = ClcModifyServer._ensure_aa_policy(
+                    aa_changed, changed_servers = ClcModifyServer._ensure_aa_policy_present(
                         clc, module, None, server, server_params)
                     ap_changed, changed_servers = ClcModifyServer._ensure_alert_policy_present(
                         clc, module, None, server, server_params)
         elif state == 'absent':
             for server in servers:
+                aa_changed, changed_servers = ClcModifyServer._ensure_aa_policy_absent(
+                        clc, module, None, server, server_params)
                 ap_changed, changed_servers = ClcModifyServer._ensure_alert_policy_absent(
                     clc, module, None, server, server_params)
         if server_changed or aa_changed or ap_changed:
@@ -404,7 +406,7 @@ class ClcModifyServer():
         return result
 
     @staticmethod
-    def _ensure_aa_policy(
+    def _ensure_aa_policy_present(
             clc, module, acct_alias, server, server_params):
         """
         ensures the server is updated with the provided anti affinity policy
@@ -450,6 +452,52 @@ class ClcModifyServer():
         return changed, changed_servers
 
     @staticmethod
+    def _ensure_aa_policy_absent(
+            clc, module, acct_alias, server, server_params):
+        """
+        ensures the server is updated with the provided anti affinity policy
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param acct_alias: the CLC account alias
+        :param server: the CLC server object
+        :param server_params: the dictionary of server parameters
+        :return: (changed, group) -
+            changed: Boolean whether a change was made
+            result: The result from the CLC API call
+        """
+        changed = False
+        changed_servers = []
+
+        if not acct_alias:
+            acct_alias = clc.v2.Account.GetAlias()
+
+        aa_policy_id = server_params.get('anti_affinity_policy_id')
+        aa_policy_name = server_params.get('anti_affinity_policy_name')
+        if not aa_policy_id and aa_policy_name:
+            aa_policy_id = ClcModifyServer._get_aa_policy_id_by_name(
+                clc,
+                module,
+                acct_alias,
+                aa_policy_name)
+        current_aa_policy_id = ClcModifyServer._get_aa_policy_id_of_server(
+            clc,
+            module,
+            acct_alias,
+            server.id)
+
+        if aa_policy_id and aa_policy_id == current_aa_policy_id:
+            if server not in changed_servers:
+                changed_servers.append(server)
+            ClcModifyServer._delete_aa_policy(
+                clc,
+                module,
+                acct_alias,
+                server.id,
+                aa_policy_id)
+            changed = True
+        return changed, changed_servers
+
+    @staticmethod
     def _modify_aa_policy(clc, module, acct_alias, server_id, aa_policy_id):
         """
         modifies the anti affinity policy of the CLC server
@@ -467,6 +515,26 @@ class ClcModifyServer():
                                          acct_alias,
                                          server_id),
                                      json.dumps({"id": aa_policy_id}))
+        return result
+
+    @staticmethod
+    def _delete_aa_policy(clc, module, acct_alias, server_id, aa_policy_id):
+        """
+        modifies the anti affinity policy of the CLC server
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param acct_alias: the CLC account alias
+        :param server_id: the CLC server id
+        :param aa_policy_id: the anti affinity policy id
+        :return: result: The result from the CLC API call
+        """
+        result = None
+        if not module.check_mode:
+            result = clc.v2.API.Call('DELETE',
+                                     'servers/%s/%s/antiAffinityPolicy' % (
+                                         acct_alias,
+                                         server_id),
+                                     json.dumps({}))
         return result
 
     @staticmethod
