@@ -173,6 +173,12 @@ class ClcModifyServer():
         self._set_clc_credentials_from_env()
 
         p = self.module.params
+        cpu = p.get('cpu')
+        memory = p.get('memory')
+        state = p.get('state')
+        if state == 'absent' and (cpu or memory):
+            return self.module.fail_json(
+                msg='\'absent\' state is not supported for \'cpu\' and \'memory\' arguments')
 
         server_ids = p['server_ids']
         if not isinstance(server_ids, list):
