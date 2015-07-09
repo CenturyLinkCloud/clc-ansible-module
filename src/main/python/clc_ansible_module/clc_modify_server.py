@@ -373,7 +373,8 @@ class ClcModifyServer():
             changed = True
         return changed, result
 
-    def _modify_clc_server(self, clc, module, acct_alias, server_id, cpu, memory):
+    @staticmethod
+    def _modify_clc_server(clc, module, acct_alias, server_id, cpu, memory):
         """
         Modify the memory or CPU on a clc server.  This function is not yet implemented.
         :param clc: the clc-sdk instance to use
@@ -490,7 +491,8 @@ class ClcModifyServer():
             changed = True
         return changed
 
-    def _modify_aa_policy(self, clc, module, acct_alias, server_id, aa_policy_id):
+    @staticmethod
+    def _modify_aa_policy(clc, module, acct_alias, server_id, aa_policy_id):
         """
         modifies the anti affinity policy of the CLC server
         :param clc: the clc-sdk instance to use
@@ -509,7 +511,8 @@ class ClcModifyServer():
                                      json.dumps({"id": aa_policy_id}))
         return result
 
-    def _delete_aa_policy(self, clc, module, acct_alias, server_id):
+    @staticmethod
+    def _delete_aa_policy(clc, module, acct_alias, server_id):
         """
         Delete the anti affinity policy of the CLC server
         :param clc: the clc-sdk instance to use
@@ -527,7 +530,8 @@ class ClcModifyServer():
                                      json.dumps({}))
         return result
 
-    def _get_aa_policy_id_by_name(self, clc, module, alias, aa_policy_name):
+    @staticmethod
+    def _get_aa_policy_id_by_name(clc, module, alias, aa_policy_name):
         """
         retrieves the anti affinity policy id of the server based on the name of the policy
         :param clc: the clc-sdk instance to use
@@ -553,7 +557,8 @@ class ClcModifyServer():
                 (aa_policy_name))
         return aa_policy_id
 
-    def _get_aa_policy_id_of_server(self, clc, module, alias, server_id):
+    @staticmethod
+    def _get_aa_policy_id_of_server(clc, module, alias, server_id):
         """
         retrieves the anti affinity policy id of the server based on the CLC server id
         :param clc: the clc-sdk instance to use
@@ -647,7 +652,8 @@ class ClcModifyServer():
             changed = True
         return changed
 
-    def _add_alert_policy_to_server(self, clc, module, acct_alias, server_id, alert_policy_id):
+    @staticmethod
+    def _add_alert_policy_to_server(clc, module, acct_alias, server_id, alert_policy_id):
         """
         add the alert policy to CLC server
         :param clc: the clc-sdk instance to use
@@ -670,7 +676,8 @@ class ClcModifyServer():
                     msg='Unable to set alert policy to the server : %s. %s' % (server_id, str(e.response_text)))
         return result
 
-    def _remove_alert_policy_to_server(self, clc, module, acct_alias, server_id, alert_policy_id):
+    @staticmethod
+    def _remove_alert_policy_to_server(clc, module, acct_alias, server_id, alert_policy_id):
         """
         remove the alert policy to the CLC server
         :param clc: the clc-sdk instance to use
@@ -691,7 +698,8 @@ class ClcModifyServer():
                     msg='Unable to remove alert policy to the server : %s. %s' % (server_id, str(e.response_text)))
         return result
 
-    def _get_alert_policy_id_by_name(self, clc, module, alias, alert_policy_name):
+    @staticmethod
+    def _get_alert_policy_id_by_name(clc, module, alias, alert_policy_name):
         """
         retrieves the alert policy id of the server based on the name of the policy
         :param clc: the clc-sdk instance to use
@@ -713,7 +721,8 @@ class ClcModifyServer():
                         (alert_policy_name))
         return alert_policy_id
 
-    def _alert_policy_exists(self, server, alert_policy_id):
+    @staticmethod
+    def _alert_policy_exists(server, alert_policy_id):
         """
         Checks if the alert policy exists for the server
         :param server: the clc server object
