@@ -1,17 +1,13 @@
 #!/usr/bin/python
 
 import unittest
-
-from uuid import UUID
 import clc as clc_sdk
-from clc import CLCException
-from clc import APIFailedResponse
-import socket
 import mock
-from mock import patch, create_autospec
+from mock import patch
 
 import clc_ansible_module.clc_modify_server as clc_modify_server
 from clc_ansible_module.clc_modify_server import ClcModifyServer
+
 
 
 class TestClcModifyServerFunctions(unittest.TestCase):
@@ -411,8 +407,8 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
                                                 [{'name' : 'test1', 'id' : '111'},
                                                  {'name' : 'test2', 'id' : '222'}]}]
-
-        policy_id = ClcModifyServer._get_aa_policy_id_by_name(mock_clc_sdk, None, 'alias', 'test1')
+        under_test = ClcModifyServer(self.module)
+        policy_id = under_test._get_aa_policy_id_by_name(mock_clc_sdk, None, 'alias', 'test1')
         self.assertEqual('111', policy_id)
 
     @patch.object(clc_modify_server, 'AnsibleModule')
@@ -422,7 +418,8 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                                 [{'name' : 'test1', 'id' : '111'},
                                                  {'name' : 'test2', 'id' : '222'}]}]
 
-        policy_id = ClcModifyServer._get_aa_policy_id_by_name(mock_clc_sdk,
+        under_test = ClcModifyServer(self.module)
+        policy_id = under_test._get_aa_policy_id_by_name(mock_clc_sdk,
                                                               mock_ansible_module,
                                                               'alias',
                                                               'testnone')
@@ -436,8 +433,8 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                                 [{'name' : 'test1', 'id' : '111'},
                                                  {'name' : 'test2', 'id' : '222'},
                                                  {'name' : 'test1', 'id' : '111'}]}]
-
-        policy_id = ClcModifyServer._get_aa_policy_id_by_name(mock_clc_sdk,
+        under_test = ClcModifyServer(self.module)
+        policy_id = under_test._get_aa_policy_id_by_name(mock_clc_sdk,
                                                               mock_ansible_module,
                                                               'alias',
                                                               'test1')
@@ -449,8 +446,8 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
                                                 [{'name' : 'test1', 'id' : '111'},
                                                  {'name' : 'test2', 'id' : '222'}]}]
-
-        policy_id = ClcModifyServer._get_alert_policy_id_by_name(mock_clc_sdk, None, 'alias', 'test1')
+        under_test = ClcModifyServer(self.module)
+        policy_id = under_test._get_alert_policy_id_by_name(mock_clc_sdk, None, 'alias', 'test1')
         self.assertEqual('111', policy_id)
 
     @patch.object(clc_modify_server, 'AnsibleModule')
@@ -459,8 +456,8 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
                                                 [{'name' : 'test1', 'id' : '111'},
                                                  {'name' : 'test2', 'id' : '222'}]}]
-
-        policy_id = ClcModifyServer._get_alert_policy_id_by_name(mock_clc_sdk,
+        under_test = ClcModifyServer(self.module)
+        policy_id = under_test._get_alert_policy_id_by_name(mock_clc_sdk,
                                                               mock_ansible_module,
                                                               'alias',
                                                               'testnone')
@@ -473,8 +470,8 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                                 [{'name' : 'test1', 'id' : '111'},
                                                  {'name' : 'test2', 'id' : '222'},
                                                  {'name' : 'test1', 'id' : '111'}]}]
-
-        policy_id = ClcModifyServer._get_alert_policy_id_by_name(mock_clc_sdk,
+        under_test = ClcModifyServer(self.module)
+        policy_id = under_test._get_alert_policy_id_by_name(mock_clc_sdk,
                                                               mock_ansible_module,
                                                               'alias',
                                                               'test1')
@@ -565,6 +562,26 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
     @patch.object(ClcModifyServer, '_get_aa_policy_id_by_name')
     @patch.object(ClcModifyServer, '_get_aa_policy_id_of_server')
+    @patch.object(ClcModifyServer, '_modify_aa_policy')
+    def test_ensure_aa_policy_present(self, mock_delete_pol, mock_get_sever_aa_pol, mock_get_aa_pol):
+        mock_delete_pol.return_value = 'OK'
+        mock_get_sever_aa_pol.return_value = '123'
+        mock_get_aa_pol.return_value = '234'
+        under_test = ClcModifyServer(self.module)
+        server_params = {
+            'anti_affinity_policy_name': 'test'
+        }
+        server = mock.MagicMock()
+        server.id = 'server1'
+        changed = under_test._ensure_aa_policy_present(self.clc,
+                                            self.module,
+                                            'acct_alias',
+                                            server,
+                                            server_params)
+        self.assertEqual(changed, True)
+
+    @patch.object(ClcModifyServer, '_get_aa_policy_id_by_name')
+    @patch.object(ClcModifyServer, '_get_aa_policy_id_of_server')
     @patch.object(ClcModifyServer, '_delete_aa_policy')
     def test_ensure_aa_policy_absent(self, mock_delete_pol, mock_get_sever_aa_pol, mock_get_aa_pol):
         mock_delete_pol.return_value = 'OK'
@@ -572,14 +589,92 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         mock_get_aa_pol.return_value = '123'
         under_test = ClcModifyServer(self.module)
         server_params = {
-            'anti_affinity_policy_id': '123'
+            'anti_affinity_policy_name': 'test'
         }
-        changed, servers = under_test._ensure_aa_policy_absent(self.clc,
+        server = mock.MagicMock()
+        server.id = 'server1'
+        changed = under_test._ensure_aa_policy_absent(self.clc,
                                             self.module,
                                             'acct_alias',
-                                            mock.MagicMock(),
+                                            server,
                                             server_params)
         self.assertEqual(changed, True)
+
+    @patch.object(ClcModifyServer, '_get_alert_policy_id_by_name')
+    @patch.object(ClcModifyServer, '_alert_policy_exists')
+    @patch.object(ClcModifyServer, '_add_alert_policy_to_server')
+    def test_ensure_alert_policy_present(self, mock_add_pol, mock_pol_exists, mock_get_pol):
+        mock_add_pol.return_value = 'OK'
+        mock_pol_exists.return_value = False
+        mock_get_pol.return_value = '123'
+        under_test = ClcModifyServer(self.module)
+        server_params = {
+            'alert_policy_name': 'test'
+        }
+        server = mock.MagicMock()
+        server.id = 'server1'
+        changed = under_test._ensure_alert_policy_present(self.clc,
+                                            self.module,
+                                            'acct_alias',
+                                            server,
+                                            server_params)
+        self.assertEqual(changed, True)
+
+    @patch.object(ClcModifyServer, '_get_alert_policy_id_by_name')
+    @patch.object(ClcModifyServer, '_alert_policy_exists')
+    @patch.object(ClcModifyServer, '_remove_alert_policy_to_server')
+    def test_ensure_alert_policy_absent(self, mock_remove_pol, mock_pol_exists, mock_get_pol):
+        mock_remove_pol.return_value = 'OK'
+        mock_pol_exists.return_value = True
+        mock_get_pol.return_value = '123'
+        under_test = ClcModifyServer(self.module)
+        server_params = {
+            'alert_policy_name': 'test'
+        }
+        server = mock.MagicMock()
+        server.id = 'server1'
+        changed = under_test._ensure_alert_policy_absent(self.clc,
+                                            self.module,
+                                            'acct_alias',
+                                            server,
+                                            server_params)
+        self.assertEqual(changed, True)
+
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_delete_aa_policy(self, mock_clc_sdk):
+        mock_clc_sdk.v2.API.Call.side_effect = 'OK'
+        self.module.check_mode = False
+        under_test = ClcModifyServer(self.module)
+        ret = under_test._delete_aa_policy(self.clc, self.module, 'alias', 'server1')
+        self.assertTrue(ret, 'OK')
+
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_modify_aa_policy(self, mock_clc_sdk):
+        mock_clc_sdk.v2.API.Call.side_effect = 'OK'
+        self.module.check_mode = False
+        under_test = ClcModifyServer(self.module)
+        ret = under_test._modify_aa_policy(self.clc, self.module, 'alias', 'server1', 'aa_id')
+        self.assertTrue(ret, 'OK')
+
+
+    @patch.object(ClcModifyServer, '_ensure_server_config')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_modify_servers(self, mock_clc_sdk, mock_ensure_config):
+        module = self.module
+        module.params = {
+            'state': 'present',
+            'wait': True
+        }
+        mock_ensure_config.return_value = mock.MagicMock(), mock.MagicMock()
+        server1 = mock.MagicMock()
+        server_ids = ['server1']
+        server1.id = 'server1'
+        mock_clc_sdk.v2.Servers(server_ids).Servers.return_value = [server1]
+        under_test = ClcModifyServer(module)
+        changed, server, result = under_test._modify_servers(self.module, mock_clc_sdk, server_ids)
+        self.assertEqual(changed, True)
+        self.assertEqual(result[0], 'server1')
+
 
 if __name__ == '__main__':
     unittest.main()
