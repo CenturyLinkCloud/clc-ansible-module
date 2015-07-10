@@ -923,7 +923,8 @@ class ClcServer():
                 alert_policy_id=alert_policy_id)
 
     @staticmethod
-    def _add_alert_policy_to_server(clc, module, alias, server_id, alert_policy_id):
+    def _add_alert_policy_to_server(
+            clc, module, alias, server_id, alert_policy_id):
         """
         Associate an alert policy to a clc server
         :param clc: the clc-sdk instance to use
@@ -969,7 +970,6 @@ class ClcServer():
                         msg='mutiple alert policies were found with policy name : %s' %
                         (alert_policy_name))
         return alert_policy_id
-
 
     @staticmethod
     def _delete_servers(module, clc, server_ids):

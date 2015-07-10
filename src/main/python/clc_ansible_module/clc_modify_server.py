@@ -311,17 +311,17 @@ class ClcModifyServer():
         servers = clc.v2.Servers(server_ids).Servers()
         for server in servers:
             if state == 'present':
-                    server_changed, server_result = self._ensure_server_config(
-                        clc, module, None, server, server_params)
-                    if server_result:
-                        requests.append(server_result)
-                    aa_changed = self._ensure_aa_policy_present(
-                        clc, module, None, server, server_params)
-                    ap_changed = self._ensure_alert_policy_present(
-                        clc, module, None, server, server_params)
+                server_changed, server_result = self._ensure_server_config(
+                    clc, module, None, server, server_params)
+                if server_result:
+                    requests.append(server_result)
+                aa_changed = self._ensure_aa_policy_present(
+                    clc, module, None, server, server_params)
+                ap_changed = self._ensure_alert_policy_present(
+                    clc, module, None, server, server_params)
             elif state == 'absent':
                 aa_changed = self._ensure_aa_policy_absent(
-                        clc, module, None, server, server_params)
+                    clc, module, None, server, server_params)
                 ap_changed = self._ensure_alert_policy_absent(
                     clc, module, None, server, server_params)
             if server_changed or aa_changed or ap_changed:
@@ -604,7 +604,8 @@ class ClcModifyServer():
                 module,
                 acct_alias,
                 alert_policy_name)
-        if alert_policy_id and not self._alert_policy_exists(server, alert_policy_id):
+        if alert_policy_id and not self._alert_policy_exists(
+                server, alert_policy_id):
             self._add_alert_policy_to_server(
                 clc,
                 module,
@@ -642,7 +643,8 @@ class ClcModifyServer():
                 acct_alias,
                 alert_policy_name)
 
-        if alert_policy_id and self._alert_policy_exists(server, alert_policy_id):
+        if alert_policy_id and self._alert_policy_exists(
+                server, alert_policy_id):
             self._remove_alert_policy_to_server(
                 clc,
                 module,
@@ -653,7 +655,8 @@ class ClcModifyServer():
         return changed
 
     @staticmethod
-    def _add_alert_policy_to_server(clc, module, acct_alias, server_id, alert_policy_id):
+    def _add_alert_policy_to_server(
+            clc, module, acct_alias, server_id, alert_policy_id):
         """
         add the alert policy to CLC server
         :param clc: the clc-sdk instance to use
@@ -677,7 +680,8 @@ class ClcModifyServer():
         return result
 
     @staticmethod
-    def _remove_alert_policy_to_server(clc, module, acct_alias, server_id, alert_policy_id):
+    def _remove_alert_policy_to_server(
+            clc, module, acct_alias, server_id, alert_policy_id):
         """
         remove the alert policy to the CLC server
         :param clc: the clc-sdk instance to use
@@ -710,7 +714,7 @@ class ClcModifyServer():
         """
         alert_policy_id = None
         alert_policies = clc.v2.API.Call(method='GET',
-                                      url='alertPolicies/%s' % (alias))
+                                         url='alertPolicies/%s' % (alias))
         for alert_policy in alert_policies.get('items'):
             if alert_policy.get('name') == alert_policy_name:
                 if not alert_policy_id:
