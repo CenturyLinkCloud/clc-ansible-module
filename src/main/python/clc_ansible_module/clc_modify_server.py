@@ -28,6 +28,7 @@
 
 DOCUMENTATION = '''
 module: clc_modify_server
+version_added: "1.0"
 short_desciption: modify servers in CenturyLink Cloud.
 description:
   - An Ansible module to modify servers in CenturyLink Cloud.

@@ -28,6 +28,7 @@
 
 DOCUMENTATION = '''
 module: clc_publicip
+version_added: "1.0"
 short_description: Add and Delete public ips on servers in CenturyLink Cloud.
 description:
   - An Ansible module to add or delete public ip addresses on an existing server or servers in CenturyLink Cloud.

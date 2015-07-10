@@ -27,6 +27,7 @@
 
 DOCUMENTATION = '''
 module: clc_alert_policy
+version_added: "1.0"
 short_descirption: Create or Delete Alert Policies at CenturyLink Cloud.
 description:
   - An Ansible module to Create or Delete Alert Policies at CenturyLink Cloud.
