@@ -13,12 +13,13 @@ use_plugin("exec")
 
 # define project level attributes:
 name = 'clc-ansible-module'
-version = '0.0.8'
+version = '1.0.0'
 summary = "Centurylink Cloud Ansible Modules"
 description = "Ansible extension modules which allow users to interact with Centurylink Cloud to define and manage cloud components."
 authors = [Author ("CenturyLink Cloud", "WFAAS-LLFT@centurylink.com")]
 url = 'http://www.centurylinkcloud.com'
 license = "CTL Corporate License"
+keywords = "centurylink cloud clc ansible modules"
 
 # targets are:
 # 	clean	compile_sources	init	package	prepare
