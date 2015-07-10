@@ -6,10 +6,9 @@
 These are additional, unofficial Ansible modules for managing CenturyLink Cloud.
 
 ### Installation
-Download clc-ansible-module-x.x.x.tar.gz from the GitHub project page.
-<br>Once downloaded execute a pip install:
+
 ```
-sudo pip install clc-ansible-module.0.0.n.gz
+sudo pip install clc-ansible-module
 ```
 <br>To use this, add the python dist/site-packages directory to to the ***ANSIBLE_LIBRARY*** environment variable, or symlink this directory to ./library underneath the directory containing the playbook that needs it.
 
@@ -700,18 +699,3 @@ Access the CLC hostvars from a play defined in yaml:
     - name: Print PowerState returned by Dynamic Inventory / CLC API
       debug: msg="PowerState={{ hostvars[inventory_hostname]['clc_data']['details']['powerState'] }}"
 ```
-## Building the clc-ansible-module project
-The project leverages pybuilder to build the distributions.  There is a build.py file in the root of the project.
-Here are some common commands:
-####Clean the workspace
-```
-pyb clean
-```
-####Build the project
-```
-pyb -X -v
-```
-
-###Mirrored
-This project is now mirrored to https://github.com/CenturylinkTechnology/wf-clc-ansible-module-mirror
-Test
