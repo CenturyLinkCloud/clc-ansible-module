@@ -173,6 +173,12 @@ class ClcModifyServer():
         self._set_clc_credentials_from_env()
 
         p = self.module.params
+        cpu = p.get('cpu')
+        memory = p.get('memory')
+        state = p.get('state')
+        if state == 'absent' and (cpu or memory):
+            return self.module.fail_json(
+                msg='\'absent\' state is not supported for \'cpu\' and \'memory\' arguments')
 
         server_ids = p['server_ids']
         if not isinstance(server_ids, list):
@@ -180,7 +186,7 @@ class ClcModifyServer():
                 msg='server_ids needs to be a list of instances to modify: %s' %
                 server_ids)
 
-        (changed, server_dict_array, new_server_ids) = ClcModifyServer._modify_servers(
+        (changed, server_dict_array, new_server_ids) = self._modify_servers(
             module=self.module, clc=self.clc, server_ids=server_ids)
 
         self.module.exit_json(
@@ -270,8 +276,7 @@ class ClcModifyServer():
         for server in servers:
             server.Refresh()
 
-    @staticmethod
-    def _modify_servers(module, clc, server_ids):
+    def _modify_servers(self, module, clc, server_ids):
         """
         modify the servers configuration on the provided list
         :param module: the AnsibleModule object
@@ -297,28 +302,31 @@ class ClcModifyServer():
         server_dict_array = []
         result_server_ids = []
         requests = []
+        changed_servers = []
 
         if not isinstance(server_ids, list) or len(server_ids) < 1:
             return module.fail_json(
                 msg='server_ids should be a list of servers, aborting')
 
         servers = clc.v2.Servers(server_ids).Servers()
-        if state == 'present':
-            for server in servers:
-                    server_changed, server_result, changed_servers = ClcModifyServer._ensure_server_config(
-                        clc, module, None, server, server_params)
-                    if server_result:
-                        requests.append(server_result)
-                    aa_changed, changed_servers = ClcModifyServer._ensure_aa_policy(
-                        clc, module, None, server, server_params)
-                    ap_changed, changed_servers = ClcModifyServer._ensure_alert_policy_present(
-                        clc, module, None, server, server_params)
-        elif state == 'absent':
-            for server in servers:
-                ap_changed, changed_servers = ClcModifyServer._ensure_alert_policy_absent(
+        for server in servers:
+            if state == 'present':
+                server_changed, server_result = self._ensure_server_config(
                     clc, module, None, server, server_params)
-        if server_changed or aa_changed or ap_changed:
-            changed = True
+                if server_result:
+                    requests.append(server_result)
+                aa_changed = self._ensure_aa_policy_present(
+                    clc, module, None, server, server_params)
+                ap_changed = self._ensure_alert_policy_present(
+                    clc, module, None, server, server_params)
+            elif state == 'absent':
+                aa_changed = self._ensure_aa_policy_absent(
+                    clc, module, None, server, server_params)
+                ap_changed = self._ensure_alert_policy_absent(
+                    clc, module, None, server, server_params)
+            if server_changed or aa_changed or ap_changed:
+                changed_servers.append(server)
+                changed = True
 
         if wait:
             for r in requests:
@@ -332,9 +340,8 @@ class ClcModifyServer():
 
         return changed, server_dict_array, result_server_ids
 
-    @staticmethod
     def _ensure_server_config(
-            clc, module, alias, server, server_params):
+            self, clc, module, alias, server, server_params):
         """
         ensures the server is updated with the provided cpu and memory
         :param clc: the clc-sdk instance to use
@@ -350,15 +357,13 @@ class ClcModifyServer():
         memory = server_params.get('memory')
         changed = False
         result = None
-        changed_servers = []
 
         if not cpu:
             cpu = server.cpu
         if not memory:
             memory = server.memory
         if memory != server.memory or cpu != server.cpu:
-            changed_servers.append(server)
-            result = ClcModifyServer._modify_clc_server(
+            result = self._modify_clc_server(
                 clc,
                 module,
                 None,
@@ -366,7 +371,7 @@ class ClcModifyServer():
                 cpu,
                 memory)
             changed = True
-        return changed, result, changed_servers
+        return changed, result
 
     @staticmethod
     def _modify_clc_server(clc, module, acct_alias, server_id, cpu, memory):
@@ -403,9 +408,8 @@ class ClcModifyServer():
             result = clc.v2.Requests(job_obj)
         return result
 
-    @staticmethod
-    def _ensure_aa_policy(
-            clc, module, acct_alias, server, server_params):
+    def _ensure_aa_policy_present(
+            self, clc, module, acct_alias, server, server_params):
         """
         ensures the server is updated with the provided anti affinity policy
         :param clc: the clc-sdk instance to use
@@ -418,7 +422,6 @@ class ClcModifyServer():
             result: The result from the CLC API call
         """
         changed = False
-        changed_servers = []
 
         if not acct_alias:
             acct_alias = clc.v2.Account.GetAlias()
@@ -426,28 +429,67 @@ class ClcModifyServer():
         aa_policy_id = server_params.get('anti_affinity_policy_id')
         aa_policy_name = server_params.get('anti_affinity_policy_name')
         if not aa_policy_id and aa_policy_name:
-            aa_policy_id = ClcModifyServer._get_aa_policy_id_by_name(
+            aa_policy_id = self._get_aa_policy_id_by_name(
                 clc,
                 module,
                 acct_alias,
                 aa_policy_name)
-        current_aa_policy_id = ClcModifyServer._get_aa_policy_id_of_server(
+        current_aa_policy_id = self._get_aa_policy_id_of_server(
             clc,
             module,
             acct_alias,
             server.id)
 
         if aa_policy_id and aa_policy_id != current_aa_policy_id:
-            if server not in changed_servers:
-                changed_servers.append(server)
-            ClcModifyServer._modify_aa_policy(
+            self._modify_aa_policy(
                 clc,
                 module,
                 acct_alias,
                 server.id,
                 aa_policy_id)
             changed = True
-        return changed, changed_servers
+        return changed
+
+    def _ensure_aa_policy_absent(
+            self, clc, module, acct_alias, server, server_params):
+        """
+        ensures the the provided anti affinity policy is removed from the server
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param acct_alias: the CLC account alias
+        :param server: the CLC server object
+        :param server_params: the dictionary of server parameters
+        :return: (changed, group) -
+            changed: Boolean whether a change was made
+            result: The result from the CLC API call
+        """
+        changed = False
+
+        if not acct_alias:
+            acct_alias = clc.v2.Account.GetAlias()
+
+        aa_policy_id = server_params.get('anti_affinity_policy_id')
+        aa_policy_name = server_params.get('anti_affinity_policy_name')
+        if not aa_policy_id and aa_policy_name:
+            aa_policy_id = self._get_aa_policy_id_by_name(
+                clc,
+                module,
+                acct_alias,
+                aa_policy_name)
+        current_aa_policy_id = self._get_aa_policy_id_of_server(
+            clc,
+            module,
+            acct_alias,
+            server.id)
+
+        if aa_policy_id and aa_policy_id == current_aa_policy_id:
+            self._delete_aa_policy(
+                clc,
+                module,
+                acct_alias,
+                server.id)
+            changed = True
+        return changed
 
     @staticmethod
     def _modify_aa_policy(clc, module, acct_alias, server_id, aa_policy_id):
@@ -467,6 +509,25 @@ class ClcModifyServer():
                                          acct_alias,
                                          server_id),
                                      json.dumps({"id": aa_policy_id}))
+        return result
+
+    @staticmethod
+    def _delete_aa_policy(clc, module, acct_alias, server_id):
+        """
+        Delete the anti affinity policy of the CLC server
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param acct_alias: the CLC account alias
+        :param server_id: the CLC server id
+        :return: result: The result from the CLC API call
+        """
+        result = None
+        if not module.check_mode:
+            result = clc.v2.API.Call('DELETE',
+                                     'servers/%s/%s/antiAffinityPolicy' % (
+                                         acct_alias,
+                                         server_id),
+                                     json.dumps({}))
         return result
 
     @staticmethod
@@ -517,9 +578,8 @@ class ClcModifyServer():
                 raise e
         return aa_policy_id
 
-    @staticmethod
     def _ensure_alert_policy_present(
-            clc, module, acct_alias, server, server_params):
+            self, clc, module, acct_alias, server, server_params):
         """
         ensures the server is updated with the provided alert policy
         :param clc: the clc-sdk instance to use
@@ -532,7 +592,6 @@ class ClcModifyServer():
             result: The result from the CLC API call
         """
         changed = False
-        changed_servers = []
 
         if not acct_alias:
             acct_alias = clc.v2.Account.GetAlias()
@@ -540,26 +599,24 @@ class ClcModifyServer():
         alert_policy_id = server_params.get('alert_policy_id')
         alert_policy_name = server_params.get('alert_policy_name')
         if not alert_policy_id and alert_policy_name:
-            alert_policy_id = ClcModifyServer._get_alert_policy_id_by_name(
+            alert_policy_id = self._get_alert_policy_id_by_name(
                 clc,
                 module,
                 acct_alias,
                 alert_policy_name)
-        if alert_policy_id and not ClcModifyServer._alert_policy_exists(server, alert_policy_id):
-            if server not in changed_servers:
-                changed_servers.append(server)
-            ClcModifyServer._add_alert_policy_to_server(
+        if alert_policy_id and not self._alert_policy_exists(
+                server, alert_policy_id):
+            self._add_alert_policy_to_server(
                 clc,
                 module,
                 acct_alias,
                 server.id,
                 alert_policy_id)
             changed = True
-        return changed, changed_servers
+        return changed
 
-    @staticmethod
     def _ensure_alert_policy_absent(
-            clc, module, acct_alias, server, server_params):
+            self, clc, module, acct_alias, server, server_params):
         """
         ensures the alert policy is removed from the server
         :param clc: the clc-sdk instance to use
@@ -573,7 +630,6 @@ class ClcModifyServer():
         """
         changed = False
         result = None
-        changed_servers = []
 
         if not acct_alias:
             acct_alias = clc.v2.Account.GetAlias()
@@ -581,26 +637,26 @@ class ClcModifyServer():
         alert_policy_id = server_params.get('alert_policy_id')
         alert_policy_name = server_params.get('alert_policy_name')
         if not alert_policy_id and alert_policy_name:
-            alert_policy_id = ClcModifyServer._get_alert_policy_id_by_name(
+            alert_policy_id = self._get_alert_policy_id_by_name(
                 clc,
                 module,
                 acct_alias,
                 alert_policy_name)
 
-        if alert_policy_id and ClcModifyServer._alert_policy_exists(server, alert_policy_id):
-            if server not in changed_servers:
-                changed_servers.append(server)
-            ClcModifyServer._remove_alert_policy_to_server(
+        if alert_policy_id and self._alert_policy_exists(
+                server, alert_policy_id):
+            self._remove_alert_policy_to_server(
                 clc,
                 module,
                 acct_alias,
                 server.id,
                 alert_policy_id)
             changed = True
-        return changed, changed_servers
+        return changed
 
     @staticmethod
-    def _add_alert_policy_to_server(clc, module, acct_alias, server_id, alert_policy_id):
+    def _add_alert_policy_to_server(
+            clc, module, acct_alias, server_id, alert_policy_id):
         """
         add the alert policy to CLC server
         :param clc: the clc-sdk instance to use
@@ -624,7 +680,8 @@ class ClcModifyServer():
         return result
 
     @staticmethod
-    def _remove_alert_policy_to_server(clc, module, acct_alias, server_id, alert_policy_id):
+    def _remove_alert_policy_to_server(
+            clc, module, acct_alias, server_id, alert_policy_id):
         """
         remove the alert policy to the CLC server
         :param clc: the clc-sdk instance to use
@@ -657,7 +714,7 @@ class ClcModifyServer():
         """
         alert_policy_id = None
         alert_policies = clc.v2.API.Call(method='GET',
-                                      url='alertPolicies/%s' % (alias))
+                                         url='alertPolicies/%s' % (alias))
         for alert_policy in alert_policies.get('items'):
             if alert_policy.get('name') == alert_policy_name:
                 if not alert_policy_id:
