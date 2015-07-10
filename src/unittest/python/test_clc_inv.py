@@ -73,5 +73,38 @@ class TestClcInvFunctions(unittest.TestCase):
         except:
             self.fail('Exception was thrown when it was not expected')
 
+    @patch('clc_inv._flatten_list')
+    def test_parse_groups_result_to_dict_empty(self, mock_flatten):
+        try:
+            input = [mock.MagicMock()]
+            mock_flatten.return_value = 'OK'
+            res = clc_inv._parse_groups_result_to_dict(input)
+            self.assertEqual(res, {})
+        except:
+            self.fail('Exception was thrown when it was not expected')
+
+    def test_build_datacenter_groups(self):
+        try:
+            input = {
+                'hostvars' : {
+                    'server1' : {
+                        'clc_data' : {
+                            'locationId': 'UC1'
+                        }
+                    }
+                }
+            }
+            res = clc_inv._build_datacenter_groups(input)
+            self.assertEqual(res, {'UC1': ['server1']})
+        except:
+            self.fail('Exception was thrown when it was not expected')
+
+    @patch('clc_inv._build_datacenter_groups')
+    def test_build_hostvars_dynamic_groups(self, mock_build):
+            input = 'test'
+            mock_build.return_value = {'status': 'OK'}
+            res = clc_inv._build_hostvars_dynamic_groups(input)
+            self.assertEqual(res, {'status': 'OK'})
+
 if __name__ == '__main__':
     unittest.main()
