@@ -903,6 +903,10 @@ class ClcServer():
         alert_policy_id = p.get('alert_policy_id')
         alert_policy_name = p.get('alert_policy_name')
         alias = p.get('alias')
+
+        if not alert_policy_id and not alert_policy_name:
+            return # no alert policy info provide so do nothing
+
         if not alert_policy_id and alert_policy_name:
             alert_policy_id = ClcServer._get_alert_policy_id_by_name(
                 clc=clc,
