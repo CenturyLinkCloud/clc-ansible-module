@@ -152,7 +152,6 @@ class ClcGroup(object):
             changed, group, response = self._ensure_group_is_present(
                 group_name=group_name, parent_name=parent_name, group_description=group_description)
 
-
         self.module.exit_json(changed=changed, group=group_name)
 
     #
@@ -262,7 +261,9 @@ class ClcGroup(object):
         group = group_name
 
         parent_exists = self._group_exists(group_name=parent, parent_name=None)
-        child_exists = self._group_exists(group_name=group_name, parent_name=parent)
+        child_exists = self._group_exists(
+            group_name=group_name,
+            parent_name=parent)
 
         if parent_exists and child_exists:
             group, parent = self.group_dict[group_name]
@@ -360,7 +361,9 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    module = AnsibleModule(argument_spec=ClcGroup._define_module_argument_spec(), supports_check_mode=True)
+    module = AnsibleModule(
+        argument_spec=ClcGroup._define_module_argument_spec(),
+        supports_check_mode=True)
 
     clc_group = ClcGroup(module)
     clc_group.process_request()

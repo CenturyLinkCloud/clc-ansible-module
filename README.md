@@ -218,7 +218,7 @@ This module can be used to modify server configuration in CLC.
 | `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server. This is mutually exclusive with `anti_affinity_policy_id:`
 | `alert_policy_id:` | N | | | The alert policy id to assign to the server. This is mutually exclusive with `alert_policy_name:`
 | `alert_policy_name:` | N | | | The alert policy name to assign to the server. This is mutually exclusive with `alert_policy_id:`
-| `state:` | Y | `present` | `present` | The state to insure that the provided resources are in.
+| `state:` | Y | `present` | `present` | The state to insure that the provided resources are in. `absent` state is not supported for cpu and memory parameters
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.

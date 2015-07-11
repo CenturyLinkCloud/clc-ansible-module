@@ -174,6 +174,7 @@ except ImportError:
 else:
     CLC_FOUND = True
 
+
 class ClcLoadBalancer():
 
     clc = None
@@ -198,37 +199,39 @@ class ClcLoadBalancer():
         :return: none
         """
 
-        loadbalancer_name=self.module.params.get('name')
-        loadbalancer_alias=self.module.params.get('alias')
-        loadbalancer_location=self.module.params.get('location')
-        loadbalancer_description=self.module.params.get('description')
-        loadbalancer_port=self.module.params.get('port')
-        loadbalancer_method=self.module.params.get('method')
-        loadbalancer_persistence=self.module.params.get('persistence')
-        loadbalancer_nodes=self.module.params.get('nodes')
-        loadbalancer_status=self.module.params.get('status')
-        state=self.module.params.get('state')
+        loadbalancer_name = self.module.params.get('name')
+        loadbalancer_alias = self.module.params.get('alias')
+        loadbalancer_location = self.module.params.get('location')
+        loadbalancer_description = self.module.params.get('description')
+        loadbalancer_port = self.module.params.get('port')
+        loadbalancer_method = self.module.params.get('method')
+        loadbalancer_persistence = self.module.params.get('persistence')
+        loadbalancer_nodes = self.module.params.get('nodes')
+        loadbalancer_status = self.module.params.get('status')
+        state = self.module.params.get('state')
 
-	if loadbalancer_description == None:
-		loadbalancer_description = loadbalancer_name
+        if loadbalancer_description is None:
+            loadbalancer_description = loadbalancer_name
 
         self._set_clc_credentials_from_env()
 
-        self.lb_dict = self._get_loadbalancer_list(alias=loadbalancer_alias, location=loadbalancer_location)
+        self.lb_dict = self._get_loadbalancer_list(
+            alias=loadbalancer_alias,
+            location=loadbalancer_location)
 
         if state == 'present':
             changed, result_lb, lb_id = self.ensure_loadbalancer_present(name=loadbalancer_name,
-                                                                  alias=loadbalancer_alias,
-                                                                  location=loadbalancer_location,
-                                                                  description=loadbalancer_description,
-                                                                  status=loadbalancer_status)
+                                                                         alias=loadbalancer_alias,
+                                                                         location=loadbalancer_location,
+                                                                         description=loadbalancer_description,
+                                                                         status=loadbalancer_status)
             if loadbalancer_port:
                 changed, result_pool, pool_id = self.ensure_loadbalancerpool_present(lb_id=lb_id,
-                                                                          alias=loadbalancer_alias,
-                                                                          location=loadbalancer_location,
-                                                                          method=loadbalancer_method,
-                                                                          persistence=loadbalancer_persistence,
-                                                                          port=loadbalancer_port)
+                                                                                     alias=loadbalancer_alias,
+                                                                                     location=loadbalancer_location,
+                                                                                     method=loadbalancer_method,
+                                                                                     persistence=loadbalancer_persistence,
+                                                                                     port=loadbalancer_port)
 
                 if loadbalancer_nodes:
                     changed, result_nodes = self.ensure_lbpool_nodes_set(alias=loadbalancer_alias,
@@ -266,7 +269,9 @@ class ClcLoadBalancer():
     #
     #  Functions to define the Ansible module and its arguments
     #
-    def ensure_loadbalancer_present(self,name,alias,location,description,status):
+
+    def ensure_loadbalancer_present(
+            self, name, alias, location, description, status):
         """
         Check for loadbalancer presence (available)
         :param name: Name of loadbalancer
@@ -285,16 +290,17 @@ class ClcLoadBalancer():
         else:
             if not self.module.check_mode:
                 result = self.create_loadbalancer(name=name,
-                                              alias=alias,
-                                              location=location,
-                                              description=description,
-                                              status=status)
+                                                  alias=alias,
+                                                  location=location,
+                                                  description=description,
+                                                  status=status)
                 lb_id = result.get('id')
             changed = True
 
         return changed, result, lb_id
 
-    def ensure_loadbalancerpool_present(self, lb_id, alias, location, method, persistence, port):
+    def ensure_loadbalancerpool_present(
+            self, lb_id, alias, location, method, persistence, port):
         """
         Checks to see if a load balancer pool exists and creates one if it does not.
         :param name: The loadbalancer name
@@ -312,11 +318,21 @@ class ClcLoadBalancer():
         result = None
         if not lb_id:
             return False, None, None
-        pool_id = self._loadbalancerpool_exists(alias=alias, location=location, port=port, lb_id=lb_id)
+        pool_id = self._loadbalancerpool_exists(
+            alias=alias,
+            location=location,
+            port=port,
+            lb_id=lb_id)
         if not pool_id:
             changed = True
             if not self.module.check_mode:
-                result = self.create_loadbalancerpool(alias=alias, location=location, lb_id=lb_id, method=method, persistence=persistence, port=port)
+                result = self.create_loadbalancerpool(
+                    alias=alias,
+                    location=location,
+                    lb_id=lb_id,
+                    method=method,
+                    persistence=persistence,
+                    port=port)
                 pool_id = result.get('id')
 
         else:
@@ -325,7 +341,7 @@ class ClcLoadBalancer():
 
         return changed, result, pool_id
 
-    def ensure_loadbalancer_absent(self,name,alias,location):
+    def ensure_loadbalancer_absent(self, name, alias, location):
         """
         Check for loadbalancer presence (not available)
         :param name: Name of loadbalancer
@@ -365,11 +381,19 @@ class ClcLoadBalancer():
         lb_exists = self._loadbalancer_exists(name=name)
         if lb_exists:
             lb_id = self._get_loadbalancer_id(name=name)
-            pool_id = self._loadbalancerpool_exists(alias=alias, location=location, port=port, lb_id=lb_id)
+            pool_id = self._loadbalancerpool_exists(
+                alias=alias,
+                location=location,
+                port=port,
+                lb_id=lb_id)
             if pool_id:
                 changed = True
                 if not self.module.check_mode:
-                    result = self.delete_loadbalancerpool(alias=alias, location=location, lb_id=lb_id, pool_id=pool_id)
+                    result = self.delete_loadbalancerpool(
+                        alias=alias,
+                        location=location,
+                        lb_id=lb_id,
+                        pool_id=pool_id)
             else:
                 changed = False
                 result = "Pool doesn't exist"
@@ -394,7 +418,11 @@ class ClcLoadBalancer():
         lb_exists = self._loadbalancer_exists(name=name)
         if lb_exists:
             lb_id = self._get_loadbalancer_id(name=name)
-            pool_id = self._loadbalancerpool_exists(alias=alias, location=location, port=port, lb_id=lb_id)
+            pool_id = self._loadbalancerpool_exists(
+                alias=alias,
+                location=location,
+                port=port,
+                lb_id=lb_id)
             if pool_id:
                 nodes_exist = self._loadbalancerpool_nodes_exists(alias=alias,
                                                                   location=location,
@@ -431,13 +459,17 @@ class ClcLoadBalancer():
         lb_exists = self._loadbalancer_exists(name=name)
         if lb_exists:
             lb_id = self._get_loadbalancer_id(name=name)
-            pool_id = self._loadbalancerpool_exists(alias=alias, location=location, port=port, lb_id=lb_id)
+            pool_id = self._loadbalancerpool_exists(
+                alias=alias,
+                location=location,
+                port=port,
+                lb_id=lb_id)
             if pool_id:
                 changed, result = self.add_lbpool_nodes(alias=alias,
-                                               location=location,
-                                               lb_id=lb_id,
-                                               pool_id=pool_id,
-                                               nodes_to_add=nodes)
+                                                        location=location,
+                                                        lb_id=lb_id,
+                                                        pool_id=pool_id,
+                                                        nodes_to_add=nodes)
             else:
                 result = "Pool doesn't exist"
         else:
@@ -460,7 +492,11 @@ class ClcLoadBalancer():
         lb_exists = self._loadbalancer_exists(name=name)
         if lb_exists:
             lb_id = self._get_loadbalancer_id(name=name)
-            pool_id = self._loadbalancerpool_exists(alias=alias, location=location, port=port, lb_id=lb_id)
+            pool_id = self._loadbalancerpool_exists(
+                alias=alias,
+                location=location,
+                port=port,
+                lb_id=lb_id)
             if pool_id:
                 changed, result = self.remove_lbpool_nodes(alias=alias,
                                                            location=location,
@@ -473,7 +509,7 @@ class ClcLoadBalancer():
             result = "Load balancer doesn't Exist"
         return changed, result
 
-    def create_loadbalancer(self,name,alias,location,description,status):
+    def create_loadbalancer(self, name, alias, location, description, status):
         """
         Create a loadbalancer w/ params
         :param name: Name of loadbalancer
@@ -483,11 +519,17 @@ class ClcLoadBalancer():
         :param status: Enabled / Disabled
         :return: Success / Failure
         """
-        result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s' % (alias, location), json.dumps({"name":name,"description":description,"status":status}))
+        result = self.clc.v2.API.Call('POST',
+                                      '/v2/sharedLoadBalancers/%s/%s' % (alias,
+                                                                         location),
+                                      json.dumps({"name": name,
+                                                  "description": description,
+                                                  "status": status}))
         sleep(1)
         return result
 
-    def create_loadbalancerpool(self, alias, location, lb_id, method, persistence, port):
+    def create_loadbalancerpool(
+            self, alias, location, lb_id, method, persistence, port):
         """
         Creates a pool on the provided load balancer
         :param alias: the account alias
@@ -498,10 +540,14 @@ class ClcLoadBalancer():
         :param port: the port that the load balancer will listen on
         :return: result: The result from the create API call
         """
-        result = self.clc.v2.API.Call('POST', '/v2/sharedLoadBalancers/%s/%s/%s/pools' % (alias, location, lb_id), json.dumps({"port":port, "method":method, "persistence":persistence}))
+        result = self.clc.v2.API.Call(
+            'POST', '/v2/sharedLoadBalancers/%s/%s/%s/pools' %
+            (alias, location, lb_id), json.dumps(
+                {
+                    "port": port, "method": method, "persistence": persistence}))
         return result
 
-    def delete_loadbalancer(self,alias,location,name):
+    def delete_loadbalancer(self, alias, location, name):
         """
         Delete CLC loadbalancer
         :param alias: Alias for account
@@ -510,7 +556,9 @@ class ClcLoadBalancer():
         :return: 204 if successful else failure
         """
         lb_id = self._get_loadbalancer_id(name=name)
-        result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, lb_id))
+        result = self.clc.v2.API.Call(
+            'DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' %
+            (alias, location, lb_id))
         return result
 
     def delete_loadbalancerpool(self, alias, location, lb_id, pool_id):
@@ -522,7 +570,9 @@ class ClcLoadBalancer():
         :param pool_id: the id string of the pool
         :return: result: The result from the delete API call
         """
-        result = self.clc.v2.API.Call('DELETE', '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s' % (alias, location, lb_id, pool_id))
+        result = self.clc.v2.API.Call(
+            'DELETE', '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s' %
+            (alias, location, lb_id, pool_id))
         return result
 
     def _get_loadbalancer_id(self, name):
@@ -543,7 +593,8 @@ class ClcLoadBalancer():
         :param location: Datacenter
         :return: JSON data for all loadbalancers at datacenter
         """
-        return self.clc.v2.API.Call('GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
+        return self.clc.v2.API.Call(
+            'GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
 
     def _loadbalancer_exists(self, name):
         """
@@ -568,14 +619,17 @@ class ClcLoadBalancer():
         :return: result: The id string of the pool or False
         """
         result = False
-        pool_list = self.clc.v2.API.Call('GET', '/v2/sharedLoadBalancers/%s/%s/%s/pools' % (alias, location, lb_id))
+        pool_list = self.clc.v2.API.Call(
+            'GET', '/v2/sharedLoadBalancers/%s/%s/%s/pools' %
+            (alias, location, lb_id))
         for pool in pool_list:
             if int(pool.get('port')) == int(port):
                 result = pool.get('id')
 
         return result
 
-    def _loadbalancerpool_nodes_exists(self, alias, location, port, lb_id, pool_id, nodes_to_check):
+    def _loadbalancerpool_nodes_exists(
+            self, alias, location, port, lb_id, pool_id, nodes_to_check):
         """
         Checks to see if a set of nodes exists on the specified port on the provided load balancer
         :param alias: the account alias
@@ -638,10 +692,16 @@ class ClcLoadBalancer():
                 changed = True
                 nodes.append(node)
         if changed == True and not self.module.check_mode:
-            result = self.set_loadbalancernodes(alias, location, lb_id, pool_id, nodes)
+            result = self.set_loadbalancernodes(
+                alias,
+                location,
+                lb_id,
+                pool_id,
+                nodes)
         return changed, result
 
-    def remove_lbpool_nodes(self, alias, location, lb_id, pool_id, nodes_to_remove):
+    def remove_lbpool_nodes(
+            self, alias, location, lb_id, pool_id, nodes_to_remove):
         """
         Removes nodes from the provided pool
         :param alias: the account alias
@@ -663,7 +723,12 @@ class ClcLoadBalancer():
                 changed = True
                 nodes.remove(node)
         if changed == True and not self.module.check_mode:
-            result = self.set_loadbalancernodes(alias, location, lb_id, pool_id, nodes)
+            result = self.set_loadbalancernodes(
+                alias,
+                location,
+                lb_id,
+                pool_id,
+                nodes)
         return changed, result
 
     def _get_lbpool_nodes(self, alias, location, lb_id, pool_id):
@@ -696,7 +761,14 @@ class ClcLoadBalancer():
             persistence=dict(choices=['standard', 'sticky']),
             nodes=dict(type='list', default=[]),
             status=dict(default='enabled', choices=['enabled', 'disabled']),
-            state=dict(default='present', choices=['present', 'absent', 'port_absent', 'nodes_present', 'nodes_absent']),
+            state=dict(
+                default='present',
+                choices=[
+                    'present',
+                    'absent',
+                    'port_absent',
+                    'nodes_present',
+                    'nodes_absent']),
             wait=dict(type='bool', default=True)
         )
 

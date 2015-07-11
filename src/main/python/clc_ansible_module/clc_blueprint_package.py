@@ -246,6 +246,7 @@ class ClcBlueprintPackage():
             ses.headers['User-Agent'] += " " + agent_string
             clc.SetRequestsSession(ses)
 
+
 def main():
     """
     Main function

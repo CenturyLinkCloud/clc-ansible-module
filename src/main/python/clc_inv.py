@@ -39,6 +39,7 @@ from clc import CLCException
 GROUP_POOL_CNT = 10
 HOSTVAR_POOL_CNT = 25
 
+
 def main():
     '''
     Main function
@@ -47,6 +48,7 @@ def main():
     print_inventory_json()
     sys.exit(0)
 
+
 def print_inventory_json():
     '''
     Print the inventory in json.  This is the main execution path for the script
@@ -54,9 +56,9 @@ def print_inventory_json():
     '''
     _set_clc_credentials_from_env()
 
-    groups         = _find_all_groups()
-    servers        = _get_servers_from_groups(groups)
-    hostvars       = _find_all_hostvars_for_servers(servers)
+    groups = _find_all_groups()
+    servers = _get_servers_from_groups(groups)
+    hostvars = _find_all_hostvars_for_servers(servers)
     dynamic_groups = _build_hostvars_dynamic_groups(hostvars)
     groups.update(dynamic_groups)
 
@@ -64,6 +66,7 @@ def print_inventory_json():
     result['_meta'] = hostvars
 
     print(json.dumps(result, indent=2, sort_keys=True))
+
 
 def _find_all_groups():
     '''
@@ -77,8 +80,10 @@ def _find_all_groups():
     results = p.map(_find_groups_for_datacenter, datacenters)
     p.close()
     p.join()
-    results = [result for result in results if result]  # Filter out results with no values
+    # Filter out results with no values
+    results = [result for result in results if result]
     return _parse_groups_result_to_dict(results)
+
 
 def _filter_datacenters(datacenters):
     '''
@@ -88,9 +93,11 @@ def _filter_datacenters(datacenters):
     '''
     include_datacenters = os.environ.get('CLC_FILTER_DATACENTERS')
     if include_datacenters:
-        return [datacenter for datacenter in datacenters if str(datacenter).upper() in include_datacenters.upper().split(',')]
+        return [datacenter for datacenter in datacenters if str(
+            datacenter).upper() in include_datacenters.upper().split(',')]
     else:
         return datacenters
+
 
 def _find_groups_for_datacenter(datacenter):
     '''
@@ -112,10 +119,15 @@ def _find_groups_for_datacenter(datacenter):
 
         if servers:
             result[group.name] = {'hosts': servers}
-            result[str(datacenter).upper() + '_' + group.name] = {'hosts': servers}
+            result[
+                str(datacenter).upper() +
+                '_' +
+                group.name] = {
+                'hosts': servers}
 
     if result:
         return result
+
 
 def _find_all_hostvars_for_servers(servers):
     '''
@@ -136,6 +148,7 @@ def _find_all_hostvars_for_servers(servers):
             hostvars.update(result)
 
     return {'hostvars': hostvars}
+
 
 def _find_hostvars_single_server(server_id):
     '''
@@ -160,6 +173,7 @@ def _find_hostvars_single_server(server_id):
 
     return result
 
+
 def _build_hostvars_dynamic_groups(hostvars):
     '''
     Build a dictionary of dynamically generated groups, parsed from
@@ -170,6 +184,7 @@ def _build_hostvars_dynamic_groups(hostvars):
     result = {}
     result.update(_build_datacenter_groups(hostvars=hostvars))
     return result
+
 
 def _build_datacenter_groups(hostvars):
     '''
@@ -187,6 +202,7 @@ def _build_datacenter_groups(hostvars):
         result[datacenter] += [server]
     return result
 
+
 def _parse_groups_result_to_dict(lst):
     '''
     Return a parsed list of groups that can be converted to Ansible Inventory JSON
@@ -201,6 +217,7 @@ def _parse_groups_result_to_dict(lst):
             result[group]['hosts'] += _flatten_list(groups[group]['hosts'])
     return result
 
+
 def _get_servers_from_groups(groups):
     '''
     Return a flat list of servers for the provided dictionary of groups
@@ -208,6 +225,7 @@ def _get_servers_from_groups(groups):
     :return: flat list of servers ['SERVER1','SERVER2', etc]
     '''
     return set(_flatten_list([groups[group]['hosts'] for group in groups]))
+
 
 def _flatten_list(lst):
     '''
@@ -219,6 +237,7 @@ def _flatten_list(lst):
         lst = list(itertools.chain.from_iterable(lst))
     return lst
 
+
 def _is_list_flat(lst):
     '''
     Checks to see if the list contains any values that are not iterable.
@@ -229,12 +248,13 @@ def _is_list_flat(lst):
     i = 0
     while i < len(lst) and not result:
         result |= (
-            type(lst[i]) is not list and
-            type(lst[i]) is not dict and
-            type(lst[i]) is not tuple and
-            type(lst[i]) is not file)
+            not isinstance(lst[i], list) and
+            not isinstance(lst[i], dict) and
+            not isinstance(lst[i], tuple) and
+            not isinstance(lst[i], file))
         i += 1
     return result
+
 
 def _set_clc_credentials_from_env():
     '''
@@ -261,7 +281,8 @@ def _set_clc_credentials_from_env():
             api_username=v2_api_username,
             api_passwd=v2_api_passwd)
     else:
-        sys.stderr.write("\n\nYou must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables to use the CenturyLink Cloud dynamic inventory script.\n")
+        sys.stderr.write(
+            "\n\nYou must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables to use the CenturyLink Cloud dynamic inventory script.\n")
         sys.exit(1)
 
 if __name__ == '__main__':
