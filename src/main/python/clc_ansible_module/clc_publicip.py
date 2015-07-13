@@ -1,42 +1,35 @@
 #!/usr/bin/python
 
-# CenturyLink Cloud Ansible Modules.
+# Copyright (c) 2015 CenturyLink Cloud
 #
-# These Ansible modules enable the CenturyLink Cloud v2 API to be called
-# from an within Ansible Playbook.
+# This file is part of Ansible.
 #
-# This file is part of CenturyLink Cloud, and is maintained
-# by the Workflow as a Service Team
+# Ansible is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-# Copyright 2015 CenturyLink Cloud
+# Ansible is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-# CenturyLink Cloud: http://www.CenturyLinkCloud.com
-# API Documentation: https://www.centurylinkcloud.com/api-docs/v2/
+# You should have received a copy of the GNU General Public License
+# along with Ansible.  If not, see <http://www.gnu.org/licenses/>
 #
 
 DOCUMENTATION = '''
 module: clc_publicip
-version_added: "1.0"
 short_description: Add and Delete public ips on servers in CenturyLink Cloud.
 description:
   - An Ansible module to add or delete public ip addresses on an existing server or servers in CenturyLink Cloud.
+version_added: 1.0
 options:
   protocol:
     descirption:
       - The protocol that the public IP will listen for.
     default: TCP
+    choices: ['TCP', 'UDP', 'ICMP']
     required: False
   ports:
     description:
@@ -59,6 +52,19 @@ options:
     choices: [ True, False ]
     default: True
     required: False
+requirements:
+    - python >= 2.6
+    - requests >= 2.5.0
+    - clc-sdk
+notes:
+    To use this module, it is required to set the below environment variables which enables access to the
+    Centurylink Cloud
+        - CLC_V2_API_USERNAME: the account login id for the centurylink cloud
+        - CLC_V2_API_PASSWORD: the account passwod for the centurylink cloud
+    Alternatively, the module accepts the API token and account alias. The API token can be generated using the
+    CLC account login and password via the HTTP api call @ https://api.ctl.io/v2/authentication/login
+        - CLC_V2_API_TOKEN: the API token generated from https://api.ctl.io/v2/authentication/login
+        - CLC_ACCT_ALIAS: the account alias associated with the centurylink cloud
 '''
 
 EXAMPLES = '''
@@ -102,7 +108,14 @@ EXAMPLES = '''
 
 __version__ = '${version}'
 
-import requests
+from distutils.version import LooseVersion
+
+try:
+    import requests
+except ImportError:
+    REQUESTS_FOUND = False
+else:
+    REQUESTS_FOUND = True
 
 #
 #  Requires the clc-python-sdk.
@@ -131,6 +144,12 @@ class ClcPublicIp(object):
         if not CLC_FOUND:
             self.module.fail_json(
                 msg='clc-python-sdk required for this module')
+        if not REQUESTS_FOUND:
+            self.module.fail_json(
+                msg='requests library is required for this module')
+        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
+            self.module.fail_json(
+                msg='requests library  version should be >= 2.5.0')
 
         self._set_user_agent(self.clc)
 
@@ -170,8 +189,8 @@ class ClcPublicIp(object):
         """
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
-            protocol=dict(default='TCP'),
-            ports=dict(type='list'),
+            protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
+            ports=dict(type='list', required=True),
             wait=dict(type='bool', default=True),
             state=dict(default='present', choices=['present', 'absent']),
         )
