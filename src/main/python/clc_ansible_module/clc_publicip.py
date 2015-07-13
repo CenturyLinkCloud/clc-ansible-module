@@ -53,7 +53,7 @@ options:
     default: True
     required: False
 requirements:
-    - python >= 2.6
+    - python = 2.7
     - requests >= 2.5.0
     - clc-sdk
 notes:
