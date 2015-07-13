@@ -220,11 +220,21 @@ class ClcPublicIp(object):
                            for port in ports]
         for server in servers_to_change:
             if not self.module.check_mode:
-                result = server.PublicIPs().Add(ports_to_expose)
+                result = self._add_publicip_to_server(server, ports_to_expose)
                 results.append(result)
             changed_server_ids.append(server.id)
             changed = True
         return changed, changed_server_ids, results
+
+    def _add_publicip_to_server(self, server, ports_to_expose):
+        result = None
+        try:
+            result = server.PublicIPs().Add(ports_to_expose)
+        except CLCException, ex:
+            self.module.fail_json(msg='Failed to add public ip to the server : {0}. {1}'.format(
+                server.id, ex.response_text
+            ))
+        return result
 
     def ensure_public_ip_absent(self, server_ids):
         """
@@ -244,18 +254,23 @@ class ClcPublicIp(object):
         servers_to_change = [
             server for server in servers if len(
                 server.PublicIPs().public_ips) > 0]
-        ips_to_delete = []
-        for server in servers_to_change:
-            for ip_address in server.PublicIPs().public_ips:
-                ips_to_delete.append(ip_address)
         for server in servers_to_change:
             if not self.module.check_mode:
-                for ip in ips_to_delete:
-                    result = ip.Delete()
-                    results.append(result)
+                result = self._remove_publicip_from_server(server)
+                results.append(result)
             changed_server_ids.append(server.id)
             changed = True
         return changed, changed_server_ids, results
+
+    def _remove_publicip_from_server(self, server):
+        try:
+            for ip_address in server.PublicIPs().public_ips:
+                    result = ip_address.Delete()
+        except CLCException, ex:
+            self.module.fail_json(msg='Failed to remove public ip from the server : {0}. {1}'.format(
+                server.id, ex.response_text
+            ))
+        return result
 
     def _wait_for_requests_to_complete(self, requests_lst):
         """
