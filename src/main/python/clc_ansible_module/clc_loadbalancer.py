@@ -52,7 +52,7 @@ options:
     description:
       -The balancing method for this pool
     default: roundRobin
-    choices: ['sticky', 'roundRobin']
+    choices: ['leastConnection', 'roundRobin']
   persistence:
     description:
       - The persistence method for this load balancer
