@@ -10,6 +10,7 @@
         ports:
             - 80
         server_ids:
+            - UC1WFADTST01
             - UC1WFADTST02
-        state: absent
+        state: present
       register: clc

@@ -155,10 +155,10 @@ try:
     import clc as clc_sdk
     from clc import CLCException
 except ImportError:
-    clc_found = False
+    CLC_FOUND = False
     clc_sdk = None
 else:
-    clc_found = True
+    CLC_FOUND = True
 
 
 class ClcAlertPolicy():
@@ -173,7 +173,7 @@ class ClcAlertPolicy():
         self.module = module
         self.policy_dict = {}
 
-        if not clc_found:
+        if not CLC_FOUND:
             self.module.fail_json(
                 msg='clc-python-sdk required for this module')
         if not REQUESTS_FOUND:

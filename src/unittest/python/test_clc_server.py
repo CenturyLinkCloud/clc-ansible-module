@@ -34,7 +34,7 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert Expected Behavior
         self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
 
-        # Reset clc_group
+        # Reset
         reload(clc_server)
 
     def test_requests_invalid_version(self):
@@ -52,7 +52,7 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert Expected Behavior
         self.module.fail_json.assert_called_with(msg='requests library  version should be >= 2.5.0')
 
-        # Reset clc_group
+        # Reset
         reload(clc_server)
 
     def test_requests_module_not_found(self):
@@ -71,7 +71,7 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert Expected Behavior
         self.module.fail_json.assert_called_with(msg='requests library is required for this module')
 
-        # Reset clc_group
+        # Reset
         reload(clc_server)
 
     @patch.object(clc_server, 'clc_sdk')

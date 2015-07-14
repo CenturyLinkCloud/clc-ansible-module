@@ -123,7 +123,7 @@ try:
     import clc as clc_sdk
     from clc import CLCException
 except ImportError:
-    clc_found = False
+    CLC_FOUND = False
     clc_sdk = None
 else:
     CLC_FOUND = True
@@ -139,6 +139,7 @@ class ClcSnapshot():
         Construct module
         """
         self.module = module
+
         if not CLC_FOUND:
             self.module.fail_json(
                 msg='clc-python-sdk required for this module')
