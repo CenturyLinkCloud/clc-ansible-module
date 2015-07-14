@@ -27,9 +27,46 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         # Under Test
         with mock.patch('__builtin__.__import__', side_effect=mock_import):
             reload(clc_modify_server)
-            clc_modify_server.ClcModifyServer(self.module)
+            ClcModifyServer(self.module)
         # Assert Expected Behavior
         self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
+
+        # Reset clc_group
+        reload(clc_modify_server)
+
+    def test_requests_invalid_version(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.4.0'
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_modify_server)
+            ClcModifyServer(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library  version should be >= 2.5.0')
+
+        # Reset clc_group
+        reload(clc_modify_server)
+
+    def test_requests_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.7.0'
+                raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_modify_server)
+            ClcModifyServer(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library is required for this module')
 
         # Reset clc_group
         reload(clc_modify_server)

@@ -128,6 +128,7 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
     def test_set_clc_credentials_from_env(self, mock_clc_sdk):
         with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',
                                        'CLC_ACCT_ALIAS': 'TEST'}):
+            self.module.fail_json.called = False
             under_test = ClcAntiAffinityPolicy(self.module)
             under_test._set_clc_credentials_from_env()
         self.assertEqual(under_test.clc._LOGIN_TOKEN_V2, 'dummyToken')
@@ -153,6 +154,54 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
             under_test = ClcAntiAffinityPolicy(self.module)
             under_test._set_clc_credentials_from_env()
         self.assertEqual(self.module.fail_json.called, True)
+
+    def test_clc_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'clc': raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_aa_policy)
+            clc_aa_policy.ClcAntiAffinityPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
+        reload(clc_aa_policy)
+
+    def test_requests_invalid_version(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.4.0'
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_aa_policy)
+            clc_aa_policy.ClcAntiAffinityPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library  version should be >= 2.5.0')
+        reload(clc_aa_policy)
+
+    def test_requests_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.7.0'
+                raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_aa_policy)
+            clc_aa_policy.ClcAntiAffinityPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library is required for this module')
+        reload(clc_aa_policy)
 
     @patch.object(clc_aa_policy, 'AnsibleModule')
     @patch.object(clc_aa_policy, 'ClcAntiAffinityPolicy')

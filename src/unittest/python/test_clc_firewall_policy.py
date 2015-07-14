@@ -4,11 +4,8 @@
 import clc_ansible_module.clc_firewall_policy as clc_firewall_policy
 from clc_ansible_module.clc_firewall_policy import ClcFirewallPolicy
 
-import clc as clc_sdk
-from clc import CLCException
 import mock
 from mock import patch
-from mock import create_autospec
 import unittest
 
 
@@ -28,6 +25,54 @@ class TestClcFirewallPolicy(unittest.TestCase):
         mock_clc_sdk.v2.SetCredentials.assert_called_once_with(
             api_username='hansolo',
             api_passwd='falcon')
+
+    def test_clc_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'clc': raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_firewall_policy)
+            ClcFirewallPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
+        reload(clc_firewall_policy)
+
+    def test_requests_invalid_version(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.4.0'
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_firewall_policy)
+            ClcFirewallPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library  version should be >= 2.5.0')
+        reload(clc_firewall_policy)
+
+    def test_requests_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.7.0'
+                raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_firewall_policy)
+            ClcFirewallPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library is required for this module')
+        reload(clc_firewall_policy)
 
     def test_get_firewall_policy_fail(self):
         source_account_alias = 'WFAD'
@@ -325,26 +370,6 @@ class TestClcFirewallPolicy(unittest.TestCase):
         with patch.dict('os.environ', {}, clear=True):
             under_test = ClcFirewallPolicy(self.module)
             under_test._set_clc_credentials_from_env()
-
-    def test_clc_module_not_found(self):
-        # Setup Mock Import Function
-        import __builtin__ as builtins
-        real_import = builtins.__import__
-
-        def mock_import(name, *args):
-            if name == 'clc':
-                raise ImportError
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_firewall_policy)
-            clc_firewall_policy.ClcFirewallPolicy(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(
-            msg='clc-python-sdk required for this module')
-
-        # Reset clc_group
-        reload(clc_firewall_policy)
 
     @patch.object(clc_firewall_policy, 'AnsibleModule')
     @patch.object(clc_firewall_policy, 'ClcFirewallPolicy')
