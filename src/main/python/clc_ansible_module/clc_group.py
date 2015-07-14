@@ -28,7 +28,6 @@
 
 DOCUMENTATION = '''
 module: clc_group
-version_added: "1.0"
 short_desciption: Create/delete Server Groups at Centurylink Cloud
 description:
   - Create or delete Server Groups at Centurylink Centurylink Cloud
@@ -37,15 +36,19 @@ options:
   name:
     description:
       - The name of the Server Group
+    required: True
   description:
     description:
       - A description of the Server Group
+    required: False
   parent:
     description:
-      - The parent group of the server group
+      - The parent group of the server group. If parent is not provided, it creates the group at top level.
+    required: False
   location:
     description:
-      - Datacenter to create the group in
+      - Datacenter to create the group in. If location is not provided, the group gets created in the default datacenter
+        associated with the account
   state:
     description:
       - Whether to create or delete the group
@@ -182,10 +185,6 @@ class ClcGroup(object):
 
         self.module.exit_json(changed=changed, group=group_name)
 
-    #
-    #  Functions to define the Ansible module and its arguments
-    #
-
     @staticmethod
     def _define_module_argument_spec():
         """
@@ -197,16 +196,9 @@ class ClcGroup(object):
             description=dict(default=None),
             parent=dict(default=None),
             location=dict(default=None),
-            alias=dict(default=None),
-            custom_fields=dict(type='list', default=[]),
-            server_ids=dict(type='list', default=[]),
             state=dict(default='present', choices=['present', 'absent']))
 
         return argument_spec
-
-    #
-    #   Module Behavior Functions
-    #
 
     def _set_clc_credentials_from_env(self):
         """
@@ -344,11 +336,10 @@ class ClcGroup(object):
                 result = True
         return result
 
-    def _get_group_tree_for_datacenter(self, datacenter=None, alias=None):
+    def _get_group_tree_for_datacenter(self, datacenter=None):
         """
         Walk the tree of groups for a datacenter
         :param datacenter: string - the datacenter to walk (ex: 'UC1')
-        :param alias: string - the account alias to search. Defaults to the current user's account
         :return: a dictionary of groups and parents
         """
         self.root_group = self.clc.v2.Datacenter(
