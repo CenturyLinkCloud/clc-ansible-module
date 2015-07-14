@@ -60,7 +60,6 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
         self.assertEqual(args, dict(
             name=dict(required=True),
             location=dict(required=True),
-            alias=dict(default=None),
             state=dict(default='present', choices=['present', 'absent']),
             wait=dict(default=True)
         ))

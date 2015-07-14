@@ -164,7 +164,6 @@ class ClcAntiAffinityPolicy():
         argument_spec = dict(
             name=dict(required=True),
             location=dict(required=True),
-            alias=dict(default=None),
             wait=dict(default=True),
             state=dict(default='present', choices=['present', 'absent']),
         )
