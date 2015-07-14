@@ -95,9 +95,9 @@ options:
   enabled:
     description:
       - If the firewall policy is enabled or disabled
-    default: true
+    default: True
     required: False
-    choices: [ true, false ]
+    choices: [ True, False ]
     aliases: []
 requirements:
     - python = 2.7
@@ -142,7 +142,7 @@ EXAMPLES = '''
       clc_firewall:
         source_account_alias: WFAD
         location: VA1
-        state: present
+        state: absent
         firewall_policy_id: c62105233d7a4231bd2e91b9c791eaae
 '''
 
@@ -209,7 +209,7 @@ class ClcFirewallPolicy():
             destination=dict(defualt=None, type='list'),
             wait=dict(default=True),
             state=dict(default='present', choices=['present', 'absent']),
-            enabled=dict(defualt=None)
+            enabled=dict(defualt=True, choices=[True, False])
         )
         return argument_spec
 
