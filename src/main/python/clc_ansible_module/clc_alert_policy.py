@@ -31,6 +31,7 @@ version_added: "1.0"
 short_descirption: Create or Delete Alert Policies at CenturyLink Cloud.
 description:
   - An Ansible module to Create or Delete Alert Policies at CenturyLink Cloud.
+version_added: 1.0
 options:
   alias:
     description:

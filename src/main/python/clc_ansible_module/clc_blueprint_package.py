@@ -32,6 +32,7 @@ version_added: "1.0"
 short_desciption: deploys a blue print package on a set of servers in CenturyLink Cloud.
 description:
   - An Ansible module to deploy blue print package on a set of servers in CenturyLink Cloud.
+version_added: 1.0
 options:
   server_ids:
     description:

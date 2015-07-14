@@ -33,6 +33,7 @@ version_added: "1.0"
 short_desciption: Create/delete/update firewall policies
 description:
   - Create or delete or updated firewall polices on Centurylink Centurylink Cloud
+version_added: 1.0
 options:
   location:
     description:

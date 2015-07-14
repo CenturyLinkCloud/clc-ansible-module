@@ -32,6 +32,7 @@ version_added: "1.0"
 short_desciption: Create/delete Server Groups at Centurylink Cloud
 description:
   - Create or delete Server Groups at Centurylink Centurylink Cloud
+version_added: 1.0
 options:
   name:
     description:
