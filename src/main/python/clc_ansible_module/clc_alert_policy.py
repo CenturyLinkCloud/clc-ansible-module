@@ -195,16 +195,16 @@ class ClcAlertPolicy():
             name=dict(default=None),
             id=dict(default=None),
             alias=dict(required=True, default=None),
-            alert_recipients=dict(type='list', required=False, default=None),
+            alert_recipients=dict(type='list', required=True, default=None),
             metric=dict(
-                required=False,
+                required=True,
                 choices=[
                     'cpu',
                     'memory',
                     'disk'],
                 default=None),
-            duration=dict(required=False, type='str', default=None),
-            threshold=dict(required=False, type='int', default=None),
+            duration=dict(required=True, type='str', default=None),
+            threshold=dict(required=True, type='int', default=None),
             state=dict(default='present', choices=['present', 'absent'])
         )
         mutually_exclusive = [

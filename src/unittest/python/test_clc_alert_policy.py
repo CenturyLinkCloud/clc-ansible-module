@@ -631,15 +631,15 @@ class TestClcAlertPolicy(unittest.TestCase):
         self.assertEqual(args, {'argument_spec':
                                     {'name': {'default': None},
                                      'metric': {'default': None,
-                                                'required': False,
+                                                'required': True,
                                                 'choices': ['cpu', 'memory', 'disk']},
                                      'alert_recipients': {'default': None,
-                                                          'required': False,
+                                                          'required': True,
                                                           'type': 'list'},
                                      'alias': {'default': None, 'required': True},
                                      'state': {'default': 'present', 'choices': ['present', 'absent']},
-                                     'threshold': {'default': None, 'required': False, 'type': 'int'},
-                                     'duration': {'default': None, 'required': False, 'type': 'str'},
+                                     'threshold': {'default': None, 'required': True, 'type': 'int'},
+                                     'duration': {'default': None, 'required': True, 'type': 'str'},
                                      'id': {'default': None}}, 'mutually_exclusive': [['name', 'id']]})
 
 
