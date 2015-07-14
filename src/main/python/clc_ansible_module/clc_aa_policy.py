@@ -240,9 +240,14 @@ class ClcAntiAffinityPolicy():
         :param p: datacenter to create policy in
         :return: response dictionary from the CLC API.
         """
-        return self.clc.v2.AntiAffinity.Create(
-            name=p['name'],
-            location=p['location'])
+        try:
+            return self.clc.v2.AntiAffinity.Create(
+                name=p['name'],
+                location=p['location'])
+        except CLCException, ex:
+            self.module.fail_json(msg='Failed to create anti affinity policy : {0}. {1}'.format(
+                p['name'], ex.response_text
+            ))
 
     def _delete_policy(self, p):
         """
@@ -250,8 +255,13 @@ class ClcAntiAffinityPolicy():
         :param p: datacenter to delete a policy from
         :return: none
         """
-        policy = self.policy_dict[p['name']]
-        policy.Delete()
+        try:
+            policy = self.policy_dict[p['name']]
+            policy.Delete()
+        except CLCException, ex:
+            self.module.fail_json(msg='Failed to delete anti affinity policy : {0}. {1}'.format(
+                p['name'], ex.response_text
+            ))
 
     def _policy_exists(self, policy_name):
         """
