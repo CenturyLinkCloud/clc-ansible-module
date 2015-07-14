@@ -37,7 +37,7 @@ import clc
 from clc import CLCException
 
 GROUP_POOL_CNT = 10
-HOSTVAR_POOL_CNT = 25
+HOSTVAR_POOL_CNT = 1
 
 
 def main():
