@@ -10,7 +10,6 @@
         ports:
             - 80
         server_ids:
-            - UC1NJSTTEST04
-            - UC1NJSTTEST05
-        state: present
+            - UC1WFADTST02
+        state: absent
       register: clc

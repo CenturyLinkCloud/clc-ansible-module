@@ -221,10 +221,6 @@ class ClcAlertPolicy():
         """
         p = self.module.params
 
-        if not clc_found:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-
         self._set_clc_credentials_from_env()
         self.policy_dict = self._get_alert_policies(p['alias'])
 

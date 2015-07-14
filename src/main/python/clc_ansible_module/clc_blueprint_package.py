@@ -134,10 +134,6 @@ class ClcBlueprintPackage():
         """
         p = self.module.params
 
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-
         self._set_clc_credentials_from_env()
 
         server_ids = p['server_ids']

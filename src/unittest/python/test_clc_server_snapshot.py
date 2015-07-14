@@ -153,24 +153,6 @@ class TestClcServerSnapshotFunctions(unittest.TestCase):
         self.module.exit_json.assert_called_once_with(changed=True, server_ids=['TESTSVR1'])
         self.assertFalse(self.module.fail_json.called)
 
-
-    @patch.object(ClcSnapshot, 'ensure_server_snapshot_present')
-    @patch.object(ClcSnapshot, '_set_clc_credentials_from_env')
-    def test_process_request_state_invalid(self, mock_set_clc_creds, mock_server_snapshot):
-        test_params = {
-            'server_ids': ['TESTSVR1', 'TESTSVR2']
-            ,'expiration_days': 7
-            ,'wait': True
-            , 'state': 'INVALID'
-        }
-
-        self.module.params = test_params
-        under_test = ClcSnapshot(self.module)
-        under_test.process_request()
-        self.assertFalse(mock_server_snapshot.called)
-        self.module.fail_json.assert_called_once_with(msg='Unknown State: INVALID')
-        self.assertFalse(self.module.exit_json.called)
-
     @patch.object(ClcSnapshot, '_get_servers_from_clc')
     def test_ensure_server_snapshot_present_w_mock_server(self,mock_get_servers):
         server_ids = ['TESTSVR1']

@@ -158,29 +158,23 @@ class ClcSnapshot():
         """
         p = self.module.params
 
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-
         server_ids = p['server_ids']
         expiration_days = p['expiration_days']
         state = p['state']
-
-        if not server_ids:
-            return self.module.fail_json(msg='List of Server ids are required')
+        requests = []
+        changed = False
+        changed_servers = []
 
         self._set_clc_credentials_from_env()
         if state == 'present':
             changed, requests, changed_servers = self.ensure_server_snapshot_present(server_ids=server_ids,
-                                                                                     expiration_days=expiration_days)
+                                                                                    expiration_days=expiration_days)
         elif state == 'absent':
             changed, requests, changed_servers = self.ensure_server_snapshot_absent(
                 server_ids=server_ids)
         elif state == 'restore':
             changed, requests, changed_servers = self.ensure_server_snapshot_restore(
                 server_ids=server_ids)
-        else:
-            return self.module.fail_json(msg="Unknown State: " + state)
 
         self._wait_for_requests_to_complete(requests)
         return self.module.exit_json(
