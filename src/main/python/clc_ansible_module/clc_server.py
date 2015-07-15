@@ -664,9 +664,12 @@ class ClcServer():
 
         if not network_id:
             try:
-                datacenter_networks = clc_sdk.v2.Networks(
-                    networks_lst=datacenter._DeploymentCapabilities()['deployableNetworks'])
-                network_id = datacenter_networks.networks[0].id
+                network_id = datacenter.Networks().networks[0].id
+                # -- added for clc-sdk 2.23 compatibility
+                # datacenter_networks = clc_sdk.v2.Networks(
+                #   networks_lst=datacenter._DeploymentCapabilities()['deployableNetworks'])
+                # network_id = datacenter_networks.networks[0].id
+                # -- end
             except CLCException:
                 module.fail_json(
                     msg=str(
