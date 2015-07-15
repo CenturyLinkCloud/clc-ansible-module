@@ -8,7 +8,7 @@
 # This file is part of CenturyLink Cloud, and is maintained
 # by the Workflow as a Service Team
 #
-# Copyright 2015 CenturyLink Cloud
+# Copyright 2015 CenturyLink 
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -665,6 +665,11 @@ class ClcServer():
         if not network_id:
             try:
                 network_id = datacenter.Networks().networks[0].id
+                # -- added for clc-sdk 2.23 compatibility
+                # datacenter_networks = clc_sdk.v2.Networks(
+                #   networks_lst=datacenter._DeploymentCapabilities()['deployableNetworks'])
+                # network_id = datacenter_networks.networks[0].id
+                # -- end
             except CLCException:
                 module.fail_json(
                     msg=str(
@@ -732,17 +737,17 @@ class ClcServer():
                     requests.append(req)
                     servers.append(server)
 
-                    ClcServer._wait_for_requests(clc, requests, servers, wait)
+            ClcServer._wait_for_requests(clc, requests, servers, wait)
 
-                    ClcServer._add_public_ip_to_servers(
-                        should_add_public_ip=add_public_ip,
-                        servers=servers,
-                        public_ip_protocol=public_ip_protocol,
-                        public_ip_ports=public_ip_ports,
-                        wait=wait)
-                    ClcServer._add_alert_policy_to_servers(clc=clc,
-                                                           module=module,
-                                                           servers=servers)
+            ClcServer._add_public_ip_to_servers(
+                should_add_public_ip=add_public_ip,
+                servers=servers,
+                public_ip_protocol=public_ip_protocol,
+                public_ip_ports=public_ip_ports,
+                wait=wait)
+            ClcServer._add_alert_policy_to_servers(clc=clc,
+                                                   module=module,
+                                                   servers=servers)
 
             for server in servers:
                 # reload server details
@@ -903,6 +908,10 @@ class ClcServer():
         alert_policy_id = p.get('alert_policy_id')
         alert_policy_name = p.get('alert_policy_name')
         alias = p.get('alias')
+
+        if not alert_policy_id and not alert_policy_name:
+            return # no alert policy info provide so do nothing
+
         if not alert_policy_id and alert_policy_name:
             alert_policy_id = ClcServer._get_alert_policy_id_by_name(
                 clc=clc,
@@ -914,13 +923,14 @@ class ClcServer():
                 module.fail_json(
                     msg='No alert policy exist with name : %s'
                         % (alert_policy_name))
-        for server in servers:
-            ClcServer._add_alert_policy_to_server(
-                clc=clc,
-                module=module,
-                alias=alias,
-                server_id=server.id,
-                alert_policy_id=alert_policy_id)
+        if alert_policy_id and not module.check_mode:
+            for server in servers:
+                ClcServer._add_alert_policy_to_server(
+                    clc=clc,
+                    module=module,
+                    alias=alias,
+                    server_id=server.id,
+                    alert_policy_id=alert_policy_id)
 
     @staticmethod
     def _add_alert_policy_to_server(

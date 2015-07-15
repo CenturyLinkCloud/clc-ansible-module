@@ -8,7 +8,7 @@
 # This file is part of CenturyLink Cloud, and is maintained
 # by the Workflow as a Service Team
 #
-# Copyright 2015 CenturyLink Cloud
+# Copyright 2015 CenturyLink 
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ options:
     description:
       -The balancing method for this pool
     default: roundRobin
-    choices: ['sticky', 'roundRobin']
+    choices: ['leastConnection', 'roundRobin']
   persistence:
     description:
       - The persistence method for this load balancer
