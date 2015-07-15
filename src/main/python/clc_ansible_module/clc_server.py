@@ -766,44 +766,45 @@ class ClcServer():
 
         changed = False if count == 0 else True
 
-        if changed:
-            for i in range(0, count):
-                if not module.check_mode:
-                    req = ClcServer._create_clc_server(clc=clc,
-                                                       module=module,
-                                                       server_params=params)
-                    server = req.requests[0].Server()
-                    requests.append(req)
-                    servers.append(server)
-
-            ClcServer._wait_for_requests(clc, requests, servers, wait)
-
-            ip_failed_servers = ClcServer._add_public_ip_to_servers(
-                clc=clc,
-                module=module,
-                should_add_public_ip=add_public_ip,
-                servers=servers,
-                public_ip_protocol=public_ip_protocol,
-                public_ip_ports=public_ip_ports,
-                wait=wait)
-            ap_failed_servers = ClcServer._add_alert_policy_to_servers(clc=clc,
+        if not changed:
+            return server_dict_array, created_server_ids, partial_created_servers_ids, changed
+        for i in range(0, count):
+            if not module.check_mode:
+                req = ClcServer._create_clc_server(clc=clc,
                                                    module=module,
-                                                   servers=servers)
+                                                   server_params=params)
+                server = req.requests[0].Server()
+                requests.append(req)
+                servers.append(server)
 
-            for server in servers:
-                if server in ip_failed_servers or server in ap_failed_servers:
-                    partial_created_servers_ids.append(server.id)
-                else:
-                    # reload server details
-                    server = clc.v2.Server(server.id)
-                    server.data['ipaddress'] = server.details[
-                        'ipAddresses'][0]['internal']
+        ClcServer._wait_for_requests(clc, requests, servers, wait)
 
-                    if add_public_ip and len(server.PublicIPs().public_ips) > 0:
-                        server.data['publicip'] = str(
-                            server.PublicIPs().public_ips[0])
-                    created_server_ids.append(server.id)
-                server_dict_array.append(server.data)
+        ip_failed_servers = ClcServer._add_public_ip_to_servers(
+            clc=clc,
+            module=module,
+            should_add_public_ip=add_public_ip,
+            servers=servers,
+            public_ip_protocol=public_ip_protocol,
+            public_ip_ports=public_ip_ports,
+            wait=wait)
+        ap_failed_servers = ClcServer._add_alert_policy_to_servers(clc=clc,
+                                               module=module,
+                                               servers=servers)
+
+        for server in servers:
+            if server in ip_failed_servers or server in ap_failed_servers:
+                partial_created_servers_ids.append(server.id)
+            else:
+                # reload server details
+                server = clc.v2.Server(server.id)
+                server.data['ipaddress'] = server.details[
+                    'ipAddresses'][0]['internal']
+
+                if add_public_ip and len(server.PublicIPs().public_ips) > 0:
+                    server.data['publicip'] = str(
+                        server.PublicIPs().public_ips[0])
+                created_server_ids.append(server.id)
+            server_dict_array.append(server.data)
 
         return server_dict_array, created_server_ids, partial_created_servers_ids, changed
 
@@ -927,23 +928,25 @@ class ClcServer():
         :return: none
         """
         failed_servers = []
-        if should_add_public_ip:
-            ports_lst = []
-            requests = []
+        if not should_add_public_ip:
+            return failed_servers
 
-            for port in public_ip_ports:
-                ports_lst.append(
-                    {'protocol': public_ip_protocol, 'port': port})
-            try:
-                if not module.check_mode:
-                    for server in servers:
-                        request = server.PublicIPs().Add(ports_lst)
-                        requests.append(request)
-            except clc.APIFailedResponse:
-                failed_servers.append(server)
-            if wait:
-                for r in requests:
-                    r.WaitUntilComplete()
+        ports_lst = []
+        requests = []
+
+        for port in public_ip_ports:
+            ports_lst.append(
+                {'protocol': public_ip_protocol, 'port': port})
+        try:
+            if not module.check_mode:
+                for server in servers:
+                    request = server.PublicIPs().Add(ports_lst)
+                    requests.append(request)
+        except clc.APIFailedResponse:
+            failed_servers.append(server)
+        if wait:
+            for r in requests:
+                r.WaitUntilComplete()
         return failed_servers
 
     @staticmethod
