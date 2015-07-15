@@ -849,5 +849,31 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_ClcServer.assert_called_once_with(mock_AnsibleModule_instance)
         mock_ClcServer_instance.process_request.assert_called_once
 
+    @patch.object(ClcServer, '_wait_for_requests')
+    @patch.object(ClcServer, '_create_clc_server')
+    @patch.object(ClcServer, '_add_alert_policy_to_servers')
+    @patch.object(ClcServer, '_add_public_ip_to_servers')
+    @patch.object(clc_server, 'AnsibleModule')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_create_servers_w_partial_servers(self, mock_clc_sdk, mock_ansible_module,
+                                              mock_public_ip, mock_alert_pol, mock_create_server,
+                                              mock_wait_for_requests):
+        mock_ansible_module.check_mode = False
+        mock_alert_pol.return_value = ['server2']
+        mock_wait_for_requests.return_value = 'success'
+        mock_request = mock.MagicMock()
+        mock_server = mock.MagicMock()
+        mock_server.id = 'server1'
+        mock_request.requests[0].Server.side_effect = [mock_server]
+        mock_public_ip.return_value = [mock_server]
+        mock_create_server.return_value = mock_request
+        under_test = ClcServer(mock_ansible_module)
+        server_dict_array, created_server_ids, partial_created_servers_ids, changed = \
+            under_test._create_servers(mock_ansible_module, mock_clc_sdk)
+        self.assertEqual(changed, True)
+        self.assertEqual(partial_created_servers_ids, ['server1'])
+
+
+
 if __name__ == '__main__':
     unittest.main()

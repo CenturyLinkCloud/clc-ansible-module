@@ -331,8 +331,7 @@ class ClcServer():
         """
         self._set_clc_credentials_from_env()
 
-        self.module.params = ClcServer._validate_module_params(self.clc,
-                                                               self.module)
+        self.module.params = self._validate_module_params(self.clc, self.module)
         p = self.module.params
         state = p.get('state')
 
@@ -349,9 +348,9 @@ class ClcServer():
 
             (changed,
              server_dict_array,
-             new_server_ids) = ClcServer._delete_servers(module=self.module,
-                                                         clc=self.clc,
-                                                         server_ids=server_ids)
+             new_server_ids) = self._delete_servers(module=self.module,
+                                                    clc=self.clc,
+                                                    server_ids=server_ids)
 
         elif state in ('started', 'stopped'):
             server_ids = p.get('server_ids')
@@ -362,9 +361,9 @@ class ClcServer():
 
             (changed,
              server_dict_array,
-             new_server_ids) = ClcServer._startstop_servers(self.module,
-                                                            self.clc,
-                                                            server_ids)
+             new_server_ids) = self._startstop_servers(self.module,
+                                                       self.clc,
+                                                       server_ids)
 
         elif state == 'present':
             # Changed is always set to true when provisioning new instances
@@ -376,14 +375,14 @@ class ClcServer():
                 (server_dict_array,
                  new_server_ids,
                  partial_servers_ids,
-                 changed) = ClcServer._create_servers(self.module,
-                                                      self.clc)
+                 changed) = self._create_servers(self.module,
+                                                 self.clc)
             else:
                 (server_dict_array,
                  new_server_ids,
                  partial_servers_ids,
-                 changed) = ClcServer._enforce_count(self.module,
-                                                     self.clc)
+                 changed) = self._enforce_count(self.module,
+                                                self.clc)
 
         self.module.exit_json(
             changed=changed,
@@ -717,8 +716,7 @@ class ClcServer():
                         % (alert_policy_name))
         return alert_policy_id
 
-    @staticmethod
-    def _create_servers(module, clc, override_count=None):
+    def _create_servers(self, module, clc, override_count=None):
         """
         Create New Servers
         :param module: the AnsibleModule object
@@ -770,16 +768,16 @@ class ClcServer():
             return server_dict_array, created_server_ids, partial_created_servers_ids, changed
         for i in range(0, count):
             if not module.check_mode:
-                req = ClcServer._create_clc_server(clc=clc,
-                                                   module=module,
-                                                   server_params=params)
+                req = self._create_clc_server(clc=clc,
+                                              module=module,
+                                              server_params=params)
                 server = req.requests[0].Server()
                 requests.append(req)
                 servers.append(server)
 
-        ClcServer._wait_for_requests(clc, requests, servers, wait)
+        self._wait_for_requests(clc, requests, servers, wait)
 
-        ip_failed_servers = ClcServer._add_public_ip_to_servers(
+        ip_failed_servers = self._add_public_ip_to_servers(
             clc=clc,
             module=module,
             should_add_public_ip=add_public_ip,
@@ -787,9 +785,9 @@ class ClcServer():
             public_ip_protocol=public_ip_protocol,
             public_ip_ports=public_ip_ports,
             wait=wait)
-        ap_failed_servers = ClcServer._add_alert_policy_to_servers(clc=clc,
-                                               module=module,
-                                               servers=servers)
+        ap_failed_servers = self._add_alert_policy_to_servers(clc=clc,
+                                                              module=module,
+                                                              servers=servers)
 
         for server in servers:
             if server in ip_failed_servers or server in ap_failed_servers:
@@ -827,8 +825,7 @@ class ClcServer():
 #  (called from main())
 #
 
-    @staticmethod
-    def _enforce_count(module, clc):
+    def _enforce_count(self, module, clc):
         """
         Enforce that there is the right number of servers in the provided group.
         Starts or stops servers as necessary.
@@ -861,7 +858,7 @@ class ClcServer():
             changed = True
             to_create = exact_count - len(running_servers)
             server_dict_array, changed_server_ids, partial_servers_ids, changed \
-                = ClcServer._create_servers(module, clc, override_count=to_create)
+                = self._create_servers(module, clc, override_count=to_create)
 
             for server in server_dict_array:
                 running_servers.append(server)
