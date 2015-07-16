@@ -52,6 +52,9 @@ class TestClcInvFunctions(unittest.TestCase):
         result = clc_inv._find_hostvars_single_server('testServerWithNoDetails')
         self.assertIsNone(result)
 
+    def test_find_hostvars_single_server_uses_unique_session(self):
+        pass
+
     @patch.object(clc_inv, 'clc')
     def test_set_clc_credentials_from_env(self, mock_clc_sdk):
         with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',
@@ -118,6 +121,7 @@ class TestClcInvFunctions(unittest.TestCase):
             mock_build.return_value = {'status': 'OK'}
             res = clc_inv._build_hostvars_dynamic_groups(input)
             self.assertEqual(res, {'status': 'OK'})
+
 
 if __name__ == '__main__':
     unittest.main()
