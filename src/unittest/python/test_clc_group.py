@@ -3,6 +3,7 @@
 import clc_ansible_module.clc_group as clc_group
 from clc_ansible_module.clc_group import ClcGroup
 
+from clc import CLCException
 import clc as clc_sdk
 import mock
 from mock import patch
@@ -326,6 +327,62 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert Expected Result
         self.assertEqual(result_changed, False)
         self.assertFalse(mock_group.Delete.called)
+
+    def test_create_group_exception(self):
+        # Setup Test
+        mock_group = mock.MagicMock()
+        mock_group.name = "MockGroup"
+
+        error = CLCException('Failed')
+        error.response_text = 'group failed'
+
+        mock_parent = mock.MagicMock()
+        mock_parent.name = "MockParent"
+        mock_parent.Create.side_effect = error
+
+        mock_grandparent = mock.MagicMock()
+        mock_grandparent.name = "MockGrandparent"
+
+        mock_rootgroup = mock.MagicMock()
+        mock_rootgroup.name = "MockRootGroup"
+
+        mock_group_dict = {mock_parent.name: (mock_parent, mock_grandparent),
+                           mock_group.name: (mock_group, mock_parent)}
+
+        under_test = ClcGroup(self.module)
+        under_test.group_dict = mock_group_dict
+        under_test.root_group = mock_rootgroup
+        ret = under_test._create_group('test', mock_parent.name, 'test')
+        self.assertIsNone(ret, 'The return value should be None')
+        self.module.fail_json.assert_called_once_with(msg='Failed to create group :test. group failed')
+
+    def test_delete_group_exception(self):
+        # Setup Test
+        mock_group = mock.MagicMock()
+        mock_group.name = "test"
+
+        error = CLCException('Failed')
+        error.response_text = 'group failed'
+        mock_group.Delete.side_effect = error
+
+        mock_parent = mock.MagicMock()
+        mock_parent.name = "MockParent"
+
+        mock_grandparent = mock.MagicMock()
+        mock_grandparent.name = "MockGrandparent"
+
+        mock_rootgroup = mock.MagicMock()
+        mock_rootgroup.name = "MockRootGroup"
+
+        mock_group_dict = {mock_parent.name: (mock_parent, mock_grandparent),
+                           mock_group.name: (mock_group, mock_parent)}
+
+        under_test = ClcGroup(self.module)
+        under_test.group_dict = mock_group_dict
+        under_test.root_group = mock_rootgroup
+        ret = under_test._delete_group('test')
+        self.assertIsNone(ret, 'The return value should be None')
+        self.module.fail_json.assert_called_once_with(msg='Failed to delete group :test. group failed')
 
     @patch.object(clc_group, 'AnsibleModule')
     @patch.object(clc_group, 'ClcGroup')

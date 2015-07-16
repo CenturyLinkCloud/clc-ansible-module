@@ -254,8 +254,14 @@ class ClcGroup(object):
         :param group_name: string - the server group to delete
         :return: none
         """
+        response = None
         group, parent = self.group_dict.get(group_name)
-        response = group.Delete()
+        try:
+            response = group.Delete()
+        except CLCException, ex:
+            self.module.fail_json(msg='Failed to delete group :{0}. {1}'.format(
+                group_name, ex.response_text
+            ))
         return response
 
     def _ensure_group_is_present(
@@ -314,13 +320,15 @@ class ClcGroup(object):
         :param description: string - a text description of the group
         :return: clc_sdk.Group - the created group
         """
-
+        response = None
         (parent, grandparent) = self.group_dict[parent]
-        return parent.Create(name=group, description=description)
-
-    #
-    #   Utility Functions
-    #
+        try:
+            response = parent.Create(name=group, description=description)
+        except CLCException, ex:
+            self.module.fail_json(msg='Failed to create group :{0}. {1}'.format(
+                    group, ex.response_text
+                ))
+        return response
 
     def _group_exists(self, group_name, parent_name):
         """
