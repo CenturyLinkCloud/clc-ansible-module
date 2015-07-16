@@ -49,11 +49,18 @@ options:
     description:
       - Datacenter to create the group in. If location is not provided, the group gets created in the default datacenter
         associated with the account
+    required: False
   state:
     description:
       - Whether to create or delete the group
     default: present
     choices: ['present', 'absent']
+  wait:
+    description:
+      - Whether to wait for the tasks to finish before returning.
+    choices: [ True, False ]
+    default: True
+    required: False
 requirements:
     - python = 2.7
     - requests >= 2.5.0
@@ -176,13 +183,14 @@ class ClcGroup(object):
             datacenter=location)
 
         if state == "absent":
-            changed, group, response = self._ensure_group_is_absent(
+            changed, group, requests = self._ensure_group_is_absent(
                 group_name=group_name, parent_name=parent_name)
 
         else:
-            changed, group, response = self._ensure_group_is_present(
+            changed, group, requests = self._ensure_group_is_present(
                 group_name=group_name, parent_name=parent_name, group_description=group_description)
-
+        if requests:
+            self._wait_for_requests_to_complete(requests)
         self.module.exit_json(changed=changed, group=group_name)
 
     @staticmethod
@@ -196,7 +204,8 @@ class ClcGroup(object):
             description=dict(default=None),
             parent=dict(default=None),
             location=dict(default=None),
-            state=dict(default='present', choices=['present', 'absent']))
+            state=dict(default='present', choices=['present', 'absent']),
+            wait=dict(type='bool', default=True))
 
         return argument_spec
 
@@ -236,17 +245,14 @@ class ClcGroup(object):
         :return: changed, group
         """
         changed = False
-        group = []
-        results = []
+        requests = []
 
         if self._group_exists(group_name=group_name, parent_name=parent_name):
             if not self.module.check_mode:
-                group.append(group_name)
-                for g in group:
-                    result = self._delete_group(group_name)
-                    results.append(result)
+                request = self._delete_group(group_name)
+                requests.append(request)
             changed = True
-        return changed, group, results
+        return changed, group_name, requests
 
     def _delete_group(self, group_name):
         """
@@ -282,9 +288,6 @@ class ClcGroup(object):
         parent = parent_name if parent_name is not None else self.root_group.name
         description = group_description
         changed = False
-        results = []
-        groups = []
-        group = group_name
 
         parent_exists = self._group_exists(group_name=parent, parent_name=None)
         child_exists = self._group_exists(
@@ -296,13 +299,10 @@ class ClcGroup(object):
             changed = False
         elif parent_exists and not child_exists:
             if not self.module.check_mode:
-                groups.append(group_name)
-                for g in groups:
-                    group = self._create_group(
-                        group=group,
-                        parent=parent,
-                        description=description)
-                    results.append(group)
+                self._create_group(
+                    group=group_name,
+                    parent=parent,
+                    description=description)
             changed = True
         else:
             self.module.fail_json(
@@ -310,7 +310,7 @@ class ClcGroup(object):
                 parent +
                 " does not exist")
 
-        return changed, group, results
+        return changed, group_name, None
 
     def _create_group(self, group, parent, description):
         """
@@ -372,6 +372,21 @@ class ClcGroup(object):
 
                 result.update(self._walk_groups_recursive(child_group, group))
         return result
+
+    def _wait_for_requests_to_complete(self, requests_lst):
+        """
+        Waits until the CLC requests are complete if the wait argument is True
+        :param requests_lst: The list of CLC request objects
+        :return: none
+        """
+        if not self.module.params['wait']:
+            return
+        for request in requests_lst:
+            request.WaitUntilComplete()
+            for request_details in request.requests:
+                if request_details.Status() != 'succeeded':
+                    self.module.fail_json(
+                        msg='Unable to process public ip request')
 
     @staticmethod
     def _set_user_agent(clc):

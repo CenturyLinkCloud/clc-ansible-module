@@ -16,6 +16,12 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module = mock.MagicMock()
         self.datacenter = mock.MagicMock()
 
+    def build_mock_request_list(self, mock_server_list=None, status='succeeded'):
+        mock_request_list = [mock.MagicMock()]
+        for request in mock_request_list:
+            request.Status.return_value = status
+        return mock_request_list
+
     def test_clc_module_not_found(self):
         # Setup Mock Import Function
         import __builtin__ as builtins
@@ -145,7 +151,8 @@ class TestClcServerFunctions(unittest.TestCase):
             'name': 'MyCoolGroup',
             'parent': 'Default Group',
             'description': 'Test Group',
-            'state': 'present'
+            'state': 'present',
+            'wait': 'True'
         }
         mock_group = mock.MagicMock()
         mock_group.data = {"name": "MyCoolGroup"}
@@ -175,7 +182,8 @@ class TestClcServerFunctions(unittest.TestCase):
             'name': 'MyCoolGroup',
             'parent': 'Default Group',
             'description': 'Test Group',
-            'state': 'absent'
+            'state': 'absent',
+            'wait': 'True'
         }
         mock_group = mock.MagicMock()
         mock_group.data = {"name": "MyCoolGroup"}
@@ -224,7 +232,7 @@ class TestClcServerFunctions(unittest.TestCase):
             group_name=mock_group.name, parent_name=mock_parent.name, group_description="Mock Description")
         # Assert Expected Result
         self.assertTrue(result_changed)
-        self.assertEqual(result_group, mock_group)
+        self.assertEqual(result_group, mock_group.name)
         self.assertFalse(self.module.fail_json.called)
 
     def test_ensure_group_is_present_parent_not_exist(self):
@@ -282,7 +290,7 @@ class TestClcServerFunctions(unittest.TestCase):
             group_name=mock_group.name, parent_name=mock_parent.name, group_description="Mock Description")
         # Assert Expected Result
         self.assertFalse(result_changed)
-        self.assertEqual(result_group, mock_group)
+        self.assertEqual(result_group, mock_group.name)
         self.assertFalse(self.module.fail_json.called)
 
     def test_ensure_group_is_absent_group_exists(self):
@@ -383,6 +391,18 @@ class TestClcServerFunctions(unittest.TestCase):
         ret = under_test._delete_group('test')
         self.assertIsNone(ret, 'The return value should be None')
         self.module.fail_json.assert_called_once_with(msg='Failed to delete group :test. group failed')
+
+    def test_wait_for_requests_to_complete_req_successful(self):
+        mock_request_list = self.build_mock_request_list(status='succeeded')
+        under_test = ClcGroup(self.module)._wait_for_requests_to_complete
+        under_test(mock_request_list)
+        self.assertFalse(self.module.fail_json.called)
+
+    def test_wait_for_requests_to_complete_req_failed(self):
+        mock_request_list = self.build_mock_request_list(status='failed')
+        under_test = ClcGroup(self.module)._wait_for_requests_to_complete
+        under_test(mock_request_list)
+        self.assertTrue(self.module.fail_json.called)
 
     @patch.object(clc_group, 'AnsibleModule')
     @patch.object(clc_group, 'ClcGroup')
