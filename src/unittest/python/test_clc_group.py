@@ -142,7 +142,10 @@ class TestClcServerFunctions(unittest.TestCase):
     def test_walk_groups_recursive(self, mock_clc_sdk):
         mock_child_group = mock.MagicMock()
         sub_group = mock.MagicMock()
-        sub_group.groups = [mock.MagicMock()]
+        grp1 = mock.MagicMock()
+        grp1.type = 'default'
+        grp2 = mock.MagicMock()
+        sub_group.groups = [grp1, grp2]
         mock_child_group.Subgroups.return_value = sub_group
         under_test = ClcGroup(self.module)
         res = under_test._walk_groups_recursive('parent', mock_child_group)
