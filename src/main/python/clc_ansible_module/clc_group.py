@@ -386,7 +386,7 @@ class ClcGroup(object):
             for request_details in request.requests:
                 if request_details.Status() != 'succeeded':
                     self.module.fail_json(
-                        msg='Unable to process public ip request')
+                        msg='Unable to process group request')
 
     @staticmethod
     def _set_user_agent(clc):

@@ -19,6 +19,11 @@ class TestClcServerFunctions(unittest.TestCase):
     def build_mock_request_list(self, mock_server_list=None, status='succeeded'):
         mock_request_list = [mock.MagicMock()]
         for request in mock_request_list:
+            reqs = []
+            req1 = mock.MagicMock()
+            req1.Status.return_value = status
+            reqs.append(req1)
+            request.requests=reqs
             request.Status.return_value = status
         return mock_request_list
 
@@ -187,7 +192,7 @@ class TestClcServerFunctions(unittest.TestCase):
         }
         mock_group = mock.MagicMock()
         mock_group.data = {"name": "MyCoolGroup"}
-        mock_response = {}
+        mock_response = mock.MagicMock()
 
         under_test = ClcGroup(self.module)
         under_test.set_clc_credentials_from_env = mock.MagicMock()
@@ -402,7 +407,17 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_request_list = self.build_mock_request_list(status='failed')
         under_test = ClcGroup(self.module)._wait_for_requests_to_complete
         under_test(mock_request_list)
-        self.assertTrue(self.module.fail_json.called)
+        self.module.fail_json.assert_called_once_with(msg='Unable to process group request')
+
+    def test_wait_for_requests_to_complete_no_wait(self):
+        mock_request_list = self.build_mock_request_list(status='failed')
+        params = {
+            'wait': False
+        }
+        self.module.params = params
+        under_test = ClcGroup(self.module)._wait_for_requests_to_complete
+        under_test(mock_request_list)
+        self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_group, 'AnsibleModule')
     @patch.object(clc_group, 'ClcGroup')
