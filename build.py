@@ -1,3 +1,18 @@
+# Copyright 2015 CenturyLink
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#    http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from pybuilder.core import init, use_plugin, Author, before
 
 # declare specific plugins we need to use:
@@ -13,7 +28,7 @@ use_plugin("exec")
 
 # define project level attributes:
 name = 'clc-ansible-module'
-version = '1.0.0'
+version = '1.0.2'
 summary = "Centurylink Cloud Ansible Modules"
 description = "Ansible extension modules which allow users to interact with Centurylink Cloud to define and manage cloud components."
 authors = [Author ("CenturyLink Cloud", "WFAAS-LLFT@centurylink.com")]
@@ -40,7 +55,7 @@ def initialize( project ):
 	project.get_property('filter_resources_glob').append('**/clc_ansible_module/*.py')
 	# ----------------
 	# install clc-sdk during installation
-	project.depends_on("clc-sdk")
+	project.depends_on("clc-sdk", "==2.20")
 	# ----------------
 	# execute some installation scripts
 	project.set_property('dir_source_main_scripts', 'src/main/python')

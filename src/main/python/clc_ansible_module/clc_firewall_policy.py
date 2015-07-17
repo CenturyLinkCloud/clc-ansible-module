@@ -8,7 +8,7 @@
 # This file is part of CenturyLink Cloud, and is maintained
 # by the Workflow as a Service Team
 #
-# Copyright 2015 CenturyLink Cloud
+# Copyright 2015 CenturyLink
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 
