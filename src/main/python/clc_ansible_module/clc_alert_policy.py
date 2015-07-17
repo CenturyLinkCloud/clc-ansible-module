@@ -40,36 +40,42 @@ options:
   name:
     description:
       - The name of the alert policy. This is mutually exclusive with id
+    required: False
     default: None
     aliases: []
   id:
     description:
       - The alert policy id. This is mutually exclusive with name
+    required: False
     default: None
     aliases: []
   alert_recipients:
     description:
       - A list of recipient email ids to notify the alert.
-    required: True
+        This is required for state 'present'
+    required: False
     aliases: []
   metric:
     description:
       - The metric on which to measure the condition that will trigger the alert.
-    required: True
+        This is required for state 'present'
+    required: False
     default: None
     choices: ['cpu','memory','disk']
     aliases: []
   duration:
     description:
       - The length of time in minutes that the condition must exceed the threshold.
-    required: True
+        This is required for state 'present'
+    required: False
     default: None
     aliases: []
   threshold:
     description:
       - The threshold that will trigger the alert when the metric equals or exceeds it.
+        This is required for state 'present'
         This number represents a percentage and must be a value between 5.0 - 95.0 that is a multiple of 5.0
-    required: True
+    required: False
     default: None
     aliases: []
   state:
@@ -153,7 +159,7 @@ else:
 #
 try:
     import clc as clc_sdk
-    from clc import CLCException
+    from clc import APIFailedResponse
 except ImportError:
     CLC_FOUND = False
     clc_sdk = None
@@ -195,16 +201,15 @@ class ClcAlertPolicy():
             name=dict(default=None),
             id=dict(default=None),
             alias=dict(required=True, default=None),
-            alert_recipients=dict(type='list', required=True, default=None),
+            alert_recipients=dict(type='list', default=None),
             metric=dict(
-                required=True,
                 choices=[
                     'cpu',
                     'memory',
                     'disk'],
                 default=None),
-            duration=dict(required=True, type='str', default=None),
-            threshold=dict(required=True, type='int', default=None),
+            duration=dict(type='str', default=None),
+            threshold=dict(type='int', default=None),
             state=dict(default='present', choices=['present', 'absent'])
         )
         mutually_exclusive = [
@@ -364,10 +369,10 @@ class ClcAlertPolicy():
         metric = p['metric']
         duration = p['duration']
         threshold = p['threshold']
-        name = p['name']
+        policy_name = p['name']
         arguments = json.dumps(
             {
-                'name': name,
+                'name': policy_name,
                 'actions': [{
                     'action': 'email',
                     'settings': {
@@ -384,13 +389,12 @@ class ClcAlertPolicy():
         try:
             result = self.clc.v2.API.Call(
                 'POST',
-                '/v2/alertPolicies/%s' %
-                (alias),
+                '/v2/alertPolicies/%s' %alias,
                 arguments)
-        except self.clc.APIFailedResponse as e:
+        except APIFailedResponse as e:
             return self.module.fail_json(
-                msg='Unable to create alert policy. %s' % str(
-                    e.response_text))
+                msg='Unable to create alert policy "{0}". {1}'.format(
+                    policy_name, str(e.response_text)))
         return result
 
     def _update_alert_policy(self, alert_policy_id):
@@ -405,10 +409,10 @@ class ClcAlertPolicy():
         metric = p['metric']
         duration = p['duration']
         threshold = p['threshold']
-        name = p['name']
+        policy_name = p['name']
         arguments = json.dumps(
             {
-                'name': name,
+                'name': policy_name,
                 'actions': [{
                     'action': 'email',
                     'settings': {
@@ -426,10 +430,10 @@ class ClcAlertPolicy():
             result = self.clc.v2.API.Call(
                 'PUT', '/v2/alertPolicies/%s/%s' %
                 (alias, alert_policy_id), arguments)
-        except self.clc.APIFailedResponse as e:
+        except APIFailedResponse as e:
             return self.module.fail_json(
-                msg='Unable to update alert policy. %s' % str(
-                    e.response_text))
+                msg='Unable to update alert policy "{0}". {1}'.format(
+                    policy_name, str(e.response_text)))
         return result
 
     def _delete_alert_policy(self, alias, policy_id):
@@ -443,10 +447,10 @@ class ClcAlertPolicy():
             result = self.clc.v2.API.Call(
                 'DELETE', '/v2/alertPolicies/%s/%s' %
                 (alias, policy_id), None)
-        except self.clc.APIFailedResponse as e:
+        except APIFailedResponse as e:
             return self.module.fail_json(
-                msg='Unable to delete alert policy. %s' % str(
-                    e.response_text))
+                msg='Unable to delete alert policy id "{0}". {1}'.format(
+                    policy_id, str(e.response_text)))
         return result
 
     def _alert_policy_exists(self, alias, policy_name):

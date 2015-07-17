@@ -52,7 +52,7 @@ options:
       - Whether to wait for the provisioning tasks to finish before returning.
     default: True
     required: False
-    choices: [ True, False]
+    choices: [True, False]
     aliases: []
 requirements:
     - python = 2.7
