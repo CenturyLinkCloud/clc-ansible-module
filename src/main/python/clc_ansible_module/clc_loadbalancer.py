@@ -187,7 +187,7 @@ else:
 #
 try:
     import clc as clc_sdk
-    from clc import CLCException
+    from clc import APIFailedResponse
 except ImportError:
     CLC_FOUND = False
     clc_sdk = None
@@ -308,12 +308,9 @@ class ClcLoadBalancer():
         :return: True / False
         """
         changed = False
-        result = None
+        result = name
         lb_id = self._loadbalancer_exists(name=name)
-        if lb_id:
-            result = name
-            changed = False
-        else:
+        if not lb_id:
             if not self.module.check_mode:
                 result = self.create_loadbalancer(name=name,
                                                   alias=alias,
@@ -341,16 +338,15 @@ class ClcLoadBalancer():
             pool_id: The string id of the pool
         """
         changed = False
-        result = None
+        result = port
         if not lb_id:
-            return False, None, None
+            return changed, None, None
         pool_id = self._loadbalancerpool_exists(
             alias=alias,
             location=location,
             port=port,
             lb_id=lb_id)
         if not pool_id:
-            changed = True
             if not self.module.check_mode:
                 result = self.create_loadbalancerpool(
                     alias=alias,
@@ -360,10 +356,7 @@ class ClcLoadBalancer():
                     persistence=persistence,
                     port=port)
                 pool_id = result.get('id')
-
-        else:
-            changed = False
-            result = port
+            changed = True
 
         return changed, result, pool_id
 
@@ -378,7 +371,7 @@ class ClcLoadBalancer():
             result: The result from the CLC API Call
         """
         changed = False
-        result = None
+        result = name
         lb_exists = self._loadbalancer_exists(name=name)
         if lb_exists:
             if not self.module.check_mode:
@@ -386,9 +379,6 @@ class ClcLoadBalancer():
                                                   location=location,
                                                   name=name)
             changed = True
-        else:
-            result = name
-            changed = False
         return changed, result
 
     def ensure_loadbalancerpool_absent(self, alias, location, name, port):
@@ -421,7 +411,6 @@ class ClcLoadBalancer():
                         lb_id=lb_id,
                         pool_id=pool_id)
             else:
-                changed = False
                 result = "Pool doesn't exist"
         else:
             result = "LB Doesn't Exist"
@@ -545,13 +534,19 @@ class ClcLoadBalancer():
         :param status: Enabled / Disabled
         :return: Success / Failure
         """
-        result = self.clc.v2.API.Call('POST',
-                                      '/v2/sharedLoadBalancers/%s/%s' % (alias,
-                                                                         location),
-                                      json.dumps({"name": name,
-                                                  "description": description,
-                                                  "status": status}))
-        sleep(1)
+        result = None
+        try:
+            result = self.clc.v2.API.Call('POST',
+                                          '/v2/sharedLoadBalancers/%s/%s' % (alias,
+                                                                             location),
+                                          json.dumps({"name": name,
+                                                      "description": description,
+                                                      "status": status}))
+            sleep(1)
+        except APIFailedResponse as e:
+            self.module.fail_json(
+                msg='Unable to create load balancer "{0}". {1}'.format(
+                    name, str(e.response_text)))
         return result
 
     def create_loadbalancerpool(
@@ -566,11 +561,18 @@ class ClcLoadBalancer():
         :param port: the port that the load balancer will listen on
         :return: result: The result from the create API call
         """
-        result = self.clc.v2.API.Call(
-            'POST', '/v2/sharedLoadBalancers/%s/%s/%s/pools' %
-            (alias, location, lb_id), json.dumps(
-                {
-                    "port": port, "method": method, "persistence": persistence}))
+        result = None
+        try:
+            result = self.clc.v2.API.Call(
+                'POST', '/v2/sharedLoadBalancers/%s/%s/%s/pools' %
+                (alias, location, lb_id), json.dumps(
+                    {
+                        "port": port, "method": method, "persistence": persistence
+                    }))
+        except APIFailedResponse as e:
+            self.module.fail_json(
+                msg='Unable to create pool for load balancer id "{0}". {1}'.format(
+                    lb_id, str(e.response_text)))
         return result
 
     def delete_loadbalancer(self, alias, location, name):
@@ -581,10 +583,16 @@ class ClcLoadBalancer():
         :param name: Name of the loadbalancer to delete
         :return: 204 if successful else failure
         """
+        result = None
         lb_id = self._get_loadbalancer_id(name=name)
-        result = self.clc.v2.API.Call(
-            'DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' %
-            (alias, location, lb_id))
+        try:
+            result = self.clc.v2.API.Call(
+                'DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' %
+                (alias, location, lb_id))
+        except APIFailedResponse as e:
+            self.module.fail_json(
+                msg='Unable to delete load balancer "{0}". {1}'.format(
+                    name, str(e.response_text)))
         return result
 
     def delete_loadbalancerpool(self, alias, location, lb_id, pool_id):
@@ -596,9 +604,15 @@ class ClcLoadBalancer():
         :param pool_id: the id string of the pool
         :return: result: The result from the delete API call
         """
-        result = self.clc.v2.API.Call(
-            'DELETE', '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s' %
-            (alias, location, lb_id, pool_id))
+        result = None
+        try:
+            result = self.clc.v2.API.Call(
+                'DELETE', '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s' %
+                (alias, location, lb_id, pool_id))
+        except APIFailedResponse as e:
+            self.module.fail_json(
+                msg='Unable to delete pool for load balancer id "{0}". {1}'.format(
+                    lb_id, str(e.response_text)))
         return result
 
     def _get_loadbalancer_id(self, name):
@@ -691,9 +705,14 @@ class ClcLoadBalancer():
         if not lb_id:
             return result
         if not self.module.check_mode:
-            result = self.clc.v2.API.Call('PUT',
-                                          '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s/nodes'
-                                          % (alias, location, lb_id, pool_id), json.dumps(nodes))
+            try:
+                result = self.clc.v2.API.Call('PUT',
+                                              '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s/nodes'
+                                              % (alias, location, lb_id, pool_id), json.dumps(nodes))
+            except APIFailedResponse as e:
+                self.module.fail_json(
+                    msg='Unable to set nodes for the load balancer pool id "{0}". {1}'.format(
+                        pool_id, str(e.response_text)))
         return result
 
     def add_lbpool_nodes(self, alias, location, lb_id, pool_id, nodes_to_add):
@@ -797,12 +816,7 @@ class ClcLoadBalancer():
                     'nodes_absent']),
             wait=dict(type='bool', default=True)
         )
-
         return argument_spec
-
-    #
-    #   Module Behavior Functions
-    #
 
     def _set_clc_credentials_from_env(self):
         """
