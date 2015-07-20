@@ -49,26 +49,26 @@ options:
     aliases: []
   source:
     description:
-      - Source addresses for traffic on the originating firewall. This is required for state 'present"
+      - Source addresses for traffic on the originating firewall. This is required when state is 'present"
     default: None
     required: False
     aliases: []
   destination:
     description:
-      - Destination addresses for traffic on the terminating firewall
+      - Destination addresses for traffic on the terminating firewall. This is required when state is 'absent'
     default: None
-    required: For Creation
+    required: False
     aliases: []
   ports:
     description:
-      - types of ports associated with the policy. TCP & UDP can take in single ports or port ranges.
+      - types of ports associated with the policy. TCP and UDP can take in single ports or port ranges.
     default: None
     required: False
     choices: ['any', 'icmp', 'TCP/123', 'UDP/123', 'TCP/123-456', 'UDP/123-456']
     aliases: []
   firewall_policy_id:
     description:
-      - Id of the firewall policy
+      - Id of the firewall policy. This is required when state is 'present'
     default: None
     required: False
     aliases: []
@@ -93,7 +93,7 @@ options:
     aliases: []
   enabled:
     description:
-      - If the firewall policy is enabled or disabled
+      - Whether the firewall policy is enabled or disabled
     default: True
     required: False
     choices: [ True, False ]
@@ -219,8 +219,7 @@ class ClcFirewallPolicy():
         """
         location = self.module.params.get('location')
         source_account_alias = self.module.params.get('source_account_alias')
-        destination_account_alias = self.module.params.get(
-            'destination_account_alias')
+        destination_account_alias = self.module.params.get('destination_account_alias')
         firewall_policy_id = self.module.params.get('firewall_policy_id')
         ports = self.module.params.get('ports')
         source = self.module.params.get('source')
@@ -242,7 +241,6 @@ class ClcFirewallPolicy():
             'enabled': enabled}
 
         self._set_clc_credentials_from_env()
-        requests = []
 
         if state == 'absent':
             changed, firewall_policy_id, response = self._ensure_firewall_policy_is_absent(
@@ -477,9 +475,7 @@ class ClcFirewallPolicy():
         response_source = response.get('source')
         response_dest = response.get('destination')
         response_ports = response.get('ports')
-
-        request_dest_account_alias = firewall_dict.get(
-            'destination_account_alias')
+        request_dest_account_alias = firewall_dict.get('destination_account_alias')
         request_enabled = firewall_dict.get('enabled')
         if request_enabled is None:
             request_enabled = True
