@@ -820,8 +820,7 @@ class ClcLoadBalancer():
                     'absent',
                     'port_absent',
                     'nodes_present',
-                    'nodes_absent']),
-            wait=dict(type='bool', default=True)
+                    'nodes_absent'])
         )
         return argument_spec
 
