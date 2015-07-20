@@ -29,9 +29,9 @@
 
 DOCUMENTATION = '''
 module: clc_firewall_policy
-short_desciption: Create/delete/update firewall policies
+short_description: Create/delete/update firewall policies
 description:
-  - Create or delete or updated firewall polices on Centurylink Centurylink Cloud
+  - Create or delete or updated firewall polices on Centurylink Cloud
 version_added: "2.0"
 options:
   location:
@@ -49,9 +49,9 @@ options:
     aliases: []
   source:
     description:
-      - Source addresses for traffic on the originating firewall
+      - Source addresses for traffic on the originating firewall. This is required for state 'present"
     default: None
-    required: For Creation
+    required: False
     aliases: []
   destination:
     description:
