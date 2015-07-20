@@ -28,11 +28,10 @@
 
 DOCUMENTATION = '''
 module: clc_loadbalancer
-version_added: "1.0"
 short_desciption: Create, Delete shared loadbalancers in CenturyLink Cloud.
 description:
   - An Ansible module to Create, Delete shared loadbalancers in CenturyLink Cloud.
-version_added: 1.0
+version_added: "2.0"
 options:
   name:
     description:

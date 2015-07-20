@@ -31,7 +31,7 @@ version_added: "1.0"
 short_descirption: Create or Delete Anti Affinity Policies at CenturyLink Cloud.
 description:
   - An Ansible module to Create or Delete Anti Affinity Policies at CenturyLink Cloud.
-version_added: 1.0
+version_added: "2.0"
 options:
   name:
     description:
