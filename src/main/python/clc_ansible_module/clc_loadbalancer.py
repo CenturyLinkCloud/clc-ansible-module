@@ -40,6 +40,7 @@ options:
   description:
     description:
       - A description for your loadbalancer
+    required: False
   alias:
     description:
       - The alias of your CLC Account
@@ -51,23 +52,29 @@ options:
   method:
     description:
       -The balancing method for this pool
-    default: roundRobin
+    required: False
+    default: None
     choices: ['leastConnection', 'roundRobin']
   persistence:
     description:
       - The persistence method for this load balancer
-    default: standard
+    required: False
+    default: None
     choices: ['standard', 'sticky']
   port:
     description:
       - Port to configure on the public-facing side of the load balancer pool
+    required: False
     choices: [80, 443]
   nodes:
     description:
       - A list of nodes that you want added to your load balancer pool
+    required: False
+    default: []
   status:
     description:
       - The status of your loadbalancer
+    required: False
     default: enabled
     choices: ['enabled', 'disabled']
   state:
