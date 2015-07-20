@@ -84,7 +84,10 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test.process_request()
 
         # Assert
-        self.module.exit_json.assert_called_once_with(changed=True, servers=[], server_ids=['TEST_SERVER'])
+        self.module.exit_json.assert_called_once_with(changed=True,
+                                                      servers=[],
+                                                      server_ids=['TEST_SERVER'],
+                                                      partially_created_server_ids=[])
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcServer, '_set_clc_credentials_from_env')
@@ -164,7 +167,8 @@ class TestClcServerFunctions(unittest.TestCase):
                                                       servers=[{'publicip': '5.6.7.8',
                                                                 'ipaddress': '1.2.3.4',
                                                                 'name': 'TEST_SERVER'}],
-                                                      server_ids=['TEST_SERVER'])
+                                                      server_ids=['TEST_SERVER'],
+                                                      partially_created_server_ids=[])
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcServer, '_set_clc_credentials_from_env')
@@ -188,6 +192,7 @@ class TestClcServerFunctions(unittest.TestCase):
             'public_ip_ports': [80],
             'alert_policy_name': 'test alert policy'
         }
+        self.module.check_mode = False
 
         # Define Mock Objects
         mock_server = mock.MagicMock()
@@ -321,7 +326,8 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.exit_json.assert_called_once_with(changed=True,
                                                       servers=[{'ipaddress': '1.2.3.4',
                                                                 'name': 'TEST_SERVER'}],
-                                                      server_ids=['TEST_SERVER'])
+                                                      server_ids=['TEST_SERVER'],
+                                                      partially_created_server_ids=[])
 
 
     @patch.object(ClcServer, '_set_clc_credentials_from_env')
@@ -365,7 +371,8 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert
         self.module.exit_json.assert_called_once_with(changed=True,
                                                       servers=[],
-                                                      server_ids=['TEST_SERVER'])
+                                                      server_ids=['TEST_SERVER'],
+                                                      partially_created_server_ids=[])
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcServer, '_set_clc_credentials_from_env')
@@ -401,7 +408,8 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert
         self.module.exit_json.assert_called_once_with(server_ids=['TEST_SERVER'],
                                                       changed=True,
-                                                      servers=[{'name': 'TEST_SERVER'}])
+                                                      servers=[{'name': 'TEST_SERVER'}],
+                                                      partially_created_server_ids=[])
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_server, 'clc_sdk')
@@ -731,14 +739,20 @@ class TestClcServerFunctions(unittest.TestCase):
 
     @patch.object(clc_server, 'AnsibleModule')
     @patch.object(clc_server, 'clc_sdk')
-    def test_get_anti_affinity_policy_id_no_match(self, mock_clc_sdk, mock_ansible_module):
+    def test_find_aa_policy_id_no_match(self, mock_clc_sdk, mock_ansible_module):
         mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
                                                 [{'name' : 'test1', 'id' : '111'},
                                                  {'name' : 'test2', 'id' : '222'}]}]
 
-        policy_id = ClcServer._get_anti_affinity_policy_id(mock_clc_sdk, mock_ansible_module, 'alias', 'testnone')
+        params = {
+            'alias': 'test',
+            'anti_affinity_policy_id': None,
+            'anti_affinity_policy_name': 'nothing'
+        }
+        mock_ansible_module.params = params
+        ClcServer._find_aa_policy_id(mock_clc_sdk, mock_ansible_module)
         mock_ansible_module.fail_json.assert_called_with(
-            msg='No anti affinity policy was found with policy name : testnone')
+            msg='No anti affinity policy was found with policy name : nothing')
 
     @patch.object(clc_server, 'AnsibleModule')
     @patch.object(clc_server, 'clc_sdk')
@@ -773,8 +787,67 @@ class TestClcServerFunctions(unittest.TestCase):
         policy_id = ClcServer._get_alert_policy_id_by_name(mock_clc_sdk, None, 'alias', 'test1')
         self.assertEqual('111', policy_id)
 
+    @patch.object(clc_server, 'AnsibleModule')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_change_server_power_state_started(self, mock_clc_sdk, mock_ansible_module):
+        server = mock.MagicMock()
+        server.PowerOn.return_value = 'OK'
+        result = ClcServer._change_server_power_state(mock_ansible_module, server, 'started')
+        self.assertEqual(result, 'OK')
+        self.assertEqual(mock_ansible_module.fail_json.called, False)
 
+    @patch.object(clc_server, 'AnsibleModule')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_change_server_power_state_stopped(self, mock_clc_sdk, mock_ansible_module):
+        server = mock.MagicMock()
+        server.PowerOff.return_value = 'OK'
+        result = ClcServer._change_server_power_state(mock_ansible_module, server, 'stopped')
+        self.assertEqual(result, 'OK')
+        self.assertEqual(mock_ansible_module.fail_json.called, False)
 
+    @patch.object(clc_server, 'AnsibleModule')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_change_server_power_state_error(self, mock_clc_sdk, mock_ansible_module):
+        error = CLCException('Failed')
+        server = mock.MagicMock()
+        server.id = 'server1'
+        server.PowerOff.side_effect = error
+        result = ClcServer._change_server_power_state(mock_ansible_module, server, 'stopped')
+        self.assertEqual(result, None)
+        mock_ansible_module.fail_json.assert_called_with(msg='Unable to change state for server server1')
+
+    @patch.object(clc_server, 'AnsibleModule')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_add_alert_policy_to_servers(self, mock_clc_sdk, mock_ansible_module):
+        params = {
+            'alias': 'test',
+            'alert_policy_id': '123',
+        }
+        mock_ansible_module.params = params
+        mock_ansible_module.check_mode = False
+        server = mock.MagicMock()
+        server.id = 'server1'
+        servers = [server]
+        result = ClcServer._add_alert_policy_to_servers(mock_clc_sdk, mock_ansible_module, servers)
+        self.assertEqual(result, [])
+        self.assertFalse(mock_ansible_module.fail_json.called)
+
+    @patch.object(clc_server, 'AnsibleModule')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_add_alert_policy_to_servers_error(self, mock_clc_sdk, mock_ansible_module):
+        error = CLCException('Failed')
+        mock_clc_sdk.v2.API.Call.side_effect = error
+        params = {
+            'alias': 'test',
+            'alert_policy_id': '123',
+        }
+        mock_ansible_module.params = params
+        mock_ansible_module.check_mode = False
+        server = mock.MagicMock()
+        server.id = 'server1'
+        servers = [server]
+        result = ClcServer._add_alert_policy_to_servers(mock_clc_sdk, mock_ansible_module, servers)
+        self.assertEqual(result[0].id, 'server1')
 
     @patch.object(clc_server, 'AnsibleModule')
     @patch.object(clc_server, 'ClcServer')
@@ -788,6 +861,32 @@ class TestClcServerFunctions(unittest.TestCase):
 
         mock_ClcServer.assert_called_once_with(mock_AnsibleModule_instance)
         mock_ClcServer_instance.process_request.assert_called_once
+
+    @patch.object(ClcServer, '_wait_for_requests')
+    @patch.object(ClcServer, '_create_clc_server')
+    @patch.object(ClcServer, '_add_alert_policy_to_servers')
+    @patch.object(ClcServer, '_add_public_ip_to_servers')
+    @patch.object(clc_server, 'AnsibleModule')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_create_servers_w_partial_servers(self, mock_clc_sdk, mock_ansible_module,
+                                              mock_public_ip, mock_alert_pol, mock_create_server,
+                                              mock_wait_for_requests):
+        mock_ansible_module.check_mode = False
+        mock_alert_pol.return_value = ['server2']
+        mock_wait_for_requests.return_value = 'success'
+        mock_request = mock.MagicMock()
+        mock_server = mock.MagicMock()
+        mock_server.id = 'server1'
+        mock_request.requests[0].Server.side_effect = [mock_server]
+        mock_public_ip.return_value = [mock_server]
+        mock_create_server.return_value = mock_request
+        under_test = ClcServer(mock_ansible_module)
+        server_dict_array, created_server_ids, partial_created_servers_ids, changed = \
+            under_test._create_servers(mock_ansible_module, mock_clc_sdk)
+        self.assertEqual(changed, True)
+        self.assertEqual(partial_created_servers_ids, ['server1'])
+
+
 
 if __name__ == '__main__':
     unittest.main()
