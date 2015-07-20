@@ -271,6 +271,7 @@ class ClcPublicIp(object):
         return changed, changed_server_ids, results
 
     def _remove_publicip_from_server(self, server):
+        result = None
         try:
             for ip_address in server.PublicIPs().public_ips:
                     result = ip_address.Delete()
