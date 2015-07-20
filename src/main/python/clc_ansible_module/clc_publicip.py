@@ -48,7 +48,7 @@ options:
     required: True
   state:
     description:
-      - Determine wheteher to create or delete public IPs. If present module will not create a second public ip if one
+      - Determine whether to create or delete public IPs. If present module will not create a second public ip if one
         already exists.
     default: present
     choices: ['present', 'absent']

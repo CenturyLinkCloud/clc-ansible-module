@@ -27,7 +27,6 @@
 
 DOCUMENTATION = '''
 module: clc_aa_policy
-version_added: "1.0"
 short_descirption: Create or Delete Anti Affinity Policies at CenturyLink Cloud.
 description:
   - An Ansible module to Create or Delete Anti Affinity Policies at CenturyLink Cloud.
@@ -49,7 +48,7 @@ options:
     choices: ['present','absent']
   wait:
     description:
-      - Whether to wait for the provisioning tasks to finish before returning.
+      - Whether to wait for the tasks to finish before returning.
     default: True
     required: False
     choices: [True, False]
