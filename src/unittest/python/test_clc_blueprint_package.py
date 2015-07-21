@@ -253,6 +253,17 @@ class TestClcBluePrintPackageFunctions(unittest.TestCase):
         under_test._wait_for_requests_to_complete(requests)
         self.assertTrue(self.module.fail_json.called)
 
+    def test_clc_install_package_exception(self):
+        self.module.check_mode = False
+        error = CLCException('Failed')
+        error.response_text = 'Mock failure message'
+        mock_server = mock.MagicMock()
+        mock_server.id = 'server1'
+        mock_server.ExecutePackage.side_effect = error
+        under_test = ClcBlueprintPackage(self.module)
+        under_test.clc_install_package(mock_server, 'package_id', {})
+        self.module.fail_json.assert_called_once_with(msg='Failed to install package : package_id to server server1. Mock failure message')
+
     @patch.object(clc_blueprint_package, 'AnsibleModule')
     @patch.object(clc_blueprint_package, 'ClcBlueprintPackage')
     def test_main(self, mock_ClcPackage, mock_AnsibleModule):

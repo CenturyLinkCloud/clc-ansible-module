@@ -36,7 +36,6 @@ options:
   server_ids:
     description:
       - A list of server Ids to deploy the blue print package.
-    default: []
     required: True
     aliases: []
   package_id:
@@ -53,10 +52,16 @@ options:
     aliases: []
   state:
     description:
-      - Whether to install or un-install the package. Currently it support only "present" for install action.
+      - Whether to install or un-install the package. Currently it supports only "present" for install action.
     required: False
     default: present
     choices: ['present']
+  wait:
+    description:
+      - Whether to wait for the tasks to finish before returning.
+    choices: [ True, False ]
+    default: True
+    required: False
 requirements:
     - python = 2.7
     - requests >= 2.5.0
@@ -146,10 +151,9 @@ class ClcBlueprintPackage():
         package_params = p['package_params']
         state = p['state']
         if state == 'present':
-            changed, changed_server_ids, requests = self.ensure_package_installed(
+            changed, changed_server_ids, request_list = self.ensure_package_installed(
                 server_ids, package_id, package_params)
-            if not self.module.check_mode:
-                self._wait_for_requests_to_complete(requests)
+            self._wait_for_requests_to_complete(request_list)
         self.module.exit_json(changed=changed, server_ids=changed_server_ids)
 
     @staticmethod
@@ -172,56 +176,56 @@ class ClcBlueprintPackage():
         """
         Ensure the package is installed in the given list of servers
         :param server_ids: the server list where the package needs to be installed
-        :param package_id: the package id
+        :param package_id: the blueprint package id
         :param package_params: the package arguments
-        :return: (changed, server_ids)
+        :return: (changed, server_ids, request_list)
                     changed: A flag indicating if a change was made
-                    server_ids: The list of servers modfied
+                    server_ids: The list of servers modified
+                    request_list: The list of request objects from clc-sdk
         """
         changed = False
-        requests = []
+        request_list = []
         servers = self._get_servers_from_clc(
             server_ids,
             'Failed to get servers from CLC')
-        try:
-            for server in servers:
+        for server in servers:
+            if not self.module.check_mode:
                 request = self.clc_install_package(
                     server,
                     package_id,
                     package_params)
-                requests.append(request)
-                changed = True
-        except CLCException as ex:
-            self.module.fail_json(
-                msg='Failed while installing package : %s with Error : %s' %
-                (package_id, ex))
-        return changed, server_ids, requests
+                request_list.append(request)
+            changed = True
+        return changed, server_ids, request_list
 
     def clc_install_package(self, server, package_id, package_params):
         """
-        Read all servers from CLC and executes each package from package_list
-        :param server_list: The target list of servers where the packages needs to be installed
-        :param package_list: The list of packages to be installed
-        :return: (changed, server_ids)
-                    changed: A flag indicating if a change was made
-                    server_ids: The list of servers modfied
+        Install the package to a given clc server
+        :param server: The server object where the package needs to be installed
+        :param package_id: The blue print package id
+        :param package_params: the required argument dict for the package installation
+        :return: The result object from the clc-sdk
         """
         result = None
-        if not self.module.check_mode:
+        try:
             result = server.ExecutePackage(
                 package_id=package_id,
                 parameters=package_params)
+        except CLCException as ex:
+            self.module.fail_json(msg='Failed to install package : {0} to server {1}. {2}'.format(
+                package_id, server.id, ex.response_text
+            ))
         return result
 
-    def _wait_for_requests_to_complete(self, requests_lst):
+    def _wait_for_requests_to_complete(self, request_lst):
         """
         Waits until the CLC requests are complete if the wait argument is True
-        :param requests_lst: The list of CLC request objects
+        :param request_lst: The list of CLC request objects
         :return: none
         """
         if not self.module.params['wait']:
             return
-        for request in requests_lst:
+        for request in request_lst:
             request.WaitUntilComplete()
             for request_details in request.requests:
                 if request_details.Status() != 'succeeded':
