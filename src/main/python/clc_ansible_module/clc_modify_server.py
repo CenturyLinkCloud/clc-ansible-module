@@ -36,47 +36,40 @@ options:
   server_ids:
     description:
       - A list of server Ids to modify.
-    default: []
     required: True
     aliases: []
   cpu:
     description:
       - How many CPUs to update on the server
-    default: None
     required: False
     aliases: []
   memory:
     description:
-      - Memory in GB.
-    default: None
+      - Memory (in GB) to set to the server.
     required: False
     aliases: []
   anti_affinity_policy_id:
     description:
-      - The anti affinity policy id to be set for a heperscale server.
+      - The anti affinity policy id to be set for a hyper scale server.
         This is mutually exclusive with 'anti_affinity_policy_name'
-    default: None
     required: False
     aliases: []
   anti_affinity_policy_name:
     description:
-      - The anti affinity policy name to be set for a heperscale server.
+      - The anti affinity policy name to be set for a hyper scale server.
         This is mutually exclusive with 'anti_affinity_policy_id'
-    default: None
     required: False
     aliases: []
   alert_policy_id:
     description:
-      - The alert policy id to be associated.
+      - The alert policy id to be associated to the server.
         This is mutually exclusive with 'alert_policy_name'
-    default: None
     required: False
     aliases: []
   alert_policy_name:
     description:
-      - The alert policy name to be associated.
+      - The alert policy name to be associated to the server.
         This is mutually exclusive with 'alert_policy_id'
-    default: None
     required: False
     aliases: []
   state:
@@ -179,7 +172,6 @@ class ClcModifyServer():
         """
         self.clc = clc_sdk
         self.module = module
-        self.group_dict = {}
 
         if not CLC_FOUND:
             self.module.fail_json(
@@ -275,26 +267,6 @@ class ClcModifyServer():
                     "environment variables")
 
     @staticmethod
-    def _wait_for_requests(clc, requests, servers, wait):
-        """
-        Block until server provisioning requests are completed.
-        :param clc: the clc-sdk instance to use
-        :param requests: a list of clc-sdk.Request instances
-        :param servers: a list of servers to refresh
-        :param wait: a boolean on whether to block or not.  This function is skipped if True
-        :return: none
-        """
-        if wait:
-            # Requests.WaitUntilComplete() returns the count of failed requests
-            failed_requests_count = sum(
-                [request.WaitUntilComplete() for request in requests])
-
-            if failed_requests_count > 0:
-                raise clc
-            else:
-                ClcModifyServer._refresh_servers(servers)
-
-    @staticmethod
     def _refresh_servers(servers):
         """
         Loop through a list of servers and refresh them
@@ -329,7 +301,7 @@ class ClcModifyServer():
         ap_changed = False
         server_dict_array = []
         result_server_ids = []
-        requests = []
+        request_list = []
         changed_servers = []
 
         if not isinstance(server_ids, list) or len(server_ids) < 1:
@@ -342,7 +314,7 @@ class ClcModifyServer():
                 server_changed, server_result = self._ensure_server_config(
                     clc, module, None, server, server_params)
                 if server_result:
-                    requests.append(server_result)
+                    request_list.append(server_result)
                 aa_changed = self._ensure_aa_policy_present(
                     clc, module, None, server, server_params)
                 ap_changed = self._ensure_alert_policy_present(
@@ -357,7 +329,7 @@ class ClcModifyServer():
                 changed = True
 
         if wait:
-            for r in requests:
+            for r in request_list:
                 r.WaitUntilComplete()
             for server in changed_servers:
                 server.Refresh()

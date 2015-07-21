@@ -528,17 +528,6 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         mock_ansible_module.fail_json.assert_called_with(
             msg='mutiple alert policies were found with policy name : test1')
 
-
-    @patch.object(clc_modify_server, 'clc_sdk')
-    def test_wait_for_requests(self, mock_clc_sdk):
-        try:
-            servers = mock.MagicMock()
-            requests = mock.MagicMock()
-            under_test = ClcModifyServer(self.module)
-            under_test._wait_for_requests(mock_clc_sdk, requests, servers, True)
-        except:
-            self.fail('Caught an unexpected exception')
-
     @patch.object(clc_modify_server, 'AnsibleModule')
     @patch.object(clc_modify_server, 'clc_sdk')
     def test_add_alert_policy(self, mock_clc_sdk, mock_ansible_module):

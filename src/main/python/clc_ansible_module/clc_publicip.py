@@ -142,7 +142,6 @@ else:
 class ClcPublicIp(object):
     clc = clc_sdk
     module = None
-    group_dict = {}
 
     def __init__(self, module):
         """
