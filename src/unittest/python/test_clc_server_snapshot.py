@@ -259,6 +259,49 @@ class TestClcServerSnapshotFunctions(unittest.TestCase):
         under_test._wait_for_requests_to_complete (mock.MagicMock())
         self.assertFalse(self.module.fail_json.called)
 
+    def test_wait_for_requests_no_wait(self):
+        mock_request = mock.MagicMock()
+        mock_request.WaitUntilComplete.return_value = True
+        self.module.params = {
+            'wait': False
+        }
+        under_test = ClcSnapshot(self.module)
+        under_test._wait_for_requests_to_complete([mock_request])
+        self.assertFalse(self.module.fail_json.called)
+
+    def test_create_server_snapshot_exception(self):
+        mock_server = mock.MagicMock()
+        mock_server.id = 'test_server'
+        error = CLCException('Failed')
+        error.response_text = 'Mock failure message'
+        mock_server.CreateSnapshot.side_effect = error
+        self.module.check_mode = False
+        under_test = ClcSnapshot(self.module)
+        under_test._create_server_snapshot(mock_server, 10)
+        self.module.fail_json.assert_called_once_with(msg='Failed to create snapshot for server : test_server. Mock failure message')
+
+    def test_delete_server_snapshot_exception(self):
+        mock_server = mock.MagicMock()
+        mock_server.id = 'test_server'
+        error = CLCException('Failed')
+        error.response_text = 'Mock failure message'
+        mock_server.DeleteSnapshot.side_effect = error
+        self.module.check_mode = False
+        under_test = ClcSnapshot(self.module)
+        under_test._delete_server_snapshot(mock_server)
+        self.module.fail_json.assert_called_once_with(msg='Failed to delete snapshot for server : test_server. Mock failure message')
+
+    def test_restore_server_snapshot_exception(self):
+        mock_server = mock.MagicMock()
+        mock_server.id = 'test_server'
+        error = CLCException('Failed')
+        error.response_text = 'Mock failure message'
+        mock_server.RestoreSnapshot.side_effect = error
+        self.module.check_mode = False
+        under_test = ClcSnapshot(self.module)
+        under_test._restore_server_snapshot(mock_server)
+        self.module.fail_json.assert_called_once_with(msg='Failed to restore snapshot for server : test_server. Mock failure message')
+
     @patch.object(clc_server_snapshot, 'AnsibleModule')
     @patch.object(clc_server_snapshot, 'ClcSnapshot')
     def test_main(self, mock_ClcSnapshot, mock_AnsibleModule):
