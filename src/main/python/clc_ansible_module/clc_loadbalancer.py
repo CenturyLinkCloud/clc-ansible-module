@@ -41,6 +41,7 @@ options:
     description:
       - A description for your loadbalancer
     required: False
+    default: None
   alias:
     description:
       - The alias of your CLC Account
@@ -65,6 +66,7 @@ options:
     description:
       - Port to configure on the public-facing side of the load balancer pool
     required: False
+    default: None
     choices: [80, 443]
   nodes:
     description:
@@ -80,6 +82,7 @@ options:
   state:
     description:
       - Whether to create or delete the load balancer pool
+    requred: False
     default: present
     choices: ['present', 'absent', 'port_absent', 'nodes_present', 'nodes_absent']
 '''

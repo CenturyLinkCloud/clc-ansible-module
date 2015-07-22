@@ -52,7 +52,6 @@ options:
     default: True
     required: False
     choices: [True, False]
-    aliases: []
 requirements:
     - python = 2.7
     - requests >= 2.5.0

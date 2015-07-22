@@ -39,65 +39,54 @@ options:
       - Target datacenter for the firewall policy
     default: None
     required: True
-    aliases: []
   state:
     description:
       - Whether to create or delete the firewall policy
     default: present
-    required: True
+    required: False
     choices: ['present', 'absent']
-    aliases: []
   source:
     description:
       - Source addresses for traffic on the originating firewall. This is required when state is 'present"
     default: None
     required: False
-    aliases: []
   destination:
     description:
       - Destination addresses for traffic on the terminating firewall. This is required when state is 'absent'
     default: None
     required: False
-    aliases: []
   ports:
     description:
       - types of ports associated with the policy. TCP and UDP can take in single ports or port ranges.
     default: None
     required: False
     choices: ['any', 'icmp', 'TCP/123', 'UDP/123', 'TCP/123-456', 'UDP/123-456']
-    aliases: []
   firewall_policy_id:
     description:
       - Id of the firewall policy. This is required when state is 'present'
     default: None
     required: False
-    aliases: []
   source_account_alias:
     description:
       - CLC alias for the source account
-    default: None
     required: True
-    aliases: []
   destination_account_alias:
     description:
       - CLC alias for the destination account
     default: None
     required: False
-    aliases: []
   wait:
     description:
       - Whether to wait for the provisioning tasks to finish before returning.
     default: True
     required: False
-    choices: [ True, False ]
-    aliases: []
+    choices: [True, False]
   enabled:
     description:
       - Whether the firewall policy is enabled or disabled
     default: True
     required: False
-    choices: [ True, False ]
-    aliases: []
+    choices: [True, False]
 requirements:
     - python = 2.7
     - requests >= 2.5.0

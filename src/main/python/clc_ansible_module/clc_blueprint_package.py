@@ -37,19 +37,16 @@ options:
     description:
       - A list of server Ids to deploy the blue print package.
     required: True
-    aliases: []
   package_id:
     description:
       - The package id of the blue print.
     default: None
     required: True
-    aliases: []
   package_params:
     description:
       - The dictionary of arguments required to deploy the blue print.
     default: {}
     required: False
-    aliases: []
   state:
     description:
       - Whether to install or un-install the package. Currently it supports only "present" for install action.

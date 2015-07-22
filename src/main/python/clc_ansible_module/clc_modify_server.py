@@ -37,55 +37,52 @@ options:
     description:
       - A list of server Ids to modify.
     required: True
-    aliases: []
   cpu:
     description:
       - How many CPUs to update on the server
     required: False
-    aliases: []
+    default: None
   memory:
     description:
       - Memory (in GB) to set to the server.
     required: False
-    aliases: []
+    default: None
   anti_affinity_policy_id:
     description:
       - The anti affinity policy id to be set for a hyper scale server.
         This is mutually exclusive with 'anti_affinity_policy_name'
     required: False
-    aliases: []
+    default: None
   anti_affinity_policy_name:
     description:
       - The anti affinity policy name to be set for a hyper scale server.
         This is mutually exclusive with 'anti_affinity_policy_id'
     required: False
-    aliases: []
+    default: None
   alert_policy_id:
     description:
       - The alert policy id to be associated to the server.
         This is mutually exclusive with 'alert_policy_name'
     required: False
-    aliases: []
+    default: None
   alert_policy_name:
     description:
       - The alert policy name to be associated to the server.
         This is mutually exclusive with 'alert_policy_id'
     required: False
-    aliases: []
+    default: None
   state:
     description:
       - The state to insure that the provided resources are in.
     default: 'present'
     required: False
     choices: ['present', 'absent']
-    aliases: []
   wait:
     description:
       - Whether to wait for the provisioning tasks to finish before returning.
     default: True
     required: False
     choices: [ True, False]
-    aliases: []
 requirements:
     - python = 2.7
     - requests >= 2.5.0

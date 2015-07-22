@@ -37,27 +37,23 @@ options:
     description:
       - The list of CLC server Ids.
     required: True
-    aliases: []
   expiration_days:
     description:
       - The number of days to keep the server snapshot before it expires.
     default: 7
     required: False
-    aliases: []
   state:
     description:
       - The state to insure that the provided resources are in.
     default: 'present'
     required: False
     choices: ['present', 'absent', 'restore']
-    aliases: []
   wait:
     description:
       - Whether to wait for the provisioning tasks to finish before returning.
     default: True
     required: False
-    choices: [ True, False]
-    aliases: []
+    choices: [True, False]
 requirements:
     - python = 2.7
     - requests >= 2.5.0
