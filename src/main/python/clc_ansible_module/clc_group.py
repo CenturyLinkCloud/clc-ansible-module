@@ -152,7 +152,12 @@ class ClcGroup(object):
             changed, group, response = self._ensure_group_is_present(
                 group_name=group_name, parent_name=parent_name, group_description=group_description)
 
-        self.module.exit_json(changed=changed, group=group_name)
+        try:
+            group = group.data
+        except AttributeError:
+            group = group_name
+
+        self.module.exit_json(changed=changed, group=group)
 
     #
     #  Functions to define the Ansible module and its arguments
