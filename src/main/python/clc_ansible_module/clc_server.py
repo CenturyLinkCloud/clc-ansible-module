@@ -189,7 +189,7 @@ options:
     aliases: []
   public_ip_ports:
     description:
-      - A list of ports to allow on the firewall to thes servers public ip, if add_public_ip is set to True.
+      - A list of ports to allow on the firewall to the servers public ip, if add_public_ip is set to True.
     default: []
     required: False
     aliases: []
@@ -259,7 +259,7 @@ notes:
     - To use this module, it is required to set the below environment variables which enables access to the
       Centurylink Cloud
           - CLC_V2_API_USERNAME, the account login id for the centurylink cloud
-          - CLC_V2_API_PASSWORD, the account passwod for the centurylink cloud
+          - CLC_V2_API_PASSWORD, the account password for the centurylink cloud
     - Alternatively, the module accepts the API token and account alias. The API token can be generated using the
       CLC account login and password via the HTTP api call @ https://api.ctl.io/v2/authentication/login
           - CLC_V2_API_TOKEN, the API token generated from https://api.ctl.io/v2/authentication/login
@@ -1014,7 +1014,7 @@ class ClcServer():
         :param clc: the clc-sdk instance to use
         :param module: the AnsibleModule object
         :param alias: the clc account alias
-        :param serverid: The clc server id
+        :param server_id: The clc server id
         :param alert_policy_id: the alert policy id to be associated to the server
         :return: none
         """
@@ -1051,7 +1051,7 @@ class ClcServer():
                     alert_policy_id = policy.get('id')
                 else:
                     return module.fail_json(
-                        msg='mutiple alert policies were found with policy name : %s' %
+                        msg='multiple alert policies were found with policy name : %s' %
                         (alert_policy_name))
         return alert_policy_id
 
@@ -1324,7 +1324,7 @@ class ClcServer():
                     aa_policy_id = aa_policy.get('id')
                 else:
                     return module.fail_json(
-                        msg='mutiple anti affinity policies were found with policy name : %s' %
+                        msg='multiple anti affinity policies were found with policy name : %s' %
                         (aa_policy_name))
         return aa_policy_id
 

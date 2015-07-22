@@ -33,7 +33,7 @@ description:
 version_added: "2.0"
 options:
   protocol:
-    descirption:
+    description:
       - The protocol that the public IP will listen for.
     default: TCP
     choices: ['TCP', 'UDP', 'ICMP']
@@ -67,7 +67,7 @@ notes:
     - To use this module, it is required to set the below environment variables which enables access to the
       Centurylink Cloud
           - CLC_V2_API_USERNAME, the account login id for the centurylink cloud
-          - CLC_V2_API_PASSWORD, the account passwod for the centurylink cloud
+          - CLC_V2_API_PASSWORD, the account password for the centurylink cloud
     - Alternatively, the module accepts the API token and account alias. The API token can be generated using the
       CLC account login and password via the HTTP api call @ https://api.ctl.io/v2/authentication/login
           - CLC_V2_API_TOKEN, the API token generated from https://api.ctl.io/v2/authentication/login
@@ -173,20 +173,20 @@ class ClcPublicIp(object):
         protocol = params['protocol']
         state = params['state']
         requests = []
-        chagned_server_ids = []
+        changed_server_ids = []
         changed = False
 
         if state == 'present':
-            changed, chagned_server_ids, requests = self.ensure_public_ip_present(
+            changed, changed_server_ids, requests = self.ensure_public_ip_present(
                 server_ids=server_ids, protocol=protocol, ports=ports)
         elif state == 'absent':
-            changed, chagned_server_ids, requests = self.ensure_public_ip_absent(
+            changed, changed_server_ids, requests = self.ensure_public_ip_absent(
                 server_ids=server_ids)
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
         self._wait_for_requests_to_complete(requests)
         return self.module.exit_json(changed=changed,
-                                     server_ids=chagned_server_ids)
+                                     server_ids=changed_server_ids)
 
     @staticmethod
     def _define_module_argument_spec():

@@ -467,7 +467,7 @@ class TestClcAlertPolicy(unittest.TestCase):
         under_test.policy_dict = {'12345': {'id': '12345', 'name': 'test1'},
                                   '23456': {'id': '23456', 'name': 'test1'}}
         policy_id = under_test._get_alert_policy_id(self.module, 'test1')
-        self.module.fail_json.assert_called_once_with(msg='mutiple alert policies were found with policy name : test1')
+        self.module.fail_json.assert_called_once_with(msg='multiple alert policies were found with policy name : test1')
 
     @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
     def test_alert_policy_exists_true(self, mock_set_clc_creds):

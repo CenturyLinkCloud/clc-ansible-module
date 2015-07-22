@@ -481,7 +481,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                                               'alias',
                                                               'test1')
         mock_ansible_module.fail_json.assert_called_with(
-            msg='mutiple anti affinity policies were found with policy name : test1')
+            msg='multiple anti affinity policies were found with policy name : test1')
 
     @patch.object(clc_modify_server, 'clc_sdk')
     def test_get_alert_policy_id_by_name_singe_match(self, mock_clc_sdk):
@@ -518,7 +518,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                                               'alias',
                                                               'test1')
         mock_ansible_module.fail_json.assert_called_with(
-            msg='mutiple alert policies were found with policy name : test1')
+            msg='multiple alert policies were found with policy name : test1')
 
     @patch.object(clc_modify_server, 'AnsibleModule')
     @patch.object(clc_modify_server, 'clc_sdk')

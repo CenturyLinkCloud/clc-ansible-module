@@ -94,7 +94,7 @@ notes:
     - To use this module, it is required to set the below environment variables which enables access to the
       Centurylink Cloud
           - CLC_V2_API_USERNAME, the account login id for the centurylink cloud
-          - CLC_V2_API_PASSWORD, the account passwod for the centurylink cloud
+          - CLC_V2_API_PASSWORD, the account password for the centurylink cloud
     - Alternatively, the module accepts the API token and account alias. The API token can be generated using the
       CLC account login and password via the HTTP api call @ https://api.ctl.io/v2/authentication/login
           - CLC_V2_API_TOKEN, the API token generated from https://api.ctl.io/v2/authentication/login
@@ -123,11 +123,23 @@ EXAMPLES = '''
     anti_affinity_policy_name: 'aa_policy'
     state: present
 
-- name: set the alert policy on a server
+- name: remove the anti affinity policy on a server
+  clc_server:
+    server_ids: ['UC1ACCTTEST01']
+    anti_affinity_policy_name: 'aa_policy'
+    state: absent
+
+- name: add the alert policy on a server
   clc_server:
     server_ids: ['UC1ACCTTEST01']
     alert_policy_name: 'alert_policy'
     state: present
+
+- name: remove the alert policy on a server
+  clc_server:
+    server_ids: ['UC1ACCTTEST01']
+    alert_policy_name: 'alert_policy'
+    state: absent
 
 - name: set the memory to 16GB and cpu to 8 core on a lust if servers
   clc_server:
@@ -337,8 +349,6 @@ class ClcModifyServer():
             self, server, server_params):
         """
         ensures the server is updated with the provided cpu and memory
-        :param clc: the clc-sdk instance to use
-        :param module: the AnsibleModule object
         :param server: the CLC server object
         :param server_params: the dictionary of server parameters
         :return: (changed, group) -
@@ -400,8 +410,6 @@ class ClcModifyServer():
             self, server, server_params):
         """
         ensures the server is updated with the provided anti affinity policy
-        :param clc: the clc-sdk instance to use
-        :param module: the AnsibleModule object
         :param server: the CLC server object
         :param server_params: the dictionary of server parameters
         :return: (changed, group) -
@@ -439,8 +447,6 @@ class ClcModifyServer():
             self, server, server_params):
         """
         ensures the the provided anti affinity policy is removed from the server
-        :param clc: the clc-sdk instance to use
-        :param module: the AnsibleModule object
         :param server: the CLC server object
         :param server_params: the dictionary of server parameters
         :return: (changed, group) -
@@ -546,7 +552,7 @@ class ClcModifyServer():
                     aa_policy_id = aa_policy.get('id')
                 else:
                     return module.fail_json(
-                        msg='mutiple anti affinity policies were found with policy name : %s' %
+                        msg='multiple anti affinity policies were found with policy name : %s' %
                         (aa_policy_name))
         if not aa_policy_id:
             module.fail_json(
@@ -580,8 +586,6 @@ class ClcModifyServer():
             self, server, server_params):
         """
         ensures the server is updated with the provided alert policy
-        :param clc: the clc-sdk instance to use
-        :param module: the AnsibleModule object
         :param server: the CLC server object
         :param server_params: the dictionary of server parameters
         :return: (changed, group) -
@@ -613,8 +617,6 @@ class ClcModifyServer():
             self, server, server_params):
         """
         ensures the alert policy is removed from the server
-        :param clc: the clc-sdk instance to use
-        :param module: the AnsibleModule object
         :param server: the CLC server object
         :param server_params: the dictionary of server parameters
         :return: (changed, group) -
@@ -716,7 +718,7 @@ class ClcModifyServer():
                     alert_policy_id = alert_policy.get('id')
                 else:
                     return module.fail_json(
-                        msg='mutiple alert policies were found with policy name : %s' %
+                        msg='multiple alert policies were found with policy name : %s' %
                         (alert_policy_name))
         return alert_policy_id
 
