@@ -334,7 +334,7 @@ class ClcServer():
         if state == 'absent':
             server_ids = p['server_ids']
             if not isinstance(server_ids, list):
-                self.module.fail_json(
+                return self.module.fail_json(
                     msg='server_ids needs to be a list of instances to delete: %s' %
                     server_ids)
 
@@ -347,7 +347,7 @@ class ClcServer():
         elif state in ('started', 'stopped'):
             server_ids = p.get('server_ids')
             if not isinstance(server_ids, list):
-                self.module.fail_json(
+                return self.module.fail_json(
                     msg='server_ids needs to be a list of servers to run: %s' %
                     server_ids)
 
@@ -360,7 +360,7 @@ class ClcServer():
         elif state == 'present':
             # Changed is always set to true when provisioning new instances
             if not p.get('template'):
-                self.module.fail_json(
+                return self.module.fail_json(
                     msg='template parameter is required for new instance')
 
             if p.get('exact_count') is None:
@@ -817,11 +817,6 @@ class ClcServer():
             module.fail_json(msg=str(
                 "When state = 'present', name must be a string with a minimum length of 1 and a maximum length of 6"))
 
-#
-#  Functions to execute the module's behaviors
-#  (called from main())
-#
-
     def _enforce_count(self, module, clc):
         """
         Enforce that there is the right number of servers in the provided group.
@@ -842,7 +837,7 @@ class ClcServer():
         # fail here if the exact count was specified without filtering
         # on a group, as this may lead to a undesired removal of instances
         if exact_count and count_group is None:
-            module.fail_json(
+            return module.fail_json(
                 msg="you must use the 'count_group' option with exact_count")
 
         servers, running_servers = ClcServer._find_running_servers_by_group(
@@ -1037,7 +1032,7 @@ class ClcServer():
 
         changed = False
         if not isinstance(server_ids, list) or len(server_ids) < 1:
-            module.fail_json(
+            return module.fail_json(
                 msg='server_ids should be a list of servers, aborting')
 
         servers = clc.v2.Servers(server_ids).Servers()
@@ -1075,7 +1070,7 @@ class ClcServer():
         requests = []
 
         if not isinstance(server_ids, list) or len(server_ids) < 1:
-            module.fail_json(
+            return module.fail_json(
                 msg='server_ids should be a list of servers, aborting')
 
         servers = clc.v2.Servers(server_ids).Servers()
@@ -1280,8 +1275,12 @@ class ClcServer():
         :return: aa_policy_id: The anti affinity policy id
         """
         aa_policy_id = None
-        aa_policies = clc.v2.API.Call(method='GET',
-                                      url='antiAffinityPolicies/%s' % (alias))
+        try:
+            aa_policies = clc.v2.API.Call(method='GET',
+                                          url='antiAffinityPolicies/%s' % (alias))
+        except clc.APIFailedResponse as ex:
+            return module.fail_json(msg='Unable to fetch anti affinity policies for account: {0}. {1}'.format(
+                alias, ex.response_text))
         for aa_policy in aa_policies.get('items'):
             if aa_policy.get('name') == aa_policy_name:
                 if not aa_policy_id:
@@ -1325,16 +1324,13 @@ class ClcServer():
 
             except APIFailedResponse as e:
                 if e.response_status_code != 404:
-                    module.fail_json(
+                    return module.fail_json(
                         msg='A failure response was received from CLC API when '
                         'attempting to get details for a server:  UUID=%s, Code=%i, Message=%s' %
                         (svr_uuid, e.response_status_code, e.message))
-                    return
                 if retries == 0:
-                    module.fail_json(
+                    return module.fail_json(
                         msg='Unable to reach the CLC API after 5 attempts')
-                    return
-
                 sleep(backout)
                 backout = backout * 2
 
