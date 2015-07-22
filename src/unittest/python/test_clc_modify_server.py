@@ -518,7 +518,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
                                                               'alias',
                                                               'test1')
         mock_ansible_module.fail_json.assert_called_with(
-            msg='multiple alert policies were found with policy name : test')
+            msg='multiple alert policies were found with policy name : test1')
 
     @patch.object(clc_modify_server, 'AnsibleModule')
     @patch.object(clc_modify_server, 'clc_sdk')
