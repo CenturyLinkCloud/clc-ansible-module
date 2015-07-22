@@ -35,222 +35,186 @@ version_added: "2.0"
 options:
   additional_disks:
     description:
-      - Specify additional disks for the server
+      - The list of additional disks for the server
     required: False
     default: None
-    aliases: []
   add_public_ip:
     description:
       - Whether to add a public ip to the server
     required: False
     default: False
     choices: [False, True]
-    aliases: []
   alias:
     description:
       - The account alias to provision the servers under.
-    default:
-      - The default alias for the API credentials
     required: False
     default: None
-    aliases: []
   anti_affinity_policy_id:
     description:
       - The anti-affinity policy to assign to the server. This is mutually exclusive with 'anti_affinity_policy_name'.
     required: False
     default: None
-    aliases: []
   anti_affinity_policy_name:
     description:
       - The anti-affinity policy to assign to the server. This is mutually exclusive with 'anti_affinity_policy_id'.
     required: False
     default: None
-    aliases: []
   alert_policy_id:
     description:
       - The alert policy to assign to the server. This is mutually exclusive with 'alert_policy_name'.
     required: False
     default: None
-    aliases: []
   alert_policy_name:
     description:
       - The alert policy to assign to the server. This is mutually exclusive with 'alert_policy_id'.
     required: False
     default: None
-    aliases: []
-
   count:
     description:
       - The number of servers to build (mutually exclusive with exact_count)
-    default: None
-    aliases: []
+    required: False
+    default: 1
   count_group:
     description:
       - Required when exact_count is specified.  The Server Group use to determine how many severs to deploy.
-    default: 1
     required: False
-    aliases: []
+    default: None
   cpu:
     description:
       - How many CPUs to provision on the server
-    default: None
+    default: 1
     required: False
-    aliases: []
   cpu_autoscale_policy_id:
     description:
       - The autoscale policy to assign to the server.
     default: None
     required: False
-    aliases: []
   custom_fields:
     description:
       - A dictionary of custom fields to set on the server.
     default: []
     required: False
-    aliases: []
   description:
     description:
       - The description to set for the server.
     default: None
     required: False
-    aliases: []
   exact_count:
     description:
       - Run in idempotent mode.  Will insure that this exact number of servers are running in the provided group, creating and deleting them to reach that count.  Requires count_group to be set.
     default: None
     required: False
-    aliases: []
   group:
     description:
       - The Server Group to create servers under.
     default: 'Default Group'
     required: False
-    aliases: []
   ip_address:
     description:
       - The IP Address for the server. One is assigned if not provided.
     default: None
     required: False
-    aliases: []
   location:
     description:
       - The Datacenter to create servers in.
     default: None
     required: False
-    aliases: []
   managed_os:
     description:
       - Whether to create the server as 'Managed' or not.
     default: False
     required: False
     choices: [True, False]
-    aliases: []
   memory:
     description:
       - Memory in GB.
     default: 1
     required: False
-    aliases: []
   name:
     description:
-      - A 1 to 6 character identifier to use for the server.
+      - A 1 to 6 character identifier to use for the server. This is required when state is 'present'
     default: None
     required: False
-    aliases: []
   network_id:
     description:
       - The network UUID on which to create servers.
     default: None
     required: False
-    aliases: []
   packages:
     description:
       - Blueprints to run on the server after its created.
     default: []
     required: False
-    aliases: []
   password:
     description:
       - Password for the administrator user
     default: None
     required: False
-    aliases: []
   primary_dns:
     description:
       - Primary DNS used by the server.
     default: None
     required: False
-    aliases: []
   public_ip_protocol:
     description:
       - The protocol to use for the public ip if add_public_ip is set to True.
     default: 'TCP'
+    choices: ['TCP', 'UDP', 'ICMP']
     required: False
-    aliases: []
   public_ip_ports:
     description:
       - A list of ports to allow on the firewall to the servers public ip, if add_public_ip is set to True.
     default: []
     required: False
-    aliases: []
   secondary_dns:
     description:
       - Secondary DNS used by the server.
     default: None
     required: False
-    aliases: []
   server_ids:
     description:
       - Required for started, stopped, and absent states. A list of server Ids to insure are started, stopped, or absent.
     default: []
     required: False
-    aliases: []
   source_server_password:
     description:
       - The password for the source server if a clone is specified.
     default: None
     required: False
-    aliases: []
   state:
     description:
       - The state to insure that the provided resources are in.
     default: 'present'
     required: False
     choices: ['present', 'absent', 'started', 'stopped']
-    aliases: []
   storage_type:
     description:
       - The type of storage to attach to the server.
     default: 'standard'
     required: False
     choices: ['standard', 'hyperscale']
-    aliases: []
   template:
     description:
       - The template to use for server creation.  Will search for a template if a partial string is provided.
     default: None
     required: false
-    aliases: []
   ttl:
     description:
       - The time to live for the server in seconds.  The server will be deleted when this time expires.
     default: None
     required: False
-    aliases: []
   type:
     description:
       - The type of server to create.
     default: 'standard'
     required: False
     choices: ['standard', 'hyperscale']
-    aliases: []
   wait:
     description:
       - Whether to wait for the provisioning tasks to finish before returning.
     default: True
     required: False
-    choices: [ True, False]
-    aliases: []
+    choices: [True, False]
 requirements:
     - python = 2.7
     - requests >= 2.5.0
@@ -430,7 +394,7 @@ class ClcServer():
                              network_id=dict(),
                              location=dict(default=None),
                              cpu=dict(default=1),
-                             memory=dict(default='1'),
+                             memory=dict(default=1),
                              alias=dict(default=None),
                              password=dict(default=None),
                              ip_address=dict(default=None),
@@ -461,12 +425,12 @@ class ClcServer():
                 'absent',
                 'started',
                 'stopped']),
-            count=dict(type='int', default='1'),
+            count=dict(type='int', default=1),
             exact_count=dict(type='int', default=None),
             count_group=dict(),
             server_ids=dict(type='list'),
             add_public_ip=dict(type='bool', default=False),
-            public_ip_protocol=dict(default='TCP'),
+            public_ip_protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
             public_ip_ports=dict(type='list'),
             wait=dict(type='bool', default=True))
 
