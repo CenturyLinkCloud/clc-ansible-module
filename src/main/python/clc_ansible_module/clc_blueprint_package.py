@@ -233,6 +233,7 @@ class ClcBlueprintPackage():
         """
         Internal function to fetch list of CLC server objects from a list of server ids
         :param server_list: the list of server ids
+        :param message: the error message to raise if there is any error
         :return the list of CLC server objects
         """
         try:
