@@ -163,7 +163,6 @@ class ClcPublicIp(object):
     def process_request(self):
         """
         Process the request - Main Code Path
-        :param params: dictionary of module parameters
         :return: Returns with either an exit_json or fail_json
         """
         self._set_clc_credentials_from_env()
@@ -172,9 +171,6 @@ class ClcPublicIp(object):
         ports = params['ports']
         protocol = params['protocol']
         state = params['state']
-        requests = []
-        changed_server_ids = []
-        changed = False
 
         if state == 'present':
             changed, changed_server_ids, requests = self.ensure_public_ip_present(

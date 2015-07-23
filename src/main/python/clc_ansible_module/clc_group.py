@@ -326,8 +326,7 @@ class ClcGroup(object):
             response = parent.Create(name=group, description=description)
         except CLCException, ex:
             self.module.fail_json(msg='Failed to create group :{0}. {1}'.format(
-                    group, ex.response_text
-                ))
+                group, ex.response_text))
         return response
 
     def _group_exists(self, group_name, parent_name):

@@ -129,7 +129,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcAntiAffinityPolicy():
+class ClcAntiAffinityPolicy:
 
     clc = clc_sdk
     module = None

@@ -480,7 +480,7 @@ class TestClcAlertPolicy(unittest.TestCase):
         under_test = ClcAlertPolicy(self.module)
         under_test.policy_dict = {'12345': {'id': '12345', 'name': 'test1'},
                                   '23456': {'id': '23456', 'name': 'test2'}}
-        res = under_test._alert_policy_exists('testalias', 'test1')
+        res = under_test._alert_policy_exists('test1')
         self.assertEqual(res, {'id': '12345', 'name': 'test1'})
 
     @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
@@ -494,7 +494,7 @@ class TestClcAlertPolicy(unittest.TestCase):
         under_test = ClcAlertPolicy(self.module)
         under_test.policy_dict = {'12345': {'id': '12345', 'name': 'test1'},
                                   '23456': {'id': '23456', 'name': 'test2'}}
-        res = under_test._alert_policy_exists('testalias', 'notfound')
+        res = under_test._alert_policy_exists('notfound')
         self.assertEqual(res, False)
 
     @patch.object(clc_alert_policy, 'clc_sdk')
