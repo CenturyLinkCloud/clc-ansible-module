@@ -127,7 +127,8 @@ class ClcBlueprintPackage():
         if not REQUESTS_FOUND:
             self.module.fail_json(
                 msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
+        if requests.__version__ and LooseVersion(
+                requests.__version__) < LooseVersion('2.5.0'):
             self.module.fail_json(
                 msg='requests library  version should be >= 2.5.0')
 
@@ -231,7 +232,7 @@ class ClcBlueprintPackage():
     def _get_servers_from_clc(self, server_list, message):
         """
         Internal function to fetch list of CLC server objects from a list of server ids
-        :param the list server ids
+        :param server_list: the list of server ids
         :return the list of CLC server objects
         """
         try:
