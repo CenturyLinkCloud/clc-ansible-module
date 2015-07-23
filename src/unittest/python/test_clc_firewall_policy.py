@@ -16,6 +16,8 @@
 import clc_ansible_module.clc_firewall_policy as clc_firewall_policy
 from clc_ansible_module.clc_firewall_policy import ClcFirewallPolicy
 
+from clc import APIFailedResponse
+
 import mock
 from mock import patch
 import unittest
@@ -86,13 +88,14 @@ class TestClcFirewallPolicy(unittest.TestCase):
         self.module.fail_json.assert_called_with(msg='requests library is required for this module')
         reload(clc_firewall_policy)
 
-    def test_get_firewall_policy_fail(self):
+    @patch.object(clc_firewall_policy, 'clc_sdk')
+    def test_get_firewall_policy_fail(self, mock_clc_sdk):
         source_account_alias = 'WFAD'
         location = 'VA1'
         firewall_policy = 'fake_policy'
 
-        mock_policy = mock.MagicMock()
-        # mock_policy.return_value =
+        error = APIFailedResponse()
+        mock_clc_sdk.v2.API.Call.side_effect = error
         test_firewall_policy = ClcFirewallPolicy(self.module)
         response, success = test_firewall_policy._get_firewall_policy(
             source_account_alias, location, firewall_policy)
@@ -190,7 +193,8 @@ class TestClcFirewallPolicy(unittest.TestCase):
             'DELETE', '/v2-experimental/firewallPolicies/%s/%s/%s' %
             (source_account_alias, location, firewall_policy))
 
-    def test_ensure_firewall_policy_absent_fail(self):
+    @patch.object(ClcFirewallPolicy, '_get_firewall_policy')
+    def test_ensure_firewall_policy_absent_fail(self, mock_get):
         source_account_alias = 'WFAD'
         location = 'wa1'
         payload = {
@@ -200,6 +204,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             'ports': 'any',
             'firewall_policy_id': 'this_is_not_a_real_policy'
         }
+        mock_get.return_value = [], False
         test_firewall_policy = ClcFirewallPolicy(self.module)
         changed, policy, response = test_firewall_policy._ensure_firewall_policy_is_absent(
             source_account_alias, location, payload)
