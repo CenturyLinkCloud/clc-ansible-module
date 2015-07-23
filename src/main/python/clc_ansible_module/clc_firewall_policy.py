@@ -150,6 +150,7 @@ else:
 try:
     import clc as clc_sdk
     from clc import CLCException
+    from clc import APIFailedResponse
 except ImportError:
     CLC_FOUND = False
     clc_sdk = None
@@ -157,7 +158,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcFirewallPolicy():
+class ClcFirewallPolicy:
 
     clc = None
 
@@ -392,7 +393,7 @@ class ClcFirewallPolicy():
             response = self.clc.v2.API.Call(
                 'POST', '/v2-experimental/firewallPolicies/%s/%s' %
                         (source_account_alias, location), payload)
-        except self.clc.APIFailedResponse as e:
+        except APIFailedResponse as e:
             return self.module.fail_json(
                 msg="Unable to successfully create firewall policy. %s" %
                     str(e.response_text))
@@ -414,7 +415,7 @@ class ClcFirewallPolicy():
             response = self.clc.v2.API.Call(
                 'DELETE', '/v2-experimental/firewallPolicies/%s/%s/%s' %
                           (source_account_alias, location, firewall_policy_id))
-        except self.clc.APIFailedResponse as e:
+        except APIFailedResponse as e:
             return self.module.fail_json(
                 msg="Unable to successfully delete firewall policy. %s" %
                     str(e.response_text))
@@ -442,7 +443,7 @@ class ClcFirewallPolicy():
                  location,
                  firewall_policy_id),
                 firewall_dict)
-        except self.clc.APIFailedResponse as e:
+        except APIFailedResponse as e:
             return self.module.fail_json(
                 msg="Unable to successfully update firewall policy. %s" %
                     str(e.response_text))
@@ -454,7 +455,8 @@ class ClcFirewallPolicy():
         Helper method to compare the json response for getting the firewall policy with the request parameters
         :param response: response from the get method
         :param firewall_dict: dictionary or request parameters for firewall policy creation
-        :return: changed: Boolean that returns true if there are differences between the response parameters and the playbook parameters
+        :return: changed: Boolean that returns true if there are differences between
+                          the response parameters and the playbook parameters
         """
 
         changed = False
@@ -500,7 +502,7 @@ class ClcFirewallPolicy():
                 'GET', '/v2-experimental/firewallPolicies/%s/%s/%s' %
                 (source_account_alias, location, firewall_policy_id))
             success = True
-        except:
+        except APIFailedResponse:
             pass
         return response, success
 
