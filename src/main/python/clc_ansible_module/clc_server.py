@@ -101,7 +101,8 @@ options:
     required: False
   exact_count:
     description:
-      - Run in idempotent mode.  Will insure that this exact number of servers are running in the provided group, creating and deleting them to reach that count.  Requires count_group to be set.
+      - Run in idempotent mode.  Will insure that this exact number of servers are running in the provided group,
+        creating and deleting them to reach that count.  Requires count_group to be set.
     default: None
     required: False
   group:
@@ -173,7 +174,8 @@ options:
     required: False
   server_ids:
     description:
-      - Required for started, stopped, and absent states. A list of server Ids to insure are started, stopped, or absent.
+      - Required for started, stopped, and absent states.
+        A list of server Ids to insure are started, stopped, or absent.
     default: []
     required: False
   source_server_password:
@@ -293,7 +295,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcServer():
+class ClcServer:
     clc = clc_sdk
 
     def __init__(self, module):
@@ -321,8 +323,11 @@ class ClcServer():
         Process the request - Main Code Path
         :return: Returns with either an exit_json or fail_json
         """
-        self._set_clc_credentials_from_env()
+        changed = False
+        new_server_ids = []
+        server_dict_array = []
 
+        self._set_clc_credentials_from_env()
         self.module.params = self._validate_module_params(self.clc, self.module)
         p = self.module.params
         state = p.get('state')
@@ -592,18 +597,18 @@ class ClcServer():
         :return: none
         """
         state = module.params.get('state')
-        type = module.params.get(
+        server_type = module.params.get(
             'type').lower() if module.params.get('type') else None
         storage_type = module.params.get(
             'storage_type').lower() if module.params.get('storage_type') else None
 
         if state == "present":
-            if type == "standard" and storage_type not in (
+            if server_type == "standard" and storage_type not in (
                     "standard", "premium"):
                 module.fail_json(
                     msg=str("Standard VMs must have storage_type = 'standard' or 'premium'"))
 
-            if type == "hyperscale" and storage_type != "hyperscale":
+            if server_type == "hyperscale" and storage_type != "hyperscale":
                 module.fail_json(
                     msg=str("Hyperscale VMs must have storage_type = 'hyperscale'"))
 
@@ -689,8 +694,7 @@ class ClcServer():
                 aa_policy_name)
             if not aa_policy_id:
                 module.fail_json(
-                    msg='No anti affinity policy was found with policy name : %s' %
-                    (aa_policy_name))
+                    msg='No anti affinity policy was found with policy name : %s' % aa_policy_name)
         return aa_policy_id
 
     @staticmethod
@@ -709,8 +713,7 @@ class ClcServer():
             )
             if not alert_policy_id:
                 module.fail_json(
-                    msg='No alert policy exist with name : %s'
-                        % (alert_policy_name))
+                    msg='No alert policy exist with name : %s' % alert_policy_name)
         return alert_policy_id
 
     def _create_servers(self, module, clc, override_count=None):
@@ -721,7 +724,7 @@ class ClcServer():
         :return: a list of dictionaries with server information about the servers that were created
         """
         p = module.params
-        requests = []
+        request_list = []
         servers = []
         server_dict_array = []
         created_server_ids = []
@@ -769,10 +772,10 @@ class ClcServer():
                                               module=module,
                                               server_params=params)
                 server = req.requests[0].Server()
-                requests.append(req)
+                request_list.append(req)
                 servers.append(server)
 
-        self._wait_for_requests(clc, requests, servers, wait)
+        self._wait_for_requests(clc, request_list, servers, wait)
 
         ip_failed_servers = self._add_public_ip_to_servers(
             clc=clc,
@@ -847,7 +850,6 @@ class ClcServer():
             changed = False
 
         elif len(running_servers) < exact_count:
-            changed = True
             to_create = exact_count - len(running_servers)
             server_dict_array, changed_server_ids, partial_servers_ids, changed \
                 = self._create_servers(module, clc, override_count=to_create)
@@ -856,7 +858,6 @@ class ClcServer():
                 running_servers.append(server)
 
         elif len(running_servers) > exact_count:
-            changed = True
             to_remove = len(running_servers) - exact_count
             all_server_ids = sorted([x.id for x in running_servers])
             remove_ids = all_server_ids[0:to_remove]
@@ -921,7 +922,8 @@ class ClcServer():
             return failed_servers
 
         ports_lst = []
-        requests = []
+        request_list = []
+        server = None
 
         for port in public_ip_ports:
             ports_lst.append(
@@ -930,11 +932,11 @@ class ClcServer():
             if not module.check_mode:
                 for server in servers:
                     request = server.PublicIPs().Add(ports_lst)
-                    requests.append(request)
+                    request_list.append(request)
         except clc.APIFailedResponse:
             failed_servers.append(server)
         if wait:
-            for r in requests:
+            for r in request_list:
                 r.WaitUntilComplete()
         return failed_servers
 
@@ -987,8 +989,8 @@ class ClcServer():
                     }))
         except clc.APIFailedResponse as e:
             raise CLCException(
-                'Failed to associate alert policy to the server : %s with Error %s'
-                    % (server_id, str(e.response_text)))
+                'Failed to associate alert policy to the server : {0} with Error {1}'.format(
+                    server_id, str(e.response_text)))
 
     @staticmethod
     def _get_alert_policy_id_by_name(clc, module, alias, alert_policy_name):
@@ -1001,7 +1003,7 @@ class ClcServer():
         :return: the alert policy id
         """
         alert_policy_id = None
-        policies = clc.v2.API.Call('GET', '/v2/alertPolicies/%s' % (alias))
+        policies = clc.v2.API.Call('GET', '/v2/alertPolicies/%s' % alias)
         if not policies:
             return alert_policy_id
         for policy in policies.get('items'):
@@ -1010,8 +1012,7 @@ class ClcServer():
                     alert_policy_id = policy.get('id')
                 else:
                     return module.fail_json(
-                        msg='multiple alert policies were found with policy name : %s' %
-                        (alert_policy_name))
+                        msg='multiple alert policies were found with policy name : %s' % alert_policy_name)
         return alert_policy_id
 
     @staticmethod
@@ -1028,28 +1029,25 @@ class ClcServer():
         wait = p.get('wait')
         terminated_server_ids = []
         server_dict_array = []
-        requests = []
+        request_list = []
 
-        changed = False
         if not isinstance(server_ids, list) or len(server_ids) < 1:
             return module.fail_json(
                 msg='server_ids should be a list of servers, aborting')
 
         servers = clc.v2.Servers(server_ids).Servers()
-        changed = True
-
         for server in servers:
             if not module.check_mode:
-                requests.append(server.Delete())
+                request_list.append(server.Delete())
 
         if wait:
-            for r in requests:
+            for r in request_list:
                 r.WaitUntilComplete()
 
         for server in servers:
             terminated_server_ids.append(server.id)
 
-        return changed, server_dict_array, terminated_server_ids
+        return True, server_dict_array, terminated_server_ids
 
     @staticmethod
     def _startstop_servers(module, clc, server_ids):
@@ -1067,7 +1065,7 @@ class ClcServer():
         changed_servers = []
         server_dict_array = []
         result_server_ids = []
-        requests = []
+        request_list = []
 
         if not isinstance(server_ids, list) or len(server_ids) < 1:
             return module.fail_json(
@@ -1078,7 +1076,7 @@ class ClcServer():
             if server.powerState != state:
                 changed_servers.append(server)
                 if not module.check_mode:
-                    requests.append(
+                    request_list.append(
                         ClcServer._change_server_power_state(
                             module,
                             server,
@@ -1086,7 +1084,7 @@ class ClcServer():
                 changed = True
 
         if wait:
-            for r in requests:
+            for r in request_list:
                 r.WaitUntilComplete()
             for server in changed_servers:
                 server.Refresh()
@@ -1112,7 +1110,7 @@ class ClcServer():
                 result = server.PowerOn()
             else:
                 result = server.PowerOff()
-        except:
+        except CLCException:
             module.fail_json(
                 msg='Unable to change state for server {0}'.format(
                     server.id))
@@ -1150,12 +1148,11 @@ class ClcServer():
         :param lookup_group: string name of the group to search for
         :return: clc-sdk.Group instance
         """
-        result = None
         if not lookup_group:
             lookup_group = module.params.get('group')
         try:
             return datacenter.Groups().Get(lookup_group)
-        except:
+        except CLCException:
             pass
 
         # The search above only acts on the main
@@ -1188,7 +1185,7 @@ class ClcServer():
             subgroups = group.Subgroups()
             try:
                 return subgroups.Get(lookup_group)
-            except:
+            except CLCException:
                 result = ClcServer._find_group_recursive(
                     module,
                     subgroups,
@@ -1277,7 +1274,7 @@ class ClcServer():
         aa_policy_id = None
         try:
             aa_policies = clc.v2.API.Call(method='GET',
-                                          url='antiAffinityPolicies/%s' % (alias))
+                                          url='antiAffinityPolicies/%s' % alias)
         except clc.APIFailedResponse as ex:
             return module.fail_json(msg='Unable to fetch anti affinity policies for account: {0}. {1}'.format(
                 alias, ex.response_text))
@@ -1287,8 +1284,7 @@ class ClcServer():
                     aa_policy_id = aa_policy.get('id')
                 else:
                     return module.fail_json(
-                        msg='multiple anti affinity policies were found with policy name : %s' %
-                        (aa_policy_name))
+                        msg='multiple anti affinity policies were found with policy name : %s' % aa_policy_name)
         return aa_policy_id
 
     #
@@ -1332,7 +1328,7 @@ class ClcServer():
                     return module.fail_json(
                         msg='Unable to reach the CLC API after 5 attempts')
                 sleep(backout)
-                backout = backout * 2
+                backout *= 2
 
     @staticmethod
     def _set_user_agent(clc):
