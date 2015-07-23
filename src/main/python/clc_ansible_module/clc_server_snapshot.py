@@ -9,13 +9,13 @@
 # by the Workflow as a Service Team
 #
 # Copyright 2015 CenturyLink
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -124,7 +124,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcSnapshot():
+class ClcSnapshot:
 
     clc = clc_sdk
     module = None
@@ -141,7 +141,8 @@ class ClcSnapshot():
         if not REQUESTS_FOUND:
             self.module.fail_json(
                 msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
+        if requests.__version__ and LooseVersion(
+                requests.__version__) < LooseVersion('2.5.0'):
             self.module.fail_json(
                 msg='requests library  version should be >= 2.5.0')
 
@@ -157,22 +158,23 @@ class ClcSnapshot():
         server_ids = p['server_ids']
         expiration_days = p['expiration_days']
         state = p['state']
-        requests = []
+        request_list = []
         changed = False
         changed_servers = []
 
         self._set_clc_credentials_from_env()
         if state == 'present':
-            changed, requests, changed_servers = self.ensure_server_snapshot_present(server_ids=server_ids,
-                                                                                    expiration_days=expiration_days)
+            changed, request_list, changed_servers = self.ensure_server_snapshot_present(
+                server_ids=server_ids,
+                expiration_days=expiration_days)
         elif state == 'absent':
-            changed, requests, changed_servers = self.ensure_server_snapshot_absent(
+            changed, request_list, changed_servers = self.ensure_server_snapshot_absent(
                 server_ids=server_ids)
         elif state == 'restore':
-            changed, requests, changed_servers = self.ensure_server_snapshot_restore(
+            changed, request_list, changed_servers = self.ensure_server_snapshot_restore(
                 server_ids=server_ids)
 
-        self._wait_for_requests_to_complete(requests)
+        self._wait_for_requests_to_complete(request_list)
         return self.module.exit_json(
             changed=changed,
             server_ids=changed_servers)
@@ -342,7 +344,8 @@ class ClcSnapshot():
     def _get_servers_from_clc(self, server_list, message):
         """
         Internal function to fetch list of CLC server objects from a list of server ids
-        :param the list server ids
+        :param server_list: The list of server ids
+        :param message: The error message to throw in case of any error
         :return the list of CLC server objects
         """
         try:
