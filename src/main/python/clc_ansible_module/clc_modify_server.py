@@ -8,7 +8,7 @@
 # This file is part of CenturyLink Cloud, and is maintained
 # by the Workflow as a Service Team
 #
-# Copyright 2015 CenturyLink 
+# Copyright 2015 CenturyLink
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -172,7 +172,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcModifyServer():
+class ClcModifyServer:
     clc = clc_sdk
 
     def __init__(self, module):
@@ -188,7 +188,8 @@ class ClcModifyServer():
         if not REQUESTS_FOUND:
             self.module.fail_json(
                 msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
+        if requests.__version__ and LooseVersion(
+                requests.__version__) < LooseVersion('2.5.0'):
             self.module.fail_json(
                 msg='requests library  version should be >= 2.5.0')
 
@@ -215,7 +216,8 @@ class ClcModifyServer():
                 msg='server_ids needs to be a list of instances to modify: %s' %
                 server_ids)
 
-        (changed, server_dict_array, new_server_ids) = self._modify_servers(server_ids=server_ids)
+        (changed, server_dict_array, new_server_ids) = self._modify_servers(
+            server_ids=server_ids)
 
         self.module.exit_json(
             changed=changed,
@@ -277,7 +279,8 @@ class ClcModifyServer():
     def _get_servers_from_clc(self, server_list, message):
         """
         Internal function to fetch list of CLC server objects from a list of server ids
-        :param the list server ids
+        :param server_list: The list of server ids
+        :param message: the error message to throw in case of any error
         :return the list of CLC server objects
         """
         try:
@@ -315,17 +318,28 @@ class ClcModifyServer():
             return self.module.fail_json(
                 msg='server_ids should be a list of servers, aborting')
 
-        servers = self._get_servers_from_clc(server_ids, 'Failed to obtain server list from the CLC API')
+        servers = self._get_servers_from_clc(
+            server_ids,
+            'Failed to obtain server list from the CLC API')
         for server in servers:
             if state == 'present':
-                server_changed, server_result = self._ensure_server_config(server, server_params)
+                server_changed, server_result = self._ensure_server_config(
+                    server, server_params)
                 if server_result:
                     request_list.append(server_result)
-                aa_changed = self._ensure_aa_policy_present(server, server_params)
-                ap_changed = self._ensure_alert_policy_present(server, server_params)
+                aa_changed = self._ensure_aa_policy_present(
+                    server,
+                    server_params)
+                ap_changed = self._ensure_alert_policy_present(
+                    server,
+                    server_params)
             elif state == 'absent':
-                aa_changed = self._ensure_aa_policy_absent(server, server_params)
-                ap_changed = self._ensure_alert_policy_absent(server, server_params)
+                aa_changed = self._ensure_aa_policy_absent(
+                    server,
+                    server_params)
+                ap_changed = self._ensure_alert_policy_absent(
+                    server,
+                    server_params)
             if server_changed or aa_changed or ap_changed:
                 changed_servers.append(server)
                 changed = True
@@ -535,26 +549,23 @@ class ClcModifyServer():
         :return: aa_policy_id: The anti affinity policy id
         """
         aa_policy_id = None
-        aa_policies = []
         try:
             aa_policies = clc.v2.API.Call(method='GET',
-                                          url='antiAffinityPolicies/%s' % (alias))
+                                          url='antiAffinityPolicies/%s' % alias)
         except APIFailedResponse as ex:
-                return module.fail_json(
-                    msg='Unable to fetch anti affinity policies from account alias : "{0}". {1}'.format(
-                        alias, str(ex.response_text)))
+            return module.fail_json(
+                msg='Unable to fetch anti affinity policies from account alias : "{0}". {1}'.format(
+                    alias, str(ex.response_text)))
         for aa_policy in aa_policies.get('items'):
             if aa_policy.get('name') == aa_policy_name:
                 if not aa_policy_id:
                     aa_policy_id = aa_policy.get('id')
                 else:
                     return module.fail_json(
-                        msg='multiple anti affinity policies were found with policy name : %s' %
-                        (aa_policy_name))
+                        msg='multiple anti affinity policies were found with policy name : %s' % aa_policy_name)
         if not aa_policy_id:
             module.fail_json(
-                msg='No anti affinity policy was found with policy name : %s' %
-                (aa_policy_name))
+                msg='No anti affinity policy was found with policy name : %s' % aa_policy_name)
         return aa_policy_id
 
     @staticmethod
@@ -576,7 +587,7 @@ class ClcModifyServer():
         except APIFailedResponse as ex:
             if ex.response_status_code != 404:
                 module.fail_json(msg='Unable to fetch anti affinity policy for server "{0}". {1}'.format(
-                        server_id, str(ex.response_text)))
+                    server_id, str(ex.response_text)))
         return aa_policy_id
 
     def _ensure_alert_policy_present(
@@ -665,8 +676,7 @@ class ClcModifyServer():
                                          json.dumps({"id": alert_policy_id}))
             except APIFailedResponse as ex:
                 module.fail_json(msg='Unable to set alert policy to the server : "{0}". {1}'.format(
-                        server_id, str(ex.response_text)))
-
+                    server_id, str(ex.response_text)))
         return result
 
     @staticmethod
@@ -689,7 +699,7 @@ class ClcModifyServer():
                                          % (acct_alias, server_id, alert_policy_id))
             except APIFailedResponse as ex:
                 module.fail_json(msg='Unable to remove alert policy from the server : "{0}". {1}'.format(
-                        server_id, str(ex.response_text)))
+                    server_id, str(ex.response_text)))
         return result
 
     @staticmethod
@@ -705,18 +715,17 @@ class ClcModifyServer():
         alert_policy_id = None
         try:
             alert_policies = clc.v2.API.Call(method='GET',
-                                             url='alertPolicies/%s' % (alias))
+                                             url='alertPolicies/%s' % alias)
         except APIFailedResponse as ex:
-                return module.fail_json(msg='Unable to fetch alert policies for account : "{0}". {1}'.format(
-                        alias, str(ex.response_text)))
+            return module.fail_json(msg='Unable to fetch alert policies for account : "{0}". {1}'.format(
+                alias, str(ex.response_text)))
         for alert_policy in alert_policies.get('items'):
             if alert_policy.get('name') == alert_policy_name:
                 if not alert_policy_id:
                     alert_policy_id = alert_policy.get('id')
                 else:
                     return module.fail_json(
-                        msg='multiple alert policies were found with policy name : %s' %
-                        (alert_policy_name))
+                        msg='multiple alert policies were found with policy name : %s' % alert_policy_name)
         return alert_policy_id
 
     @staticmethod
