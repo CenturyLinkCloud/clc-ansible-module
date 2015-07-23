@@ -551,7 +551,7 @@ class ClcServer:
                 cpu = group.Defaults("cpu")
             else:
                 module.fail_json(
-                    msg=str("Cannot determine a default cpu value. Please provide a value for cpu."))
+                    msg=str("Can\'t determine a default cpu value. Please provide a value for cpu."))
         return cpu
 
     @staticmethod
@@ -574,7 +574,7 @@ class ClcServer:
                 memory = group.Defaults("memory")
             else:
                 module.fail_json(msg=str(
-                    "Cannot determine a default memory value. Please provide a value for memory."))
+                    "Can\'t determine a default memory value. Please provide a value for memory."))
         return memory
 
     @staticmethod
@@ -624,7 +624,7 @@ class ClcServer:
 
         if ttl:
             if ttl <= 3600:
-                module.fail_json(msg=str("Ttl cannot be <= 3600"))
+                return module.fail_json(msg=str("Ttl cannot be <= 3600"))
             else:
                 ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time()) + ttl)
         return ttl
@@ -685,8 +685,6 @@ class ClcServer:
         aa_policy_name = module.params.get('anti_affinity_policy_name')
         if not aa_policy_id and aa_policy_name:
             alias = module.params.get('alias')
-            if not alias:
-                alias = clc.v2.Account.GetAlias()
             aa_policy_id = ClcServer._get_anti_affinity_policy_id(
                 clc,
                 module,
@@ -703,8 +701,6 @@ class ClcServer:
         alert_policy_name = module.params.get('alert_policy_name')
         if not alert_policy_id and alert_policy_name:
             alias = module.params.get('alias')
-            if not alias:
-                alias = clc.v2.Account.GetAlias()
             alert_policy_id = ClcServer._get_alert_policy_id_by_name(
                 clc=clc,
                 module=module,
@@ -836,6 +832,7 @@ class ClcServer:
         exact_count = p.get('exact_count')
         server_dict_array = []
         partial_servers_ids = []
+        changed_server_ids = []
 
         # fail here if the exact count was specified without filtering
         # on a group, as this may lead to a undesired removal of instances

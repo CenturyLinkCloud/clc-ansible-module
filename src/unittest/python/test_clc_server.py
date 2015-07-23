@@ -561,6 +561,16 @@ class TestClcServerFunctions(unittest.TestCase):
 
         mock_clc_sdk.v2.SetCredentials.assert_called_once_with(api_username='hansolo', api_passwd='falcon')
 
+    def test_set_clc_credentials_w_token(self):
+        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'Token12345',
+                                       'CLC_ACCT_ALIAS': 'TEST' }):
+            mock_clc_sdk = mock.MagicMock()
+            under_test = ClcServer(self.module)
+            under_test.clc = mock_clc_sdk
+            under_test._set_clc_credentials_from_env()
+            self.assertEqual(mock_clc_sdk._LOGIN_TOKEN_V2, 'Token12345')
+            self.assertFalse(mock_clc_sdk.v2.SetCredentials.called)
+            self.assertEqual(self.module.fail_json.called, False)
 
     def test_clc_set_credentials_w_no_creds(self):
         with patch.dict('os.environ', {}, clear=True):
@@ -825,6 +835,19 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test._create_clc_server(mock_clc_sdk, self.module, server_params)
         self.module.fail_json.assert_called_with(msg='Unable to create the server: test server. Mock failure message')
 
+    @patch.object(clc_server, 'clc_sdk')
+    def test_find_datacenter_exception(self, mock_clc_sdk):
+        error = CLCException()
+        mock_clc_sdk.v2.Datacenter.side_effect = error
+        params = {
+            'state': 'present',
+            'location': 'testdc'
+        }
+        self.module.params = params
+        under_test = ClcServer(self.module)
+        under_test._find_datacenter(mock_clc_sdk, self.module)
+        self.module.fail_json.assert_called_with(msg='Unable to find location: testdc')
+
     @patch.object(ClcServer, '_find_group_recursive')
     def test_find_group_no_result(self, mock_find_recursive):
         mock_find_recursive.return_value = None
@@ -836,6 +859,73 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_with(msg='Unable to find group: lookup_group in location: testdc')
         self.assertEqual(ret, None)
 
+    @patch.object(clc_server, 'clc_sdk')
+    def test_find_cpu_exception(self, mock_clc_sdk):
+        params = {
+            'state': 'present'
+        }
+        mock_group = mock.MagicMock()
+        mock_group.Defaults.return_value = None
+        mock_clc_sdk.v2.Group.return_value = mock_group
+        self.module.params = params
+        ClcServer._find_cpu(mock_clc_sdk, self.module)
+        self.module.fail_json.assert_called_with(msg="Can't determine a default cpu value. Please provide a value for cpu.")
+
+    @patch.object(clc_server, 'clc_sdk')
+    def test_find_memory_exception(self, mock_clc_sdk):
+        params = {
+            'state': 'present'
+        }
+        mock_group = mock.MagicMock()
+        mock_group.Defaults.return_value = None
+        mock_clc_sdk.v2.Group.return_value = mock_group
+        self.module.params = params
+        ClcServer._find_memory(mock_clc_sdk, self.module)
+        self.module.fail_json.assert_called_with(msg="Can't determine a default memory value. Please provide a value for memory.")
+
+    def test_validate_types_exception_standard(self):
+        params = {
+            'state': 'present',
+            'type': 'standard',
+            'storage_type': 'invalid'
+        }
+        self.module.params = params
+        ClcServer._validate_types(self.module)
+        self.module.fail_json.assert_called_with(msg="Standard VMs must have storage_type = 'standard' or 'premium'")
+
+    def test_validate_types_exception_hyperscale(self):
+        params = {
+            'state': 'present',
+            'type': 'hyperscale',
+            'storage_type': 'invalid'
+        }
+        self.module.params = params
+        ClcServer._validate_types(self.module)
+        self.module.fail_json.assert_called_with(msg="Hyperscale VMs must have storage_type = 'hyperscale'")
+
+    @patch.object(clc_server, 'clc_sdk')
+    def test_find_ttl(self, mock_clc_sdk):
+        params = {
+            'state': 'present',
+            'ttl': 5000
+        }
+        self.module.params = params
+        mock_clc_sdk.v2.time_utils.SecondsToZuluTS.return_value = 'TTL'
+        res = ClcServer._find_ttl(mock_clc_sdk, self.module)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(res, 'TTL')
+
+    @patch.object(clc_server, 'clc_sdk')
+    def test_find_ttl_exception(self, mock_clc_sdk):
+        params = {
+            'state': 'present',
+            'ttl': 1000
+        }
+        self.module.params = params
+        mock_clc_sdk.v2.time_utils.SecondsToZuluTS.return_value = 'TTL'
+        ClcServer._find_ttl(mock_clc_sdk, self.module)
+        self.module.fail_json.assert_called_with(msg='Ttl cannot be <= 3600')
+
     def test_startstop_servers_invalid_list(self):
         ClcServer._startstop_servers(self.module, self.clc, {'id': 'value'})
         self.module.fail_json.assert_called_with(msg='server_ids should be a list of servers, aborting')
@@ -843,6 +933,42 @@ class TestClcServerFunctions(unittest.TestCase):
     def test_delete_servers_invalid_list(self):
         ClcServer._delete_servers(self.module, self.clc, {'id': 'value'})
         self.module.fail_json.assert_called_with(msg='server_ids should be a list of servers, aborting')
+
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(ClcServer, '_validate_module_params')
+    def test_process_request_absent_state_w_invalid_servers(self, mock_validate, mock_creds):
+        params = {
+            'state': 'absent',
+            'server_ids': {'data': 'invalid'}
+        }
+        mock_validate.return_value = params
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+        self.module.fail_json.assert_called_with(msg="server_ids needs to be a list of instances to delete: {'data': 'invalid'}")
+
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(ClcServer, '_validate_module_params')
+    def test_process_request_started_state_w_invalid_servers(self, mock_validate, mock_creds):
+        params = {
+            'state': 'started',
+            'server_ids': {'data': 'invalid'}
+        }
+        mock_validate.return_value = params
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+        self.module.fail_json.assert_called_with(msg="server_ids needs to be a list of servers to run: {'data': 'invalid'}")
+
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(ClcServer, '_validate_module_params')
+    def test_process_request_present_state_w_no_template(self, mock_validate, mock_creds):
+        params = {
+            'state': 'present',
+            'server_ids': ['id1', 'id2']
+        }
+        mock_validate.return_value = params
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+        self.module.fail_json.assert_called_with(msg='template parameter is required for new instance')
 
     @patch.object(clc_server, 'clc_sdk')
     def test_add_alert_policy_to_server_exception(self, mock_clc_sdk):
@@ -982,7 +1108,105 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(changed, True)
         self.assertEqual(partial_created_servers_ids, ['server1'])
 
+    def test_create_servers_no_change(self):
+        params = {
+            'state': 'present',
+            'count': 0
+        }
+        self.module.params = params
+        under_test = ClcServer(self.module)
+        server_dict_array, created_server_ids, partial_created_servers_ids, changed = \
+            under_test._create_servers(self.module, self.clc)
+        self.assertEqual(changed, False)
+        self.assertEqual(server_dict_array, [])
+        self.assertEqual(created_server_ids, [])
+        self.assertEqual(partial_created_servers_ids, [])
 
+    def test_enforce_count_missing_argument(self):
+        params = {
+            'state': 'present',
+            'exact_count': 1
+        }
+        self.module.params = params
+        under_test = ClcServer(self.module)
+        under_test._enforce_count(self.module, self.clc)
+        self.module.fail_json.assert_called_with(msg="you must use the 'count_group' option with exact_count")
+
+    @patch.object(ClcServer, '_find_running_servers_by_group')
+    def test_enforce_count_no_change(self, mock_running_servers):
+        mock_server_list = [mock.MagicMock()]
+        mock_running_servers.return_value = (mock_server_list, mock_server_list)
+        params = {
+            'state': 'present',
+            'exact_count': 0,
+            'count_group': 'test'
+        }
+        self.module.params = params
+        under_test = ClcServer(self.module)
+        server_dict_array, changed_server_ids, partial_servers_ids, changed = \
+            under_test._enforce_count(self.module, self.clc)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(changed, False)
+        self.assertEqual(server_dict_array, [])
+        self.assertEqual(changed_server_ids, [])
+        self.assertEqual(partial_servers_ids, [])
+
+    def test_add_public_ip_to_servers_w_failed_servers(self):
+        mock_server = mock.MagicMock()
+        mock_server.id = 'server1'
+        mock_server.PublicIPs().Add.side_effect = APIFailedResponse()
+        servers = [mock_server]
+        self.module.check_mode = False
+        under_test = ClcServer(self.module)
+        failed_servers = under_test._add_public_ip_to_servers(self.clc,
+                                             self.module,
+                                             True, servers,
+                                             'TCP',
+                                             [80],
+                                             False)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(len(failed_servers), 1)
+        self.assertEqual(failed_servers[0].id, 'server1')
+
+    @patch.object(clc_server, 'clc_sdk')
+    def test_delete_servers(self, mock_clc_sdk):
+        params = {
+            'wait': True
+        }
+        self.module.params = params
+        mock_server = mock.MagicMock()
+        mock_server.id = 'mockid1'
+        mock_servers = mock.MagicMock()
+        mock_servers.id = 'temp1'
+        mock_servers.Servers.return_value = [mock_server]
+        mock_clc_sdk.v2.Servers.return_value = mock_servers
+        self.module.check_mode = False
+        under_test = ClcServer(self.module)
+        changed, server_dict_array, terminated_server_ids = \
+            under_test._delete_servers(self.module, mock_clc_sdk, ['server1', 'server2'])
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(changed, True)
+        self.assertEqual(terminated_server_ids, ['mockid1'])
+
+    @patch.object(clc_server, 'clc_sdk')
+    def test_start_stop_servers(self, mock_clc_sdk):
+        params = {
+            'wait': True
+        }
+        self.module.params = params
+        mock_server = mock.MagicMock()
+        mock_server.id = 'mockid1'
+        mock_servers = mock.MagicMock()
+        mock_servers.id = 'temp1'
+        mock_servers.Servers.return_value = [mock_server]
+        mock_clc_sdk.v2.Servers.return_value = mock_servers
+        self.module.check_mode = False
+        under_test = ClcServer(self.module)
+        changed, server_dict_array, result_server_ids = \
+            under_test._startstop_servers(self.module, mock_clc_sdk, ['server1', 'server2'])
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(changed, True)
+        self.assertEqual(result_server_ids, ['mockid1'])
 
 if __name__ == '__main__':
     unittest.main()
