@@ -40,7 +40,6 @@ options:
   package_id:
     description:
       - The package id of the blue print.
-    default: None
     required: True
   package_params:
     description:
@@ -201,7 +200,7 @@ class ClcBlueprintPackage():
         :param server: The server object where the package needs to be installed
         :param package_id: The blue print package id
         :param package_params: the required argument dict for the package installation
-        :return: The result object from the clc-sdk
+        :return: The result object from the CLC API call
         """
         result = None
         try:
