@@ -803,6 +803,65 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_ansible_module.fail_json.assert_called_with(
             msg='multiple anti affinity policies were found with policy name : test1')
 
+    @patch.object(clc_server, 'clc_sdk')
+    def test_get_anti_affinity_policy_id_get_fail(self, mock_clc_sdk):
+        error = APIFailedResponse()
+        error.response_text = 'Mock failure message'
+        mock_clc_sdk.v2.API.Call.side_effect = error
+        under_test = ClcServer(self.module)
+        under_test._get_anti_affinity_policy_id(mock_clc_sdk, self.module, 'alias', 'aa_policy_name')
+        self.module.fail_json.assert_called_with(msg='Unable to fetch anti affinity policies for account: alias. Mock failure message')
+
+    @patch.object(clc_server, 'clc_sdk')
+    def test_create_clc_server_exception(self, mock_clc_sdk):
+        error = APIFailedResponse()
+        error.response_text = 'Mock failure message'
+        mock_clc_sdk.v2.API.Call.side_effect = error
+        under_test = ClcServer(self.module)
+        server_params = {
+            'alias': 'mock',
+            'name': 'test server'
+        }
+        under_test._create_clc_server(mock_clc_sdk, self.module, server_params)
+        self.module.fail_json.assert_called_with(msg='Unable to create the server: test server. Mock failure message')
+
+    @patch.object(ClcServer, '_find_group_recursive')
+    def test_find_group_no_result(self, mock_find_recursive):
+        mock_find_recursive.return_value = None
+        mock_dc = mock.MagicMock()
+        mock_dc.id = 'testdc'
+        mock_dc.Groups().Get.side_effect = CLCException()
+        under_test = ClcServer(self.module)
+        ret = under_test._find_group(self.module, mock_dc, 'lookup_group')
+        self.module.fail_json.assert_called_with(msg='Unable to find group: lookup_group in location: testdc')
+        self.assertEqual(ret, None)
+
+    def test_startstop_servers_invalid_list(self):
+        ClcServer._startstop_servers(self.module, self.clc, {'id': 'value'})
+        self.module.fail_json.assert_called_with(msg='server_ids should be a list of servers, aborting')
+
+    def test_delete_servers_invalid_list(self):
+        ClcServer._delete_servers(self.module, self.clc, {'id': 'value'})
+        self.module.fail_json.assert_called_with(msg='server_ids should be a list of servers, aborting')
+
+    @patch.object(clc_server, 'clc_sdk')
+    def test_add_alert_policy_to_server_exception(self, mock_clc_sdk):
+        error = APIFailedResponse()
+        error.response_text = 'Mock failure message'
+        mock_clc_sdk.v2.API.Call.side_effect = error
+        under_test = ClcServer(self.module)
+        server_params = {
+            'alias': 'mock',
+            'name': 'test server'
+        }
+        self.assertRaises(CLCException,
+                          under_test._add_alert_policy_to_server,
+                          mock_clc_sdk,
+                          self.module,
+                          'alias',
+                          'server_id',
+                          'alert_policy_id')
+
     @patch.object(clc_server, 'AnsibleModule')
     @patch.object(clc_server, 'clc_sdk')
     def test_get_alert_policy_id_by_name_dup_match(self, mock_clc_sdk, mock_ansible_module):

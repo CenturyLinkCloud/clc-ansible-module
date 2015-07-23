@@ -933,7 +933,7 @@ class ClcServer:
                 for server in servers:
                     request = server.PublicIPs().Add(ports_lst)
                     request_list.append(request)
-        except clc.APIFailedResponse:
+        except APIFailedResponse:
             failed_servers.append(server)
         if wait:
             for r in request_list:
@@ -987,7 +987,7 @@ class ClcServer:
                     {
                         'id': alert_policy_id
                     }))
-        except clc.APIFailedResponse as e:
+        except APIFailedResponse as e:
             raise CLCException(
                 'Failed to associate alert policy to the server : {0} with Error {1}'.format(
                     server_id, str(e.response_text)))
@@ -1238,7 +1238,7 @@ class ClcServer:
                         'packages': server_params.get('packages')}))
 
             result = clc.v2.Requests(res)
-        except clc.APIFailedResponse as ex:
+        except APIFailedResponse as ex:
             return module.fail_json(msg='Unable to create the server: {0}. {1}'.format(
                 server_params.get('name'),
                 ex.response_text
@@ -1275,7 +1275,7 @@ class ClcServer:
         try:
             aa_policies = clc.v2.API.Call(method='GET',
                                           url='antiAffinityPolicies/%s' % alias)
-        except clc.APIFailedResponse as ex:
+        except APIFailedResponse as ex:
             return module.fail_json(msg='Unable to fetch anti affinity policies for account: {0}. {1}'.format(
                 alias, ex.response_text))
         for aa_policy in aa_policies.get('items'):
