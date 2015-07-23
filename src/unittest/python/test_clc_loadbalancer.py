@@ -456,7 +456,7 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         self.module.check_mode = False
         test = ClcLoadBalancer(self.module)
         mock_get_pool_nodes.return_value = [{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }]
-        result = test._loadbalancerpool_nodes_exists('alias','location',80,'lb_id','pool_id',
+        result = test._loadbalancerpool_nodes_exists('alias','location','lb_id','pool_id',
                                        [{ 'ipAddress': '10.82.152.15', 'privatePort': 80}])
         self.assertEqual(result, True)
 
@@ -473,7 +473,7 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         self.module.check_mode = False
         test = ClcLoadBalancer(self.module)
         mock_get_pool_nodes.return_value = [{ 'ipAddress': '10.82.152.15', 'privatePort': 80, 'status': 'enabled' }]
-        result = test._loadbalancerpool_nodes_exists('alias','location',80,'lb_id','pool_id',
+        result = test._loadbalancerpool_nodes_exists('alias','location','lb_id','pool_id',
                                        [{ 'ipAddress': '10.82.152.15', 'privatePort': 90}])
         self.assertEqual(result, False)
 

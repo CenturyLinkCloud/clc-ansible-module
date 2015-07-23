@@ -39,7 +39,7 @@ options:
     required: True
   description:
     description:
-      - A description for your loadbalancer
+      - A description for the loadbalancer
     required: False
     default: None
   alias:
@@ -48,17 +48,17 @@ options:
     required: True
   location:
     description:
-      - The location of the datacenter your load balancer resides in
+      - The location of the datacenter where the load balancer resides in
     required: True
   method:
     description:
-      -The balancing method for this pool
+      -The balancing method for the load balancer pool
     required: False
     default: None
     choices: ['leastConnection', 'roundRobin']
   persistence:
     description:
-      - The persistence method for this load balancer
+      - The persistence method for the load balancer
     required: False
     default: None
     choices: ['standard', 'sticky']
@@ -70,12 +70,12 @@ options:
     choices: [80, 443]
   nodes:
     description:
-      - A list of nodes that you want added to your load balancer pool
+      - A list of nodes that needs to be added to the load balancer pool
     required: False
     default: []
   status:
     description:
-      - The status of your loadbalancer
+      - The status of the loadbalancer
     required: False
     default: enabled
     choices: ['enabled', 'disabled']
@@ -274,8 +274,7 @@ class ClcLoadBalancer():
                                                                          location=loadbalancer_location,
                                                                          name=loadbalancer_name,
                                                                          port=loadbalancer_port,
-                                                                         nodes=loadbalancer_nodes
-                                                                         )
+                                                                         nodes=loadbalancer_nodes)
         elif state == 'absent':
             changed, result_lb = self.ensure_loadbalancer_absent(name=loadbalancer_name,
                                                                  alias=loadbalancer_alias,
@@ -302,20 +301,20 @@ class ClcLoadBalancer():
                                                                  nodes=loadbalancer_nodes)
 
         self.module.exit_json(changed=changed, loadbalancer=result_lb)
-    #
-    #  Functions to define the Ansible module and its arguments
-    #
 
     def ensure_loadbalancer_present(
             self, name, alias, location, description, status):
         """
-        Check for loadbalancer presence (available)
+        Checks to see if a load balancer exists and creates one if it does not.
         :param name: Name of loadbalancer
         :param alias: Alias of account
         :param location: Datacenter
         :param description: Description of loadbalancer
         :param status: Enabled / Disabled
-        :return: True / False
+        :return: (changed, result, lb_id)
+            changed: Boolean whether a change was made
+            result: The result object from the CLC load balancer request
+            lb_id: The load balancer id
         """
         changed = False
         result = name
@@ -336,7 +335,7 @@ class ClcLoadBalancer():
             self, lb_id, alias, location, method, persistence, port):
         """
         Checks to see if a load balancer pool exists and creates one if it does not.
-        :param name: The loadbalancer name
+        :param lb_id: The loadbalancer id
         :param alias: The account alias
         :param location: the datacenter the load balancer resides in
         :param method: the load balancing method
@@ -345,7 +344,7 @@ class ClcLoadBalancer():
         :return: (changed, group, pool_id) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
-            pool_id: The string id of the pool
+            pool_id: The string id of the load balancer pool
         """
         changed = False
         result = port
@@ -372,8 +371,8 @@ class ClcLoadBalancer():
 
     def ensure_loadbalancer_absent(self, name, alias, location):
         """
-        Check for loadbalancer presence (not available)
-        :param name: Name of loadbalancer
+        Checks to see if a load balancer exists and deletes it if it does
+        :param name: Name of the load balancer
         :param alias: Alias of account
         :param location: Datacenter
         :return: (changed, result)
@@ -396,9 +395,9 @@ class ClcLoadBalancer():
         Checks to see if a load balancer pool exists and deletes it if it does
         :param alias: The account alias
         :param location: the datacenter the load balancer resides in
-        :param loadbalancer: the name of the load balancer
-        :param port: the port that the load balancer will listen on
-        :return: (changed, group) -
+        :param name: the name of the load balancer
+        :param port: the port that the load balancer listens on
+        :return: (changed, result) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
         """
@@ -434,7 +433,7 @@ class ClcLoadBalancer():
         :param name: the name of the load balancer
         :param port: the port that the load balancer will listen on
         :param nodes: The list of nodes to be updated to the pool
-        :return: (changed, group) -
+        :return: (changed, result) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
         """
@@ -451,7 +450,6 @@ class ClcLoadBalancer():
             if pool_id:
                 nodes_exist = self._loadbalancerpool_nodes_exists(alias=alias,
                                                                   location=location,
-                                                                  port=port,
                                                                   lb_id=lb_id,
                                                                   pool_id=pool_id,
                                                                   nodes_to_check=nodes)
@@ -476,7 +474,7 @@ class ClcLoadBalancer():
         :param name: the name of the load balancer
         :param port: the port that the load balancer will listen on
         :param nodes: the list of nodes to be added
-        :return: (changed, group) -
+        :return: (changed, result) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
         """
@@ -503,13 +501,13 @@ class ClcLoadBalancer():
 
     def ensure_lbpool_nodes_absent(self, alias, location, name, port, nodes):
         """
-        Checks to see if the provided list of nodes exist for the pool and add the missing nodes to the pool
+        Checks to see if the provided list of nodes exist for the pool and removes them if found any
         :param alias: The account alias
         :param location: the datacenter the load balancer resides in
         :param name: the name of the load balancer
         :param port: the port that the load balancer will listen on
         :param nodes: the list of nodes to be removed
-        :return: (changed, group) -
+        :return: (changed, result) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
         """
@@ -542,7 +540,7 @@ class ClcLoadBalancer():
         :param location: Datacenter
         :param description: Description for loadbalancer to be created
         :param status: Enabled / Disabled
-        :return: Success / Failure
+        :return: result: The result from the CLC API call
         """
         result = None
         try:
@@ -591,7 +589,7 @@ class ClcLoadBalancer():
         :param alias: Alias for account
         :param location: Datacenter
         :param name: Name of the loadbalancer to delete
-        :return: 204 if successful else failure
+        :return: result: The result from the CLC API call
         """
         result = None
         lb_id = self._get_loadbalancer_id(name=name)
@@ -607,11 +605,11 @@ class ClcLoadBalancer():
 
     def delete_loadbalancerpool(self, alias, location, lb_id, pool_id):
         """
-        Delete a pool on the provided load balancer
+        Delete the pool on the provided load balancer
         :param alias: The account alias
         :param location: the datacenter the load balancer resides in
         :param lb_id: the id string of the load balancer
-        :param pool_id: the id string of the pool
+        :param pool_id: the id string of the load balancer pool
         :return: result: The result from the delete API call
         """
         result = None
@@ -627,9 +625,9 @@ class ClcLoadBalancer():
 
     def _get_loadbalancer_id(self, name):
         """
-        Retrieve unique ID of loadbalancer
+        Retrieves unique ID of loadbalancer
         :param name: Name of loadbalancer
-        :return: Unique ID of loadbalancer
+        :return: Unique ID of the loadbalancer
         """
         for lb in self.lb_dict:
             if lb.get('name') == name:
@@ -675,20 +673,18 @@ class ClcLoadBalancer():
         for pool in pool_list:
             if int(pool.get('port')) == int(port):
                 result = pool.get('id')
-
         return result
 
     def _loadbalancerpool_nodes_exists(
-            self, alias, location, port, lb_id, pool_id, nodes_to_check):
+            self, alias, location, lb_id, pool_id, nodes_to_check):
         """
         Checks to see if a set of nodes exists on the specified port on the provided load balancer
         :param alias: the account alias
         :param location: the datacenter the load balancer resides in
-        :param port: the port to check and see if it exists
         :param lb_id: the id string of the provided load balancer
         :param pool_id: the id string of the load balancer pool
         :param nodes_to_check: the list of nodes to check for
-        :return: result: The id string of the pool or False
+        :return: result: True / False indicating if the given nodes exist
         """
         result = False
         nodes = self._get_lbpool_nodes(alias, location, lb_id, pool_id)
@@ -709,7 +705,7 @@ class ClcLoadBalancer():
         :param lb_id: the id string of the load balancer
         :param pool_id: the id string of the pool
         :param nodes: a list of dictionaries containing the nodes to set
-        :return: result: The result from the API call
+        :return: result: The result from the CLC API call
         """
         result = None
         if not lb_id:
@@ -732,8 +728,8 @@ class ClcLoadBalancer():
         :param location: the datacenter the load balancer resides in
         :param lb_id: the id string of the load balancer
         :param pool_id: the id string of the pool
-        :param nodes: a list of dictionaries containing the nodes to add
-        :return: (changed, group) -
+        :param nodes_to_add: a list of dictionaries containing the nodes to add
+        :return: (changed, result) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
         """
@@ -763,8 +759,8 @@ class ClcLoadBalancer():
         :param location: the datacenter the load balancer resides in
         :param lb_id: the id string of the load balancer
         :param pool_id: the id string of the pool
-        :param nodes: a list of dictionaries containing the nodes to remove
-        :return: (changed, group) -
+        :param nodes_to_remove: a list of dictionaries containing the nodes to remove
+        :return: (changed, result) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
         """
