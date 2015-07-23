@@ -984,7 +984,6 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertRaises(CLCException,
                           under_test._add_alert_policy_to_server,
                           mock_clc_sdk,
-                          self.module,
                           'alias',
                           'server_id',
                           'alert_policy_id')
@@ -1159,7 +1158,7 @@ class TestClcServerFunctions(unittest.TestCase):
         servers = [mock_server]
         self.module.check_mode = False
         under_test = ClcServer(self.module)
-        failed_servers = under_test._add_public_ip_to_servers(self.clc,
+        failed_servers = under_test._add_public_ip_to_servers(
                                              self.module,
                                              True, servers,
                                              'TCP',

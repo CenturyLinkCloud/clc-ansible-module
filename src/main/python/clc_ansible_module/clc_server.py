@@ -774,7 +774,6 @@ class ClcServer:
         self._wait_for_requests(module, request_list, servers, wait)
 
         ip_failed_servers = self._add_public_ip_to_servers(
-            clc=clc,
             module=module,
             should_add_public_ip=add_public_ip,
             servers=servers,
@@ -896,7 +895,6 @@ class ClcServer:
 
     @staticmethod
     def _add_public_ip_to_servers(
-            clc,
             module,
             should_add_public_ip,
             servers,
@@ -905,7 +903,6 @@ class ClcServer:
             wait):
         """
         Create a public IP for servers
-        :param clc: the clc-sdk instance to use
         :param module: the AnsibleModule object
         :param should_add_public_ip: boolean - whether or not to provision a public ip for servers.  Skipped if False
         :param servers: List of servers to add public ips to
@@ -956,7 +953,6 @@ class ClcServer:
                 try:
                     ClcServer._add_alert_policy_to_server(
                         clc=clc,
-                        module=module,
                         alias=alias,
                         server_id=server.id,
                         alert_policy_id=alert_policy_id)
@@ -966,11 +962,10 @@ class ClcServer:
 
     @staticmethod
     def _add_alert_policy_to_server(
-            clc, module, alias, server_id, alert_policy_id):
+            clc, alias, server_id, alert_policy_id):
         """
         Associate an alert policy to a clc server
         :param clc: the clc-sdk instance to use
-        :param module: the AnsibleModule object
         :param alias: the clc account alias
         :param server_id: The clc server id
         :param alert_policy_id: the alert policy id to be associated to the server
