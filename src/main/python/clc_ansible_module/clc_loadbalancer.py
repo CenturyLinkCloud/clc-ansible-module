@@ -8,7 +8,7 @@
 # This file is part of CenturyLink Cloud, and is maintained
 # by the Workflow as a Service Team
 #
-# Copyright 2015 CenturyLink 
+# Copyright 2015 CenturyLink
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@ options:
   state:
     description:
       - Whether to create or delete the load balancer pool
-    requred: False
+    required: False
     default: present
     choices: ['present', 'absent', 'port_absent', 'nodes_present', 'nodes_absent']
 '''
@@ -205,7 +205,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcLoadBalancer():
+class ClcLoadBalancer:
 
     clc = None
 
@@ -223,7 +223,8 @@ class ClcLoadBalancer():
         if not REQUESTS_FOUND:
             self.module.fail_json(
                 msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
+        if requests.__version__ and LooseVersion(
+                requests.__version__) < LooseVersion('2.5.0'):
             self.module.fail_json(
                 msg='requests library  version should be >= 2.5.0')
 
@@ -234,7 +235,8 @@ class ClcLoadBalancer():
         Execute the main code path, and handle the request
         :return: none
         """
-
+        changed = False
+        result_lb = None
         loadbalancer_name = self.module.params.get('name')
         loadbalancer_alias = self.module.params.get('alias')
         loadbalancer_location = self.module.params.get('location')
@@ -256,49 +258,56 @@ class ClcLoadBalancer():
             location=loadbalancer_location)
 
         if state == 'present':
-            changed, result_lb, lb_id = self.ensure_loadbalancer_present(name=loadbalancer_name,
-                                                                         alias=loadbalancer_alias,
-                                                                         location=loadbalancer_location,
-                                                                         description=loadbalancer_description,
-                                                                         status=loadbalancer_status)
+            changed, result_lb, lb_id = self.ensure_loadbalancer_present(
+                name=loadbalancer_name,
+                alias=loadbalancer_alias,
+                location=loadbalancer_location,
+                description=loadbalancer_description,
+                status=loadbalancer_status)
             if loadbalancer_port:
-                changed, result_pool, pool_id = self.ensure_loadbalancerpool_present(lb_id=lb_id,
-                                                                                     alias=loadbalancer_alias,
-                                                                                     location=loadbalancer_location,
-                                                                                     method=loadbalancer_method,
-                                                                                     persistence=loadbalancer_persistence,
-                                                                                     port=loadbalancer_port)
+                changed, result_pool, pool_id = self.ensure_loadbalancerpool_present(
+                    lb_id=lb_id,
+                    alias=loadbalancer_alias,
+                    location=loadbalancer_location,
+                    method=loadbalancer_method,
+                    persistence=loadbalancer_persistence,
+                    port=loadbalancer_port)
 
                 if loadbalancer_nodes:
-                    changed, result_nodes = self.ensure_lbpool_nodes_set(alias=loadbalancer_alias,
-                                                                         location=loadbalancer_location,
-                                                                         name=loadbalancer_name,
-                                                                         port=loadbalancer_port,
-                                                                         nodes=loadbalancer_nodes)
+                    changed, result_nodes = self.ensure_lbpool_nodes_set(
+                        alias=loadbalancer_alias,
+                        location=loadbalancer_location,
+                        name=loadbalancer_name,
+                        port=loadbalancer_port,
+                        nodes=loadbalancer_nodes)
         elif state == 'absent':
-            changed, result_lb = self.ensure_loadbalancer_absent(name=loadbalancer_name,
-                                                                 alias=loadbalancer_alias,
-                                                                 location=loadbalancer_location)
+            changed, result_lb = self.ensure_loadbalancer_absent(
+                name=loadbalancer_name,
+                alias=loadbalancer_alias,
+                location=loadbalancer_location)
 
         elif state == 'port_absent':
-            changed, result_lb = self.ensure_loadbalancerpool_absent(alias=loadbalancer_alias,
-                                                                     location=loadbalancer_location,
-                                                                     name=loadbalancer_name,
-                                                                     port=loadbalancer_port)
+            changed, result_lb = self.ensure_loadbalancerpool_absent(
+                alias=loadbalancer_alias,
+                location=loadbalancer_location,
+                name=loadbalancer_name,
+                port=loadbalancer_port)
 
         elif state == 'nodes_present':
-            changed, result_lb = self.ensure_lbpool_nodes_present(alias=loadbalancer_alias,
-                                                                  location=loadbalancer_location,
-                                                                  name=loadbalancer_name,
-                                                                  port=loadbalancer_port,
-                                                                  nodes=loadbalancer_nodes)
+            changed, result_lb = self.ensure_lbpool_nodes_present(
+                alias=loadbalancer_alias,
+                location=loadbalancer_location,
+                name=loadbalancer_name,
+                port=loadbalancer_port,
+                nodes=loadbalancer_nodes)
 
         elif state == 'nodes_absent':
-            changed, result_lb = self.ensure_lbpool_nodes_absent(alias=loadbalancer_alias,
-                                                                 location=loadbalancer_location,
-                                                                 name=loadbalancer_name,
-                                                                 port=loadbalancer_port,
-                                                                 nodes=loadbalancer_nodes)
+            changed, result_lb = self.ensure_lbpool_nodes_absent(
+                alias=loadbalancer_alias,
+                location=loadbalancer_location,
+                name=loadbalancer_name,
+                port=loadbalancer_port,
+                nodes=loadbalancer_nodes)
 
         self.module.exit_json(changed=changed, loadbalancer=result_lb)
 
@@ -427,7 +436,8 @@ class ClcLoadBalancer():
 
     def ensure_lbpool_nodes_set(self, alias, location, name, port, nodes):
         """
-        Checks to see if the provided list of nodes exist for the pool and set the nodes if any in the list doesn't exist
+        Checks to see if the provided list of nodes exist for the pool
+         and set the nodes if any in the list those doesn't exist
         :param alias: The account alias
         :param location: the datacenter the load balancer resides in
         :param name: the name of the load balancer
@@ -629,6 +639,7 @@ class ClcLoadBalancer():
         :param name: Name of loadbalancer
         :return: Unique ID of the loadbalancer
         """
+        id = None
         for lb in self.lb_dict:
             if lb.get('name') == name:
                 id = lb.get('id')
