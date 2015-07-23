@@ -771,7 +771,7 @@ class ClcServer:
                 request_list.append(req)
                 servers.append(server)
 
-        self._wait_for_requests(clc, request_list, servers, wait)
+        self._wait_for_requests(module, request_list, servers, wait)
 
         ip_failed_servers = self._add_public_ip_to_servers(
             clc=clc,
@@ -825,7 +825,6 @@ class ClcServer:
         :return: a list of dictionaries with server information about the servers that were created or deleted
         """
         p = module.params
-        changed_server_ids = None
         changed = False
         count_group = p.get('count_group')
         datacenter = ClcServer._find_datacenter(clc, module)
@@ -865,10 +864,10 @@ class ClcServer:
         return server_dict_array, changed_server_ids, partial_servers_ids, changed
 
     @staticmethod
-    def _wait_for_requests(clc, requests, servers, wait):
+    def _wait_for_requests(module, requests, servers, wait):
         """
         Block until server provisioning requests are completed.
-        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
         :param requests: a list of clc-sdk.Request instances
         :param servers: a list of servers to refresh
         :param wait: a boolean on whether to block or not.  This function is skipped if True
@@ -880,7 +879,8 @@ class ClcServer:
                 [request.WaitUntilComplete() for request in requests])
 
             if failed_requests_count > 0:
-                raise clc
+                module.fail_json(
+                    msg='Unable to process server request')
             else:
                 ClcServer._refresh_servers(servers)
 

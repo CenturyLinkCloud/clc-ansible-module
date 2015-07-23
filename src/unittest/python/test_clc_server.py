@@ -287,7 +287,7 @@ class TestClcServerFunctions(unittest.TestCase):
     @patch.object(ClcServer, '_get_alert_policy_id_by_name')
     @patch.object(ClcServer, '_set_clc_credentials_from_env')
     @patch.object(clc_server, 'clc_sdk')
-    def test_process_request_exact_count_1_server_w_alert_pol_name(self,
+    def test_process_request_count_1_server_w_alert_pol_name(self,
                                                           mock_clc_sdk,
                                                           mock_set_clc_creds,
                                                           mock_get_alert_policy):
@@ -300,7 +300,7 @@ class TestClcServerFunctions(unittest.TestCase):
             'template': 'TEST_TEMPLATE',
             'storage_type': 'standard',
             'wait': True,
-            'exact_count': 1,
+            'count': 1,
             'count_group': 'Default Group',
             'add_public_ip': False,
             'public_ip_protocol': 'TCP',
@@ -474,13 +474,14 @@ class TestClcServerFunctions(unittest.TestCase):
 
         mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
         mock_clc_sdk.v2.Server.return_value  = mock_server
+        mock_clc_sdk.v2.Account.GetAlias.return_value  = 'TST'
 
         # Test
         under_test = ClcServer(self.module)
         result = under_test._find_server_by_uuid_w_retry(clc=mock_clc_sdk,
                                                          module=self.module,
                                                          svr_uuid='12345',
-                                                         alias='TST',
+                                                         alias=None,
                                                          retries=2)
 
         # Assert
@@ -1207,6 +1208,13 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, True)
         self.assertEqual(result_server_ids, ['mockid1'])
+
+    def test_wait_for_requests_fail(self):
+        under_test = ClcServer(self.module)
+        mock_request = mock.MagicMock()
+        mock_request.WaitUntilComplete.return_value = 1
+        under_test._wait_for_requests(self.module, [mock_request], None, True)
+        self.module.fail_json.assert_called_with(msg='Unable to process server request')
 
 if __name__ == '__main__':
     unittest.main()
