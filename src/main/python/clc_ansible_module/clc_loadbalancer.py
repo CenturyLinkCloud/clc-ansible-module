@@ -641,8 +641,15 @@ class ClcLoadBalancer():
         :param location: Datacenter
         :return: JSON data for all loadbalancers at datacenter
         """
-        return self.clc.v2.API.Call(
-            'GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
+        result = None
+        try:
+            result = self.clc.v2.API.Call(
+                'GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
+        except APIFailedResponse as e:
+            self.module.fail_json(
+                msg='Unable to fetch load balancers for account: {0}. {1}'.format(
+                    alias, str(e.response_text)))
+        return result
 
     def _loadbalancer_exists(self, name):
         """
@@ -667,9 +674,14 @@ class ClcLoadBalancer():
         :return: result: The id string of the pool or False
         """
         result = False
-        pool_list = self.clc.v2.API.Call(
-            'GET', '/v2/sharedLoadBalancers/%s/%s/%s/pools' %
-            (alias, location, lb_id))
+        try:
+            pool_list = self.clc.v2.API.Call(
+                'GET', '/v2/sharedLoadBalancers/%s/%s/%s/pools' %
+                (alias, location, lb_id))
+        except APIFailedResponse as e:
+            return self.module.fail_json(
+                msg='Unable to fetch the load balancer pools for for load balancer id: {0}. {1}'.format(
+                    lb_id, str(e.response_text)))
         for pool in pool_list:
             if int(pool.get('port')) == int(port):
                 result = pool.get('id')
@@ -791,9 +803,15 @@ class ClcLoadBalancer():
         :param pool_id: the id string of the pool
         :return: result: The list of nodes
         """
-        result = self.clc.v2.API.Call('GET',
-                                      '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s/nodes'
-                                      % (alias, location, lb_id, pool_id))
+        result = None
+        try:
+            result = self.clc.v2.API.Call('GET',
+                                          '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s/nodes'
+                                          % (alias, location, lb_id, pool_id))
+        except APIFailedResponse as e:
+            self.module.fail_json(
+                msg='Unable to fetch list of available nodes for load balancer pool id: {0}. {1}'.format(
+                    pool_id, str(e.response_text)))
         return result
 
     @staticmethod

@@ -431,6 +431,37 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         result = test.set_loadbalancernodes('alias', 'location', 'lb_id', 'pool_id', [1,2,3])
         self.module.fail_json.assert_called_with(msg='Unable to set nodes for the load balancer pool id "pool_id". Mock failure response')
 
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    def test_get_loadbalancer_list_exception(self, mock_clc_sdk):
+        error = APIFailedResponse('Failed')
+        error.response_text = 'Mock failure response'
+        mock_clc_sdk.v2.API.Call.side_effect = error
+        self.module.check_mode = False
+        test = ClcLoadBalancer(self.module)
+        test._get_loadbalancer_list('alias', 'location')
+        self.module.fail_json.assert_called_with(msg='Unable to fetch load balancers for account: alias. Mock failure response')
+
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    def test_loadbalancerpool_exists_exception(self, mock_clc_sdk):
+        error = APIFailedResponse('Failed')
+        error.response_text = 'Mock failure response'
+        mock_clc_sdk.v2.API.Call.side_effect = error
+        self.module.check_mode = False
+        test = ClcLoadBalancer(self.module)
+        test._loadbalancerpool_exists('alias', 'location', 90, 'lb_id')
+        self.module.fail_json.assert_called_with(msg='Unable to fetch the load balancer pools for for load balancer id: lb_id. Mock failure response')
+
+    @patch.object(clc_loadbalancer, 'clc_sdk')
+    def test_get_lbpool_nodes_exception(self, mock_clc_sdk):
+        error = APIFailedResponse('Failed')
+        error.response_text = 'Mock failure response'
+        mock_clc_sdk.v2.API.Call.side_effect = error
+        self.module.check_mode = False
+        test = ClcLoadBalancer(self.module)
+        result = test._get_lbpool_nodes('alias', 'location', 'lb_id', 'pool_id')
+        self.module.fail_json.assert_called_with(msg='Unable to fetch list of available nodes for load balancer pool id: pool_id. Mock failure response')
+        self.assertEqual(result, None)
+
     @patch.object(ClcLoadBalancer, '_get_loadbalancer_id')
     @patch.object(clc_loadbalancer, 'clc_sdk')
     def test_delete_loadbalancer_exception(self, mock_clc_sdk, mock_get):
