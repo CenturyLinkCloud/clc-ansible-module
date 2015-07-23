@@ -834,8 +834,8 @@ class ClcLoadBalancer:
         argument_spec = dict(
             name=dict(required=True),
             description=dict(default=None),
-            location=dict(required=True, default=None),
-            alias=dict(required=True, default=None),
+            location=dict(required=True),
+            alias=dict(required=True),
             port=dict(choices=[80, 443]),
             method=dict(choices=['leastConnection', 'roundRobin']),
             persistence=dict(choices=['standard', 'sticky']),

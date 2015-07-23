@@ -37,7 +37,6 @@ options:
   location:
     description:
       - Target datacenter for the firewall policy
-    default: None
     required: True
   state:
     description:
@@ -189,7 +188,7 @@ class ClcFirewallPolicy:
         :return: argument spec dictionary
         """
         argument_spec = dict(
-            location=dict(required=True, defualt=None),
+            location=dict(required=True),
             source_account_alias=dict(required=True, default=None),
             destination_account_alias=dict(default=None),
             firewall_policy_id=dict(default=None),
