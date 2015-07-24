@@ -697,6 +697,12 @@ class ClcServer:
 
     @staticmethod
     def _find_aa_policy_id(clc, module):
+        """
+        Validate if the anti affinity policy exist for the given name and throw error if not
+        :param clc: the clc-sdk instance
+        :param module: the module to validate
+        :return: aa_policy_id: the anti affinity policy id of the given name.
+        """
         aa_policy_id = module.params.get('anti_affinity_policy_id')
         aa_policy_name = module.params.get('anti_affinity_policy_name')
         if not aa_policy_id and aa_policy_name:
@@ -713,6 +719,12 @@ class ClcServer:
 
     @staticmethod
     def _find_alert_policy_id(clc, module):
+        """
+        Validate if the alert policy exist for the given name and throw error if not
+        :param clc: the clc-sdk instance
+        :param module: the module to validate
+        :return: alert_policy_id: the alert policy id of the given name.
+        """
         alert_policy_id = module.params.get('alert_policy_id')
         alert_policy_name = module.params.get('alert_policy_name')
         if not alert_policy_id and alert_policy_name:
@@ -953,11 +965,11 @@ class ClcServer:
     @staticmethod
     def _add_alert_policy_to_servers(clc, module, servers):
         """
-        Associate an alert policy to servers
+        Associate the alert policy to servers
         :param clc: the clc-sdk instance to use
         :param module: the AnsibleModule object
         :param servers: List of servers to add alert policy to
-        :return: none
+        :return: failed_servers: the list of servers which failed while associating alert policy
         """
         failed_servers = []
         p = module.params
@@ -1008,7 +1020,7 @@ class ClcServer:
         :param module: the AnsibleModule object
         :param alias: the clc account alias
         :param alert_policy_name: the name of the alert policy
-        :return: the alert policy id
+        :return: alert_policy_id: the alert policy id
         """
         alert_policy_id = None
         policies = clc.v2.API.Call('GET', '/v2/alertPolicies/%s' % alias)
@@ -1032,7 +1044,6 @@ class ClcServer:
         :param server_ids: list of servers to delete
         :return: a list of dictionaries with server information about the servers that were deleted
         """
-        # Whether to wait for termination to complete before returning
         p = module.params
         wait = p.get('wait')
         terminated_server_ids = []
@@ -1220,6 +1231,7 @@ class ClcServer:
         """
         Call the CLC Rest API to Create a Server
         :param clc: the clc-python-sdk instance to use
+        :param module: the AnsibleModule instance to use
         :param server_params: a dictionary of params to use to create the servers
         :return: clc-sdk.Request object linked to the queued server request
         """
@@ -1309,11 +1321,13 @@ class ClcServer:
 
     @staticmethod
     def _find_server_by_uuid_w_retry(
-            clc, module, svr_uuid, alias=None, retries=5, backout=2):
+            clc, module, svr_uuid, alias=None, retries=5, back_out=2):
         """
         Find the clc server by the UUID returned from the provisioning request.  Retry the request if a 404 is returned.
         :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
         :param svr_uuid: UUID of the server
+        :param retries: the number of retry attempts to make prior to fail. default is 5
         :param alias: the Account Alias to search
         :return: a clc-sdk.Server instance
         """
@@ -1343,8 +1357,8 @@ class ClcServer:
                 if retries == 0:
                     return module.fail_json(
                         msg='Unable to reach the CLC API after 5 attempts')
-                sleep(backout)
-                backout *= 2
+                sleep(back_out)
+                back_out *= 2
 
     @staticmethod
     def _set_user_agent(clc):
