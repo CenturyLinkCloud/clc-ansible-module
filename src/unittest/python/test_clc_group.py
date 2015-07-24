@@ -177,7 +177,6 @@ class TestClcServerFunctions(unittest.TestCase):
         }
         mock_group = mock.MagicMock()
         mock_group.data = {"name": "MyCoolGroup"}
-        mock_response = {}
 
 
         under_test = ClcGroup(self.module)
@@ -185,8 +184,7 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test._ensure_group_is_present = mock.MagicMock(
             return_value=(
                 True,
-                mock_group,
-                mock_response))
+                mock_group))
 
         under_test.process_request()
 
@@ -207,7 +205,7 @@ class TestClcServerFunctions(unittest.TestCase):
             'wait': 'True'
         }
         mock_group = mock.MagicMock()
-        mock_group.data = {"name": "MyCoolGroup"}
+        mock_group = {"name": "MyCoolGroup"}
         mock_response = mock.MagicMock()
 
         under_test = ClcGroup(self.module)
@@ -223,7 +221,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
         self.module.exit_json.assert_called_once_with(
             changed=True,
-            group=mock_group.data)
+            group='MyCoolGroup')
 
     def test_ensure_group_is_present_group_not_exist(self):
 
@@ -249,7 +247,7 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test.root_group = mock_rootgroup
 
         # Test
-        result_changed, result_group, response = under_test._ensure_group_is_present(
+        result_changed, result_group = under_test._ensure_group_is_present(
             group_name=mock_group.name, parent_name=mock_parent.name, group_description="Mock Description")
         # Assert Expected Result
         self.assertTrue(result_changed)
@@ -275,7 +273,7 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test.root_group = mock_rootgroup
 
         # Test
-        result_changed, result_group, response = under_test._ensure_group_is_present(
+        result_changed, result_group = under_test._ensure_group_is_present(
             group_name=mock_group.name, parent_name=mock_parent.name, group_description="Mock Description")
         # Assert Expected Result
         self.module.fail_json.assert_called_once_with(
@@ -307,7 +305,7 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test.root_group = mock_rootgroup
 
         # Test
-        result_changed, result_group, response = under_test._ensure_group_is_present(
+        result_changed, result_group = under_test._ensure_group_is_present(
             group_name=mock_group.name, parent_name=mock_parent.name, group_description="Mock Description")
         # Assert Expected Result
         self.assertFalse(result_changed)

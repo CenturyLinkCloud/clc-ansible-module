@@ -188,7 +188,7 @@ class ClcGroup(object):
             if requests:
                 self._wait_for_requests_to_complete(requests)
         else:
-            changed, group, requests = self._ensure_group_is_present(
+            changed, group = self._ensure_group_is_present(
                 group_name=group_name, parent_name=parent_name, group_description=group_description)
         try:
             group = group.data
@@ -293,7 +293,6 @@ class ClcGroup(object):
         parent = parent_name if parent_name is not None else self.root_group.name
         description = group_description
         changed = False
-        results = []
         group = group_name
 
         parent_exists = self._group_exists(group_name=parent, parent_name=None)
@@ -306,11 +305,10 @@ class ClcGroup(object):
             changed = False
         elif parent_exists and not child_exists:
             if not self.module.check_mode:
-                result = self._create_group(
+                group = self._create_group(
                     group=group,
                     parent=parent,
                     description=description)
-                results.append(result)
             changed = True
         else:
             self.module.fail_json(
@@ -318,7 +316,7 @@ class ClcGroup(object):
                 parent +
                 " does not exist")
 
-        return changed, group, results
+        return changed, group
 
     def _create_group(self, group, parent, description):
         """
