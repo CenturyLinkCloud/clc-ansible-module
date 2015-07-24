@@ -31,7 +31,7 @@ DOCUMENTATION = '''
 module: clc_firewall_policy
 short_description: Create/delete/update firewall policies
 description:
-  - Create or delete or updated firewall polices on Centurylink Cloud
+  - Create or delete or update firewall polices on Centurylink Cloud
 version_added: "2.0"
 options:
   location:
@@ -46,23 +46,26 @@ options:
     choices: ['present', 'absent']
   source:
     description:
-      - Source addresses for traffic on the originating firewall. This is required when state is 'present"
+      - The list  of source addresses for traffic on the originating firewall.
+        This is required when state is 'present"
     default: None
     required: False
   destination:
     description:
-      - Destination addresses for traffic on the terminating firewall. This is required when state is 'absent'
+      - The list of destination addresses for traffic on the terminating firewall.
+        This is required when state is 'present'
     default: None
     required: False
   ports:
     description:
-      - types of ports associated with the policy. TCP and UDP can take in single ports or port ranges.
+      - The list of ports associated with the policy.
+        TCP and UDP can take in single ports or port ranges.
     default: None
     required: False
     choices: ['any', 'icmp', 'TCP/123', 'UDP/123', 'TCP/123-456', 'UDP/123-456']
   firewall_policy_id:
     description:
-      - Id of the firewall policy. This is required when state is 'present'
+      - Id of the firewall policy. This is required to update or delete an existing firewall policy
     default: None
     required: False
   source_account_alias:
@@ -206,6 +209,7 @@ class ClcFirewallPolicy:
         Execute the main code path, and handle the request
         :return: none
         """
+        changed = False
         location = self.module.params.get('location')
         source_account_alias = self.module.params.get('source_account_alias')
         destination_account_alias = self.module.params.get('destination_account_alias')
@@ -238,8 +242,6 @@ class ClcFirewallPolicy:
         elif state == 'present':
             changed, firewall_policy_id, response = self._ensure_firewall_policy_is_present(
                 source_account_alias, location, self.firewall_dict)
-        else:
-            return self.module.fail_json(msg="Unknown State: " + state)
 
         return self.module.exit_json(
             changed=changed,
@@ -249,7 +251,7 @@ class ClcFirewallPolicy:
     def _get_policy_id_from_response(response):
         """
         Method to parse out the policy id from creation response
-        :param response: response from firewall creation control
+        :param response: response from firewall creation API call
         :return: policy_id: firewall policy id from creation call
         """
         url = response.get('links')[0]['href']
@@ -377,7 +379,7 @@ class ClcFirewallPolicy:
             location,
             firewall_dict):
         """
-        Ensures that a given firewall policy is present
+        Creates the firewall policy for the given account alias
         :param source_account_alias: the source account alias for the firewall policy
         :param location: datacenter of the firewall policy
         :param firewall_dict: dictionary or request parameters for firewall policy creation
@@ -394,7 +396,7 @@ class ClcFirewallPolicy:
                         (source_account_alias, location), payload)
         except APIFailedResponse as e:
             return self.module.fail_json(
-                msg="Unable to successfully create firewall policy. %s" %
+                msg="Unable to create firewall policy. %s" %
                     str(e.response_text))
         return response
 
@@ -416,8 +418,9 @@ class ClcFirewallPolicy:
                           (source_account_alias, location, firewall_policy_id))
         except APIFailedResponse as e:
             return self.module.fail_json(
-                msg="Unable to successfully delete firewall policy. %s" %
-                    str(e.response_text))
+                msg="Unable to delete the firewall policy id : {0}. {1}".format(
+                    firewall_policy_id, str(e.response_text)
+                ))
         return response
 
     def _update_firewall_policy(
@@ -444,8 +447,9 @@ class ClcFirewallPolicy:
                 firewall_dict)
         except APIFailedResponse as e:
             return self.module.fail_json(
-                msg="Unable to successfully update firewall policy. %s" %
-                    str(e.response_text))
+                 msg="Unable to update the firewall policy id : {0}. {1}".format(
+                    firewall_policy_id, str(e.response_text)
+                ))
         return response
 
     @staticmethod
@@ -492,7 +496,9 @@ class ClcFirewallPolicy:
         :param source_account_alias: the source account alias for the firewall policy
         :param location: datacenter of the firewall policy
         :param firewall_policy_id: id of the firewall policy to get
-        :return: response from CLC API call
+        :return: (response, success) -
+                  response - The response from CLC API call
+                  success - True/False falg indicating if the firewall policy was found
         """
         response = []
         success = False
