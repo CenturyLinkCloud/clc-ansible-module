@@ -193,6 +193,13 @@ class ClcGroup(object):
             self._wait_for_requests_to_complete(requests)
         self.module.exit_json(changed=changed, group=group_name)
 
+        try:
+            group = group.data
+        except AttributeError:
+            group = group_name
+
+        self.module.exit_json(changed=changed, group=group)
+
     @staticmethod
     def _define_module_argument_spec():
         """
@@ -245,14 +252,17 @@ class ClcGroup(object):
         :return: changed, group
         """
         changed = False
-        requests = []
+        group = []
+        results = []
 
         if self._group_exists(group_name=group_name, parent_name=parent_name):
             if not self.module.check_mode:
-                request = self._delete_group(group_name)
-                requests.append(request)
+                group.append(group_name)
+                for g in group:
+                    result = self._delete_group(group_name)
+                    results.append(result)
             changed = True
-        return changed, group_name, requests
+        return changed, group, results
 
     def _delete_group(self, group_name):
         """
@@ -288,6 +298,9 @@ class ClcGroup(object):
         parent = parent_name if parent_name is not None else self.root_group.name
         description = group_description
         changed = False
+        results = []
+        groups = []
+        group = group_name
 
         parent_exists = self._group_exists(group_name=parent, parent_name=None)
         child_exists = self._group_exists(
@@ -299,10 +312,13 @@ class ClcGroup(object):
             changed = False
         elif parent_exists and not child_exists:
             if not self.module.check_mode:
-                self._create_group(
-                    group=group_name,
-                    parent=parent,
-                    description=description)
+                groups.append(group_name)
+                for g in groups:
+                    group = self._create_group(
+                        group=group,
+                        parent=parent,
+                        description=description)
+                    results.append(group)
             changed = True
         else:
             self.module.fail_json(
@@ -310,7 +326,7 @@ class ClcGroup(object):
                 parent +
                 " does not exist")
 
-        return changed, group_name, None
+        return changed, group, results
 
     def _create_group(self, group, parent, description):
         """

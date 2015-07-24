@@ -193,7 +193,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
         self.module.exit_json.assert_called_once_with(
             changed=True,
-            group=mock_group.data['name'])
+            group=mock_group.data)
 
     @patch.object(ClcGroup, '_set_clc_credentials_from_env')
     @patch.object(clc_group, 'clc_sdk')
@@ -223,7 +223,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
         self.module.exit_json.assert_called_once_with(
             changed=True,
-            group=mock_group.data['name'])
+            group=mock_group.data)
 
     def test_ensure_group_is_present_group_not_exist(self):
 
