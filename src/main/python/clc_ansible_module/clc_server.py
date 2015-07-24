@@ -1104,7 +1104,15 @@ class ClcServer():
             for server in changed_servers:
                 server.Refresh()
 
-        for server in changed_servers:
+        for server in set(changed_servers + servers):
+            try:
+                server.data['ipaddress'] = server.details[
+                    'ipAddresses'][0]['internal']
+                server.data['publicip'] = str(
+                    server.PublicIPs().public_ips[0])
+            except (KeyError, IndexError):
+                pass
+
             server_dict_array.append(server.data)
             result_server_ids.append(server.id)
 
