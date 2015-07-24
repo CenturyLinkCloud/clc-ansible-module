@@ -8,7 +8,7 @@
 # This file is part of CenturyLink Cloud, and is maintained
 # by the Workflow as a Service Team
 #
-# Copyright 2015 CenturyLink 
+# Copyright 2015 CenturyLink
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ options:
     description:
       - The list of additional disks for the server
     required: False
-    default: None
+    default: []
   add_public_ip:
     description:
       - Whether to add a public ip to the server
@@ -91,7 +91,7 @@ options:
     required: False
   custom_fields:
     description:
-      - A dictionary of custom fields to set on the server.
+      - The list of custom fields to set on the server.
     default: []
     required: False
   description:
@@ -143,12 +143,12 @@ options:
     required: False
   packages:
     description:
-      - Blueprints to run on the server after its created.
+      - The list of blue print packages to run on the server after its created.
     default: []
     required: False
   password:
     description:
-      - Password for the administrator user
+      - Password for the administrator / root user
     default: None
     required: False
   primary_dns:
@@ -198,6 +198,7 @@ options:
   template:
     description:
       - The template to use for server creation.  Will search for a template if a partial string is provided.
+        This is required when state is 'present'
     default: None
     required: false
   ttl:
@@ -312,7 +313,8 @@ class ClcServer:
         if not REQUESTS_FOUND:
             self.module.fail_json(
                 msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
+        if requests.__version__ and LooseVersion(
+                requests.__version__) < LooseVersion('2.5.0'):
             self.module.fail_json(
                 msg='requests library  version should be >= 2.5.0')
 
@@ -328,7 +330,9 @@ class ClcServer:
         server_dict_array = []
 
         self._set_clc_credentials_from_env()
-        self.module.params = self._validate_module_params(self.clc, self.module)
+        self.module.params = self._validate_module_params(
+            self.clc,
+            self.module)
         p = self.module.params
         state = p.get('state')
 
@@ -393,22 +397,23 @@ class ClcServer:
         Define the argument spec for the ansible module
         :return: argument spec dictionary
         """
-        argument_spec = dict(name=dict(),
-                             template=dict(),
-                             group=dict(default='Default Group'),
-                             network_id=dict(),
-                             location=dict(default=None),
-                             cpu=dict(default=1),
-                             memory=dict(default=1),
-                             alias=dict(default=None),
-                             password=dict(default=None),
-                             ip_address=dict(default=None),
-                             storage_type=dict(default='standard'),
-                             type=dict(
-            default='standard',
-            choices=[
-                'standard',
-                'hyperscale']),
+        argument_spec = dict(
+            name=dict(),
+            template=dict(),
+            group=dict(default='Default Group'),
+            network_id=dict(),
+            location=dict(default=None),
+            cpu=dict(default=1),
+            memory=dict(default=1),
+            alias=dict(default=None),
+            password=dict(default=None),
+            ip_address=dict(default=None),
+            storage_type=dict(
+                default='standard',
+                choices=[
+                    'standard',
+                    'hyperscale']),
+            type=dict(default='standard', choices=['standard', 'hyperscale']),
             primary_dns=dict(default=None),
             secondary_dns=dict(default=None),
             additional_disks=dict(type='list', default=[]),
@@ -424,19 +429,24 @@ class ClcServer:
             alert_policy_name=dict(default=None),
             packages=dict(type='list', default=[]),
             state=dict(
-            default='present',
-            choices=[
-                'present',
-                'absent',
-                'started',
-                'stopped']),
+                default='present',
+                choices=[
+                    'present',
+                    'absent',
+                    'started',
+                    'stopped']),
             count=dict(type='int', default=1),
             exact_count=dict(type='int', default=None),
             count_group=dict(),
-            server_ids=dict(type='list'),
+            server_ids=dict(type='list', default=[]),
             add_public_ip=dict(type='bool', default=False),
-            public_ip_protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
-            public_ip_ports=dict(type='list'),
+            public_ip_protocol=dict(
+                default='TCP',
+                choices=[
+                    'TCP',
+                    'UDP',
+                    'ICMP']),
+            public_ip_ports=dict(type='list', default=[]),
             wait=dict(type='bool', default=True))
 
         mutually_exclusive = [
@@ -498,8 +508,12 @@ class ClcServer:
         params['template'] = ClcServer._find_template_id(module, datacenter)
         params['group'] = ClcServer._find_group(module, datacenter).id
         params['network_id'] = ClcServer._find_network_id(module, datacenter)
-        params['anti_affinity_policy_id'] = ClcServer._find_aa_policy_id(clc, module)
-        params['alert_policy_id'] = ClcServer._find_alert_policy_id(clc, module)
+        params['anti_affinity_policy_id'] = ClcServer._find_aa_policy_id(
+            clc,
+            module)
+        params['alert_policy_id'] = ClcServer._find_alert_policy_id(
+            clc,
+            module)
 
         return params
 
@@ -516,7 +530,9 @@ class ClcServer:
             datacenter = clc.v2.Datacenter(location)
             return datacenter
         except CLCException:
-            module.fail_json(msg=str("Unable to find location: {0}".format(location)))
+            module.fail_json(
+                msg=str(
+                    "Unable to find location: {0}".format(location)))
 
     @staticmethod
     def _find_alias(clc, module):
