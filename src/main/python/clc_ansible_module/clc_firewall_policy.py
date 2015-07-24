@@ -322,14 +322,14 @@ class ClcFirewallPolicy:
                     firewall_policy_id)
             changed = True
         else:
-            get_before_response, success = self._get_firewall_policy(
+            policy = self._get_firewall_policy(
                 source_account_alias, location, firewall_policy_id)
-            if not success:
+            if not policy:
                 return self.module.fail_json(
-                    msg='Unable to find the firewall policy id : %s' %
-                    firewall_policy_id)
+                    msg='Unable to find the firewall policy id : {0}'.format(
+                        firewall_policy_id))
             changed = self._compare_get_request_with_dict(
-                get_before_response,
+                policy,
                 firewall_dict)
             if not self.module.check_mode and changed:
                 response = self._update_firewall_policy(
@@ -362,9 +362,9 @@ class ClcFirewallPolicy:
         changed = False
         response = []
         firewall_policy_id = firewall_dict.get('firewall_policy_id')
-        result, success = self._get_firewall_policy(
+        result = self._get_firewall_policy(
             source_account_alias, location, firewall_policy_id)
-        if success:
+        if result:
             if not self.module.check_mode:
                 response = self._delete_firewall_policy(
                     source_account_alias,
@@ -500,16 +500,17 @@ class ClcFirewallPolicy:
                   response - The response from CLC API call
                   success - True/False falg indicating if the firewall policy was found
         """
-        response = []
-        success = False
+        response = None
         try:
             response = self.clc.v2.API.Call(
                 'GET', '/v2-experimental/firewallPolicies/%s/%s/%s' %
                 (source_account_alias, location, firewall_policy_id))
-            success = True
-        except APIFailedResponse:
-            pass
-        return response, success
+        except APIFailedResponse as e:
+            if e.response_status_code != 404:
+                self.module.fail_json(
+                     msg="Unable to fetch the firewall policy with id : {0}. {1}".format(
+                        firewall_policy_id, str(e.response_text)))
+        return response
 
     def _wait_for_requests_to_complete(
             self,
@@ -523,7 +524,7 @@ class ClcFirewallPolicy:
         :return: none
         """
         if wait:
-            response, success = self._get_firewall_policy(
+            response = self._get_firewall_policy(
                 source_account_alias, location, firewall_policy_id)
             if response.get('status') == 'pending':
                 sleep(2)
