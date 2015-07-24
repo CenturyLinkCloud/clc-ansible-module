@@ -253,7 +253,7 @@ class TestClcServerFunctions(unittest.TestCase):
             group_name=mock_group.name, parent_name=mock_parent.name, group_description="Mock Description")
         # Assert Expected Result
         self.assertTrue(result_changed)
-        self.assertEqual(result_group, mock_group.name)
+        self.assertEqual(result_group, mock_group)
         self.assertFalse(self.module.fail_json.called)
 
     def test_ensure_group_is_present_parent_not_exist(self):
@@ -311,7 +311,7 @@ class TestClcServerFunctions(unittest.TestCase):
             group_name=mock_group.name, parent_name=mock_parent.name, group_description="Mock Description")
         # Assert Expected Result
         self.assertFalse(result_changed)
-        self.assertEqual(result_group, mock_group.name)
+        self.assertEqual(result_group, mock_group)
         self.assertFalse(self.module.fail_json.called)
 
     def test_ensure_group_is_absent_group_exists(self):

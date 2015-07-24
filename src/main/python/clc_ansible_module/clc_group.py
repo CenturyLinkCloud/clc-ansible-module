@@ -185,19 +185,15 @@ class ClcGroup(object):
         if state == "absent":
             changed, group, requests = self._ensure_group_is_absent(
                 group_name=group_name, parent_name=parent_name)
-
+            if requests:
+                self._wait_for_requests_to_complete(requests)
         else:
             changed, group, requests = self._ensure_group_is_present(
                 group_name=group_name, parent_name=parent_name, group_description=group_description)
-        if requests:
-            self._wait_for_requests_to_complete(requests)
-        self.module.exit_json(changed=changed, group=group_name)
-
         try:
             group = group.data
         except AttributeError:
             group = group_name
-
         self.module.exit_json(changed=changed, group=group)
 
     @staticmethod
@@ -258,9 +254,8 @@ class ClcGroup(object):
         if self._group_exists(group_name=group_name, parent_name=parent_name):
             if not self.module.check_mode:
                 group.append(group_name)
-                for g in group:
-                    result = self._delete_group(group_name)
-                    results.append(result)
+                result = self._delete_group(group_name)
+                results.append(result)
             changed = True
         return changed, group, results
 
@@ -299,7 +294,6 @@ class ClcGroup(object):
         description = group_description
         changed = False
         results = []
-        groups = []
         group = group_name
 
         parent_exists = self._group_exists(group_name=parent, parent_name=None)
@@ -312,13 +306,11 @@ class ClcGroup(object):
             changed = False
         elif parent_exists and not child_exists:
             if not self.module.check_mode:
-                groups.append(group_name)
-                for g in groups:
-                    group = self._create_group(
-                        group=group,
-                        parent=parent,
-                        description=description)
-                    results.append(group)
+                result = self._create_group(
+                    group=group,
+                    parent=parent,
+                    description=description)
+                results.append(result)
             changed = True
         else:
             self.module.fail_json(
