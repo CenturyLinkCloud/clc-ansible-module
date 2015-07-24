@@ -433,6 +433,8 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_server.data = {'name': 'TEST_SERVER'}
         mock_server.powerState = 'stopped'
         mock_server.PowerOn.return_value = mock_request
+        mock_server.PublicIPs().public_ips.__getitem__.return_value = "5.6.7.8"
+        mock_server.details['ipAddresses'][0].__getitem__.return_value = "1.2.3.4"
 
         mock_request.WaitUntilComplete.return_value = 0
 
@@ -445,7 +447,9 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert
         self.module.exit_json.assert_called_once_with(server_ids=['TEST_SERVER'],
                                                       changed=True,
-                                                      servers=[{'name': 'TEST_SERVER'}],
+                                                      servers=[{'name': 'TEST_SERVER',
+                                                                'publicip': '5.6.7.8',
+                                                                'ipaddress': '1.2.3.4'}],
                                                       partially_created_server_ids=[])
         self.assertFalse(self.module.fail_json.called)
 
