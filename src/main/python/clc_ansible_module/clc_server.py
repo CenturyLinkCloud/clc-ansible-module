@@ -363,8 +363,8 @@ class ClcServer:
             (changed,
              server_dict_array,
              new_server_ids) = self._start_stop_servers(self.module,
-                                                       self.clc,
-                                                       server_ids)
+                                                        self.clc,
+                                                        server_ids)
 
         elif state == 'present':
             # Changed is always set to true when provisioning new instances
@@ -640,10 +640,11 @@ class ClcServer:
         :param module: the module to validate
         :return: none
         """
-        name = module.params.get('name')
+        server_name = module.params.get('name')
         state = module.params.get('state')
 
-        if state == 'present' and (len(name) < 1 or len(name) > 6):
+        if state == 'present' and (
+                len(server_name) < 1 or len(server_name) > 6):
             module.fail_json(msg=str(
                 "When state = 'present', name must be a string with a minimum length of 1 and a maximum length of 6"))
 
@@ -895,20 +896,18 @@ class ClcServer:
         return server_dict_array, changed_server_ids, partial_servers_ids, changed
 
     @staticmethod
-    def _wait_for_requests(module, requests):
+    def _wait_for_requests(module, request_list):
         """
         Block until server provisioning requests are completed.
         :param module: the AnsibleModule object
-        :param requests: a list of clc-sdk.Request instances
-        :param servers: a list of servers to refresh
-        :param wait: a boolean on whether to block or not.  This function is skipped if True
+        :param request_list: a list of clc-sdk.Request instances
         :return: none
         """
         wait = module.params.get('wait')
         if wait:
             # Requests.WaitUntilComplete() returns the count of failed requests
             failed_requests_count = sum(
-                [request.WaitUntilComplete() for request in requests])
+                [request.WaitUntilComplete() for request in request_list])
 
             if failed_requests_count > 0:
                 module.fail_json(
@@ -930,7 +929,6 @@ class ClcServer:
                     server.id, ex.message
                 ))
 
-
     @staticmethod
     def _add_public_ip_to_servers(
             module,
@@ -945,7 +943,6 @@ class ClcServer:
         :param servers: List of servers to add public ips to
         :param public_ip_protocol: a protocol to allow for the public ips
         :param public_ip_ports: list of ports to allow for the public ips
-        :param wait: boolean - whether to block until the provisioning requests complete
         :return: none
         """
         failed_servers = []
@@ -1051,7 +1048,6 @@ class ClcServer:
         :param server_ids: list of servers to delete
         :return: a list of dictionaries with server information about the servers that were deleted
         """
-        p = module.params
         terminated_server_ids = []
         server_dict_array = []
         request_list = []
