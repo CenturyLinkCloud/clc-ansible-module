@@ -178,7 +178,8 @@ class ClcFirewallPolicy:
         if not REQUESTS_FOUND:
             self.module.fail_json(
                 msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
+        if requests.__version__ and LooseVersion(
+                requests.__version__) < LooseVersion('2.5.0'):
             self.module.fail_json(
                 msg='requests library  version should be >= 2.5.0')
 
@@ -212,7 +213,8 @@ class ClcFirewallPolicy:
         changed = False
         location = self.module.params.get('location')
         source_account_alias = self.module.params.get('source_account_alias')
-        destination_account_alias = self.module.params.get('destination_account_alias')
+        destination_account_alias = self.module.params.get(
+            'destination_account_alias')
         firewall_policy_id = self.module.params.get('firewall_policy_id')
         ports = self.module.params.get('ports')
         source = self.module.params.get('source')
@@ -468,7 +470,8 @@ class ClcFirewallPolicy:
         response_source = response.get('source')
         response_dest = response.get('destination')
         response_ports = response.get('ports')
-        request_dest_account_alias = firewall_dict.get('destination_account_alias')
+        request_dest_account_alias = firewall_dict.get(
+            'destination_account_alias')
         request_enabled = firewall_dict.get('enabled')
         if request_enabled is None:
             request_enabled = True
