@@ -932,7 +932,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_with(msg='Ttl cannot be <= 3600')
 
     def test_startstop_servers_invalid_list(self):
-        ClcServer._startstop_servers(self.module, self.clc, {'id': 'value'})
+        ClcServer._start_stop_servers(self.module, self.clc, {'id': 'value'})
         self.module.fail_json.assert_called_with(msg='server_ids should be a list of servers, aborting')
 
     def test_delete_servers_invalid_list(self):
@@ -1207,7 +1207,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.check_mode = False
         under_test = ClcServer(self.module)
         changed, server_dict_array, result_server_ids = \
-            under_test._startstop_servers(self.module, mock_clc_sdk, ['server1', 'server2'])
+            under_test._start_stop_servers(self.module, mock_clc_sdk, ['server1', 'server2'])
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, True)
         self.assertEqual(result_server_ids, ['mockid1'])

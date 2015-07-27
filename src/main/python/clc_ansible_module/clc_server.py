@@ -362,7 +362,7 @@ class ClcServer:
 
             (changed,
              server_dict_array,
-             new_server_ids) = self._startstop_servers(self.module,
+             new_server_ids) = self._start_stop_servers(self.module,
                                                        self.clc,
                                                        server_ids)
 
@@ -1069,7 +1069,7 @@ class ClcServer:
         return True, server_dict_array, terminated_server_ids
 
     @staticmethod
-    def _startstop_servers(module, clc, server_ids):
+    def _start_stop_servers(module, clc, server_ids):
         """
         Start or Stop the servers on the provided list
         :param module: the AnsibleModule object
