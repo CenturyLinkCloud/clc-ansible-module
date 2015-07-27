@@ -297,13 +297,12 @@ class ClcFirewallPolicy:
         Ensures that a given firewall policy is present
         :param source_account_alias: the source account alias for the firewall policy
         :param location: datacenter of the firewall policy
-        :param firewall_dict: dictionary or request parameters for firewall policy creation
-        :return: (changed, firewall_policy, response)
+        :param firewall_dict: dictionary of request parameters for firewall policy
+        :return: (changed, firewall_policy_id, response)
             changed: flag for if a change occurred
-            firewall_policy: policy that was changed
+            firewall_policy_id: the firewall policy id that was created/updated
             response: response from CLC API call
         """
-        changed = False
         response = {}
         firewall_policy_id = firewall_dict.get('firewall_policy_id')
 
@@ -356,7 +355,7 @@ class ClcFirewallPolicy:
         :param firewall_dict: firewall policy to delete
         :return: (changed, firewall_policy_id, response)
             changed: flag for if a change occurred
-            firewall_policy_id: policy that was changed
+            firewall_policy_id: the firewall policy id that was deleted
             response: response from CLC API call
         """
         changed = False
@@ -382,7 +381,7 @@ class ClcFirewallPolicy:
         Creates the firewall policy for the given account alias
         :param source_account_alias: the source account alias for the firewall policy
         :param location: datacenter of the firewall policy
-        :param firewall_dict: dictionary or request parameters for firewall policy creation
+        :param firewall_dict: dictionary of request parameters for firewall policy
         :return: response from CLC API call
         """
         payload = {
@@ -409,7 +408,7 @@ class ClcFirewallPolicy:
         Deletes a given firewall policy for an account alias in a datacenter
         :param source_account_alias: the source account alias for the firewall policy
         :param location: datacenter of the firewall policy
-        :param firewall_policy_id: firewall policy to delete
+        :param firewall_policy_id: firewall policy id to delete
         :return: response: response from CLC API call
         """
         try:
@@ -433,8 +432,8 @@ class ClcFirewallPolicy:
         Updates a firewall policy for a given datacenter and account alias
         :param source_account_alias: the source account alias for the firewall policy
         :param location: datacenter of the firewall policy
-        :param firewall_policy_id: firewall policy to delete
-        :param firewall_dict: dictionary or request parameters for firewall policy creation
+        :param firewall_policy_id: firewall policy id to update
+        :param firewall_dict: dictionary of request parameters for firewall policy
         :return: response: response from CLC API call
         """
         try:
@@ -447,7 +446,7 @@ class ClcFirewallPolicy:
                 firewall_dict)
         except APIFailedResponse as e:
             return self.module.fail_json(
-                 msg="Unable to update the firewall policy id : {0}. {1}".format(
+                msg="Unable to update the firewall policy id : {0}. {1}".format(
                     firewall_policy_id, str(e.response_text)
                 ))
         return response
@@ -457,7 +456,7 @@ class ClcFirewallPolicy:
         """
         Helper method to compare the json response for getting the firewall policy with the request parameters
         :param response: response from the get method
-        :param firewall_dict: dictionary or request parameters for firewall policy creation
+        :param firewall_dict: dictionary of request parameters for firewall policy
         :return: changed: Boolean that returns true if there are differences between
                           the response parameters and the playbook parameters
         """
@@ -496,9 +495,7 @@ class ClcFirewallPolicy:
         :param source_account_alias: the source account alias for the firewall policy
         :param location: datacenter of the firewall policy
         :param firewall_policy_id: id of the firewall policy to get
-        :return: (response, success) -
-                  response - The response from CLC API call
-                  success - True/False falg indicating if the firewall policy was found
+        :return: response - The response from CLC API call
         """
         response = None
         try:
@@ -508,7 +505,7 @@ class ClcFirewallPolicy:
         except APIFailedResponse as e:
             if e.response_status_code != 404:
                 self.module.fail_json(
-                     msg="Unable to fetch the firewall policy with id : {0}. {1}".format(
+                    msg="Unable to fetch the firewall policy with id : {0}. {1}".format(
                         firewall_policy_id, str(e.response_text)))
         return response
 
@@ -520,7 +517,10 @@ class ClcFirewallPolicy:
             firewall_policy_id):
         """
         Waits until the CLC requests are complete if the wait argument is True
-        :param requests_lst: The list of CLC request objects
+        :param wait: The True/False flag indicating whether to wait
+        :param source_account_alias: The source account alias for the firewall policy
+        :param location: datacenter of the firewall policy
+        :param firewall_policy_id: The firewall policy id
         :return: none
         """
         if wait:
