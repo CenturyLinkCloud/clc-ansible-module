@@ -240,28 +240,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             location,
             'something')
 
-    @patch.object(clc_firewall_policy, 'clc_sdk')
-    def test_ensure_firewall_policy_present_fail(self, mock_clc_sdk):
-        source_account_alias = 'WFAD'
-        location = 'wa1'
-        payload = {
-            'destinationAccount': 'wfas',
-            'source': '12345',
-            'destination': '12345',
-            'ports': 'any'
-        }
-        self.module.check_mode = False
-
-        mock_clc_sdk.v2.API.Call.side_effect = OSError('Failed')
-        test_firewall_policy = ClcFirewallPolicy(self.module)
-
-        self.assertRaises(
-            OSError,
-            test_firewall_policy._ensure_firewall_policy_is_present,
-            source_account_alias,
-            location,
-            payload)
-
+    @mock.patch.object(ClcFirewallPolicy, '_wait_for_requests_to_complete')
     @mock.patch.object(ClcFirewallPolicy, '_compare_get_request_with_dict')
     @mock.patch.object(ClcFirewallPolicy, '_get_firewall_policy')
     @mock.patch.object(ClcFirewallPolicy, '_update_firewall_policy')
@@ -271,7 +250,8 @@ class TestClcFirewallPolicy(unittest.TestCase):
             mock_get_policy_id_from_response,
             mock_update_firewall_policy,
             mock_get_firewall_policy,
-            mock_compare_get_request_with_dict):
+            mock_compare_get_request_with_dict,
+            mock_wait):
         source_account_alias = 'WFAD'
         location = 'VA1'
         firewall_dict = {'firewall_policy_id': 'something'}
@@ -281,6 +261,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
         mock_update_firewall_policy.return_value = mock_firewall_response
         mock_get_firewall_policy.return_value = firewall_dict
         mock_compare_get_request_with_dict.return_value = True
+        mock_wait.return_value = 'OK'
 
         self.module.check_mode = False
         test_firewall = ClcFirewallPolicy(self.module)
@@ -296,7 +277,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             location,
             'something',
             firewall_dict)
-        mock_get_firewall_policy.assert_called_once_with(
+        mock_get_firewall_policy.assert_called_with(
             source_account_alias,
             location,
             'something')
@@ -328,7 +309,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             firewall_dict)
         self.assertEqual(changed, True)
         self.assertEqual(firewall_policy_id, 'policy1')
-        self.assertEqual(response, 'SUCCESS')
+        self.assertEqual(response, 'OK')
 
     @patch.object(clc_firewall_policy, 'clc_sdk')
     def test_update_firewall_policy_pass(self, mock_clc_sdk):
@@ -458,7 +439,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
 
         # Assert
         self.assertTrue(self.module.exit_json.called)
-        self.module.exit_json.assert_called_once_with(changed=True, firewall_policy_id='123')
+        self.module.exit_json.assert_called_once_with(changed=True, firewall_policy_id='123', firewall_policy={})
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcFirewallPolicy, '_ensure_firewall_policy_is_present')
@@ -488,7 +469,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
 
         # Assert
         self.assertTrue(self.module.exit_json.called)
-        self.module.exit_json.assert_called_once_with(changed=True, firewall_policy_id=None)
+        self.module.exit_json.assert_called_once_with(changed=True, firewall_policy_id=None, firewall_policy=[])
         self.assertFalse(self.module.fail_json.called)
 
     def test_compare_get_request_with_dict_false(self):
@@ -721,13 +702,23 @@ class TestClcFirewallPolicy(unittest.TestCase):
         self.assertEqual(res, True)
 
     @patch.object(ClcFirewallPolicy, '_get_firewall_policy')
-    def test_wait_for_requests_to_complete(self, mock_get):
-        mock_status = {
-            'status': 'success'
+    def test_wait_for_requests_to_complete_pending(self, mock_get):
+        mock_pending_status = {
+            'status': 'pending'
         }
-        mock_get.return_value = mock_status
+        mock_get.return_value = mock_pending_status
         under_test = ClcFirewallPolicy(self.module)
-        under_test._wait_for_requests_to_complete(True, 'alias', 'location', 'firewall_pol_id')
+        under_test._wait_for_requests_to_complete('alias', 'location', 'firewall_pol_id', 2)
+        self.assertTrue(under_test._get_firewall_policy.called)
+
+    @patch.object(ClcFirewallPolicy, '_get_firewall_policy')
+    def test_wait_for_requests_to_complete_active(self, mock_get):
+        mock_pending_status = {
+            'status': 'active'
+        }
+        mock_get.return_value = mock_pending_status
+        under_test = ClcFirewallPolicy(self.module)
+        under_test._wait_for_requests_to_complete('alias', 'location', 'firewall_pol_id', 2)
         self.assertTrue(under_test._get_firewall_policy.called)
 
     @patch.object(clc_firewall_policy, 'clc_sdk')

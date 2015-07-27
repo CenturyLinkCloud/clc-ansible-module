@@ -238,16 +238,17 @@ class ClcFirewallPolicy:
         self._set_clc_credentials_from_env()
 
         if state == 'absent':
-            changed, firewall_policy_id, response = self._ensure_firewall_policy_is_absent(
+            changed, firewall_policy_id, firewall_policy = self._ensure_firewall_policy_is_absent(
                 source_account_alias, location, self.firewall_dict)
 
         elif state == 'present':
-            changed, firewall_policy_id, response = self._ensure_firewall_policy_is_present(
+            changed, firewall_policy_id, firewall_policy = self._ensure_firewall_policy_is_present(
                 source_account_alias, location, self.firewall_dict)
 
         return self.module.exit_json(
             changed=changed,
-            firewall_policy_id=firewall_policy_id)
+            firewall_policy_id=firewall_policy_id,
+            firewall_policy=firewall_policy)
 
     @staticmethod
     def _get_policy_id_from_response(response):
@@ -305,7 +306,7 @@ class ClcFirewallPolicy:
             firewall_policy_id: the firewall policy id that was created/updated
             response: response from CLC API call
         """
-        response = {}
+        firewall_policy = None
         firewall_policy_id = firewall_dict.get('firewall_policy_id')
 
         if firewall_policy_id is None:
@@ -316,34 +317,32 @@ class ClcFirewallPolicy:
                     firewall_dict)
                 firewall_policy_id = self._get_policy_id_from_response(
                     response)
-                self._wait_for_requests_to_complete(
-                    firewall_dict.get('wait'),
+                firewall_policy = self._wait_for_requests_to_complete(
                     source_account_alias,
                     location,
                     firewall_policy_id)
             changed = True
         else:
-            policy = self._get_firewall_policy(
+            firewall_policy = self._get_firewall_policy(
                 source_account_alias, location, firewall_policy_id)
-            if not policy:
+            if not firewall_policy:
                 return self.module.fail_json(
                     msg='Unable to find the firewall policy id : {0}'.format(
                         firewall_policy_id))
             changed = self._compare_get_request_with_dict(
-                policy,
+                firewall_policy,
                 firewall_dict)
             if not self.module.check_mode and changed:
-                response = self._update_firewall_policy(
+                self._update_firewall_policy(
                     source_account_alias,
                     location,
                     firewall_policy_id,
                     firewall_dict)
-                self._wait_for_requests_to_complete(
-                    firewall_dict.get('wait'),
+                firewall_policy = self._wait_for_requests_to_complete(
                     source_account_alias,
                     location,
                     firewall_policy_id)
-        return changed, firewall_policy_id, response
+        return changed, firewall_policy_id, firewall_policy
 
     def _ensure_firewall_policy_is_absent(
             self,
@@ -514,29 +513,36 @@ class ClcFirewallPolicy:
 
     def _wait_for_requests_to_complete(
             self,
-            wait,
             source_account_alias,
             location,
-            firewall_policy_id):
+            firewall_policy_id,
+            wait_limit=500):
         """
         Waits until the CLC requests are complete if the wait argument is True
         :param wait: The True/False flag indicating whether to wait
         :param source_account_alias: The source account alias for the firewall policy
         :param location: datacenter of the firewall policy
         :param firewall_policy_id: The firewall policy id
+        :param wait_limit: The number of times to check the status for completion
         :return: none
         """
-        if wait:
-            response = self._get_firewall_policy(
+        wait = self.module.params.get('wait')
+        count = 0
+        firewall_policy = None
+        while wait:
+            count += 1
+            firewall_policy = self._get_firewall_policy(
                 source_account_alias, location, firewall_policy_id)
-            if response.get('status') == 'pending':
+            status = firewall_policy.get('status')
+            if status == 'active':
+                wait = False
+            elif count < wait_limit:
+                # wait for 2 seconds
                 sleep(2)
-                self._wait_for_requests_to_complete(
-                    wait,
-                    source_account_alias,
-                    location,
-                    firewall_policy_id)
-            return None
+            else:
+                # maximum no.of attempts to wait for the request is finished. exit
+                wait = False
+        return firewall_policy
 
     @staticmethod
     def _set_user_agent(clc):
