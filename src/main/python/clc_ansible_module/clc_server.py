@@ -544,7 +544,12 @@ class ClcServer:
         """
         alias = module.params.get('alias')
         if not alias:
-            alias = clc.v2.Account.GetAlias()
+            try:
+                alias = clc.v2.Account.GetAlias()
+            except CLCException as ex:
+                module.fail_json(msg='Unable to find account alias. {0}'.format(
+                    ex.message
+                ))
         return alias
 
     @staticmethod
@@ -627,6 +632,20 @@ class ClcServer:
             if server_type == "hyperscale" and storage_type != "hyperscale":
                 module.fail_json(
                     msg=str("Hyperscale VMs must have storage_type = 'hyperscale'"))
+
+    @staticmethod
+    def _validate_name(module):
+        """
+        Validate that name is the correct length if provided, fail if it's not
+        :param module: the module to validate
+        :return: none
+        """
+        name = module.params.get('name')
+        state = module.params.get('state')
+
+        if state == 'present' and (len(name) < 1 or len(name) > 6):
+            module.fail_json(msg=str(
+                "When state = 'present', name must be a string with a minimum length of 1 and a maximum length of 6"))
 
     @staticmethod
     def _find_ttl(clc, module):
@@ -742,7 +761,7 @@ class ClcServer:
 
     def _create_servers(self, module, clc, override_count=None):
         """
-        Create New Servers
+        Create New Servers in CLC cloud
         :param module: the AnsibleModule object
         :param clc: the clc-sdk instance to use
         :return: a list of dictionaries with server information about the servers that were created
@@ -757,7 +776,6 @@ class ClcServer:
         add_public_ip = p.get('add_public_ip')
         public_ip_protocol = p.get('public_ip_protocol')
         public_ip_ports = p.get('public_ip_ports')
-        wait = p.get('wait')
 
         params = {
             'name': p.get('name'),
@@ -799,15 +817,15 @@ class ClcServer:
                 request_list.append(req)
                 servers.append(server)
 
-        self._wait_for_requests(module, request_list, servers, wait)
+        self._wait_for_requests(module, request_list)
+        self._refresh_servers(module, servers)
 
         ip_failed_servers = self._add_public_ip_to_servers(
             module=module,
             should_add_public_ip=add_public_ip,
             servers=servers,
             public_ip_protocol=public_ip_protocol,
-            public_ip_ports=public_ip_ports,
-            wait=wait)
+            public_ip_ports=public_ip_ports)
         ap_failed_servers = self._add_alert_policy_to_servers(clc=clc,
                                                               module=module,
                                                               servers=servers)
@@ -828,20 +846,6 @@ class ClcServer:
             server_dict_array.append(server.data)
 
         return server_dict_array, created_server_ids, partial_created_servers_ids, changed
-
-    @staticmethod
-    def _validate_name(module):
-        """
-        Validate that name is the correct length if provided, fail if it's not
-        :param module: the module to validate
-        :return: none
-        """
-        name = module.params.get('name')
-        state = module.params.get('state')
-
-        if state == 'present' and (len(name) < 1 or len(name) > 6):
-            module.fail_json(msg=str(
-                "When state = 'present', name must be a string with a minimum length of 1 and a maximum length of 6"))
 
     def _enforce_count(self, module, clc):
         """
@@ -891,7 +895,7 @@ class ClcServer:
         return server_dict_array, changed_server_ids, partial_servers_ids, changed
 
     @staticmethod
-    def _wait_for_requests(module, requests, servers, wait):
+    def _wait_for_requests(module, requests):
         """
         Block until server provisioning requests are completed.
         :param module: the AnsibleModule object
@@ -900,6 +904,7 @@ class ClcServer:
         :param wait: a boolean on whether to block or not.  This function is skipped if True
         :return: none
         """
+        wait = module.params.get('wait')
         if wait:
             # Requests.WaitUntilComplete() returns the count of failed requests
             failed_requests_count = sum(
@@ -908,18 +913,23 @@ class ClcServer:
             if failed_requests_count > 0:
                 module.fail_json(
                     msg='Unable to process server request')
-            else:
-                ClcServer._refresh_servers(servers)
 
     @staticmethod
-    def _refresh_servers(servers):
+    def _refresh_servers(module, servers):
         """
-        Loop through a list of servers and refresh them
+        Loop through a list of servers and refresh them.
+        :param module: the AnsibleModule object
         :param servers: list of clc-sdk.Server instances to refresh
         :return: none
         """
         for server in servers:
-            server.Refresh()
+            try:
+                server.Refresh()
+            except CLCException as ex:
+                module.fail_json(msg='Unable to refresh the server {0}. {1}'.format(
+                    server.id, ex.message
+                ))
+
 
     @staticmethod
     def _add_public_ip_to_servers(
@@ -927,8 +937,7 @@ class ClcServer:
             should_add_public_ip,
             servers,
             public_ip_protocol,
-            public_ip_ports,
-            wait):
+            public_ip_ports):
         """
         Create a public IP for servers
         :param module: the AnsibleModule object
@@ -957,9 +966,7 @@ class ClcServer:
                     request_list.append(request)
         except APIFailedResponse:
             failed_servers.append(server)
-        if wait:
-            for r in request_list:
-                r.WaitUntilComplete()
+        ClcServer._wait_for_requests(module, request_list)
         return failed_servers
 
     @staticmethod
@@ -1045,7 +1052,6 @@ class ClcServer:
         :return: a list of dictionaries with server information about the servers that were deleted
         """
         p = module.params
-        wait = p.get('wait')
         terminated_server_ids = []
         server_dict_array = []
         request_list = []
@@ -1058,10 +1064,7 @@ class ClcServer:
         for server in servers:
             if not module.check_mode:
                 request_list.append(server.Delete())
-
-        if wait:
-            for r in request_list:
-                r.WaitUntilComplete()
+        ClcServer._wait_for_requests(module, request_list)
 
         for server in servers:
             terminated_server_ids.append(server.id)
@@ -1078,7 +1081,6 @@ class ClcServer:
         :return: a list of dictionaries with server information about the servers that were started or stopped
         """
         p = module.params
-        wait = p.get('wait')
         state = p.get('state')
         changed = False
         changed_servers = []
@@ -1102,11 +1104,8 @@ class ClcServer:
                             state))
                 changed = True
 
-        if wait:
-            for r in request_list:
-                r.WaitUntilComplete()
-            for server in changed_servers:
-                server.Refresh()
+        ClcServer._wait_for_requests(module, request_list)
+        ClcServer._refresh_servers(module, changed_servers)
 
         for server in set(changed_servers + servers):
             try:
@@ -1139,7 +1138,7 @@ class ClcServer:
                 result = server.PowerOff()
         except CLCException:
             module.fail_json(
-                msg='Unable to change state for server {0}'.format(
+                msg='Unable to change power state for server {0}'.format(
                     server.id))
         return result
 

@@ -140,7 +140,7 @@ class TestClcServerFunctions(unittest.TestCase):
             'type': 'standard',
             'template': 'TEST_TEMPLATE',
             'storage_type': 'standard',
-            'wait': True,
+            'wait': False,
             'exact_count': 1,
             'count_group': 'Default Group',
             'add_public_ip': True,
@@ -1040,7 +1040,7 @@ class TestClcServerFunctions(unittest.TestCase):
         server.PowerOff.side_effect = error
         result = ClcServer._change_server_power_state(mock_ansible_module, server, 'stopped')
         self.assertEqual(result, None)
-        mock_ansible_module.fail_json.assert_called_with(msg='Unable to change state for server server1')
+        mock_ansible_module.fail_json.assert_called_with(msg='Unable to change power state for server server1')
 
     @patch.object(clc_server, 'AnsibleModule')
     @patch.object(clc_server, 'clc_sdk')
@@ -1166,8 +1166,7 @@ class TestClcServerFunctions(unittest.TestCase):
                                              self.module,
                                              True, servers,
                                              'TCP',
-                                             [80],
-                                             False)
+                                             [80])
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(len(failed_servers), 1)
         self.assertEqual(failed_servers[0].id, 'server1')
@@ -1175,7 +1174,7 @@ class TestClcServerFunctions(unittest.TestCase):
     @patch.object(clc_server, 'clc_sdk')
     def test_delete_servers(self, mock_clc_sdk):
         params = {
-            'wait': True
+            'wait': False
         }
         self.module.params = params
         mock_server = mock.MagicMock()
@@ -1195,7 +1194,7 @@ class TestClcServerFunctions(unittest.TestCase):
     @patch.object(clc_server, 'clc_sdk')
     def test_start_stop_servers(self, mock_clc_sdk):
         params = {
-            'wait': True
+            'wait': False
         }
         self.module.params = params
         mock_server = mock.MagicMock()
@@ -1216,8 +1215,30 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test = ClcServer(self.module)
         mock_request = mock.MagicMock()
         mock_request.WaitUntilComplete.return_value = 1
-        under_test._wait_for_requests(self.module, [mock_request], None, True)
+        under_test._wait_for_requests(self.module, [mock_request])
         self.module.fail_json.assert_called_with(msg='Unable to process server request')
+
+    def test_refresh_servers_fail(self):
+        error = CLCException()
+        error.message = 'Mock fail message'
+        under_test = ClcServer(self.module)
+        mock_server = mock.MagicMock()
+        mock_server.id = 'mock_server_id'
+        mock_server.Refresh.side_effect = error
+        mock_servers = [mock_server]
+        under_test._refresh_servers(self.module, mock_servers)
+        self.module.fail_json.assert_called_with(msg='Unable to refresh the server mock_server_id. Mock fail message')
+
+    @patch.object(clc_server, 'clc_sdk')
+    def test_find_alias_exception(self, mock_clc_sdk):
+        error = CLCException()
+        error.message = 'Mock fail message'
+        mock_clc_sdk.v2.Account.GetAlias.side_effect = error
+        self.module.params = {}
+        under_test = ClcServer(self.module)
+        under_test._find_alias(mock_clc_sdk, self.module)
+        self.module.fail_json.assert_called_with(msg='Unable to find account alias. Mock fail message')
+
 
 if __name__ == '__main__':
     unittest.main()
