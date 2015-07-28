@@ -295,7 +295,6 @@ class ClcModifyServer:
         :return: a list of dictionaries with server information about the servers that were modified
         """
         p = self.module.params
-        wait = p.get('wait')
         state = p.get('state')
         server_params = {
             'cpu': p.get('cpu'),
@@ -344,11 +343,8 @@ class ClcModifyServer:
                 changed_servers.append(server)
                 changed = True
 
-        if wait:
-            for r in request_list:
-                r.WaitUntilComplete()
-            for server in changed_servers:
-                server.Refresh()
+        self._wait_for_requests(self.module, request_list)
+        self._refresh_servers(self.module, changed_servers)
 
         for server in changed_servers:
             server_dict_array.append(server.data)
@@ -416,6 +412,40 @@ class ClcModifyServer:
                 msg='Unable to update the server configuration for server : "{0}". {1}'.format(
                     server_id, str(ex.response_text)))
         return result
+
+    @staticmethod
+    def _wait_for_requests(module, request_list):
+        """
+        Block until server provisioning requests are completed.
+        :param module: the AnsibleModule object
+        :param request_list: a list of clc-sdk.Request instances
+        :return: none
+        """
+        wait = module.params.get('wait')
+        if wait:
+            # Requests.WaitUntilComplete() returns the count of failed requests
+            failed_requests_count = sum(
+                [request.WaitUntilComplete() for request in request_list])
+
+            if failed_requests_count > 0:
+                module.fail_json(
+                    msg='Unable to process modify server request')
+
+    @staticmethod
+    def _refresh_servers(module, servers):
+        """
+        Loop through a list of servers and refresh them.
+        :param module: the AnsibleModule object
+        :param servers: list of clc-sdk.Server instances to refresh
+        :return: none
+        """
+        for server in servers:
+            try:
+                server.Refresh()
+            except CLCException as ex:
+                module.fail_json(msg='Unable to refresh the server {0}. {1}'.format(
+                    server.id, ex.message
+                ))
 
     def _ensure_aa_policy_present(
             self, server, server_params):

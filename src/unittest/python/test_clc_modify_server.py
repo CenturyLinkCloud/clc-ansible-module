@@ -872,5 +872,23 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         under_test._get_alert_policy_id_by_name(mock_clc_sdk, self.module, 'alias', 'name')
         self.module.fail_json.assert_called_once_with(msg='Unable to fetch alert policies for account : "alias". Mock failure message')
 
+    def test_wait_for_requests_fail(self):
+        under_test = ClcModifyServer(self.module)
+        mock_request = mock.MagicMock()
+        mock_request.WaitUntilComplete.return_value = 1
+        under_test._wait_for_requests(self.module, [mock_request])
+        self.module.fail_json.assert_called_with(msg='Unable to process modify server request')
+
+    def test_refresh_servers_fail(self):
+        error = CLCException()
+        error.message = 'Mock fail message'
+        under_test = ClcModifyServer(self.module)
+        mock_server = mock.MagicMock()
+        mock_server.id = 'mock_server_id'
+        mock_server.Refresh.side_effect = error
+        mock_servers = [mock_server]
+        under_test._refresh_servers(self.module, mock_servers)
+        self.module.fail_json.assert_called_with(msg='Unable to refresh the server mock_server_id. Mock fail message')
+
 if __name__ == '__main__':
     unittest.main()
