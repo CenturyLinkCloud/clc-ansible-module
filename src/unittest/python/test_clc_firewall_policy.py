@@ -725,7 +725,6 @@ class TestClcFirewallPolicy(unittest.TestCase):
     def test_set_user_agent(self, mock_clc_sdk):
         clc_firewall_policy.__version__ = "1"
         ClcFirewallPolicy._set_user_agent(mock_clc_sdk)
-
         self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
 
 if __name__ == '__main__':
