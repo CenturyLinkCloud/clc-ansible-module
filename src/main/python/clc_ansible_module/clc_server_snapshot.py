@@ -76,8 +76,8 @@ EXAMPLES = '''
 - name: Create server snapshot
   clc_server_snapshot:
     server_ids:
-        - UC1WFSDTEST01
-        - UC1WFSDTEST02
+        - UC1TESTSVR01
+        - UC1TESTSVR02
     expiration_days: 10
     wait: True
     state: present
@@ -85,16 +85,16 @@ EXAMPLES = '''
 - name: Restore server snapshot
   clc_server_snapshot:
     server_ids:
-        - UC1WFSDTEST01
-        - UC1WFSDTEST02
+        - UC1TESTSVR01
+        - UC1TESTSVR02
     wait: True
     state: restore
 
 - name: Delete server snapshot
   clc_server_snapshot:
     server_ids:
-        - UC1WFSDTEST01
-        - UC1WFSDTEST02
+        - UC1TESTSVR01
+        - UC1TESTSVR02
     wait: True
     state: absent
 '''
@@ -154,7 +154,6 @@ class ClcSnapshot:
         :return: Returns with either an exit_json or fail_json
         """
         p = self.module.params
-
         server_ids = p['server_ids']
         expiration_days = p['expiration_days']
         state = p['state']
@@ -211,7 +210,7 @@ class ClcSnapshot:
         Create the snapshot for the CLC server
         :param server: the CLC server object
         :param expiration_days: The number of days to keep the snapshot
-        :return: the request object from CLC API Call
+        :return: the create request object from CLC API Call
         """
         result = None
         try:
