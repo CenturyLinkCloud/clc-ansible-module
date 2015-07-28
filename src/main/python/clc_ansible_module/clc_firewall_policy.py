@@ -211,6 +211,7 @@ class ClcFirewallPolicy:
         :return: none
         """
         changed = False
+        firewall_policy = None
         location = self.module.params.get('location')
         source_account_alias = self.module.params.get('source_account_alias')
         destination_account_alias = self.module.params.get(
@@ -301,10 +302,10 @@ class ClcFirewallPolicy:
         :param source_account_alias: the source account alias for the firewall policy
         :param location: datacenter of the firewall policy
         :param firewall_dict: dictionary of request parameters for firewall policy
-        :return: (changed, firewall_policy_id, response)
+        :return: (changed, firewall_policy_id, firewall_policy)
             changed: flag for if a change occurred
             firewall_policy_id: the firewall policy id that was created/updated
-            response: response from CLC API call
+            firewall_policy: The firewall_policy object
         """
         firewall_policy = None
         firewall_policy_id = firewall_dict.get('firewall_policy_id')
@@ -516,15 +517,14 @@ class ClcFirewallPolicy:
             source_account_alias,
             location,
             firewall_policy_id,
-            wait_limit=500):
+            wait_limit=50):
         """
         Waits until the CLC requests are complete if the wait argument is True
-        :param wait: The True/False flag indicating whether to wait
         :param source_account_alias: The source account alias for the firewall policy
         :param location: datacenter of the firewall policy
         :param firewall_policy_id: The firewall policy id
         :param wait_limit: The number of times to check the status for completion
-        :return: none
+        :return: the firewall_policy object
         """
         wait = self.module.params.get('wait')
         count = 0
