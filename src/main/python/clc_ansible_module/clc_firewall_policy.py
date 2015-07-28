@@ -545,6 +545,7 @@ class ClcFirewallPolicy:
             ses.headers['User-Agent'] += " " + agent_string
             clc.SetRequestsSession(ses)
 
+
 def main():
     """
     The main function.  Instantiates the module and calls process_request.
