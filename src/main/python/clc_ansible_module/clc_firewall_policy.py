@@ -133,7 +133,7 @@ EXAMPLES = '''
         source_account_alias: WFAD
         location: VA1
         state: absent
-        firewall_policy_id: c62105233d7a4231bd2e91b9c791eaae
+        firewall_policy_id: 'c62105233d7a4231bd2e91b9c791e43e1'
 '''
 
 __version__ = '${version}'
@@ -417,8 +417,7 @@ class ClcFirewallPolicy:
         except APIFailedResponse as e:
             return self.module.fail_json(
                 msg="Unable to delete the firewall policy id : {0}. {1}".format(
-                    firewall_policy_id, str(e.response_text)
-                ))
+                    firewall_policy_id, str(e.response_text)))
         return response
 
     def _update_firewall_policy(
@@ -446,8 +445,7 @@ class ClcFirewallPolicy:
         except APIFailedResponse as e:
             return self.module.fail_json(
                 msg="Unable to update the firewall policy id : {0}. {1}".format(
-                    firewall_policy_id, str(e.response_text)
-                ))
+                    firewall_policy_id, str(e.response_text)))
         return response
 
     @staticmethod
@@ -546,7 +544,6 @@ class ClcFirewallPolicy:
             ses.headers.update({"Api-Client": agent_string})
             ses.headers['User-Agent'] += " " + agent_string
             clc.SetRequestsSession(ses)
-
 
 def main():
     """
