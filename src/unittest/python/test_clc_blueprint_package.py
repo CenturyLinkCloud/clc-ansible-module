@@ -255,8 +255,8 @@ class TestClcBluePrintPackageFunctions(unittest.TestCase):
 
     def test_clc_install_package_exception(self):
         self.module.check_mode = False
-        error = CLCException('Failed')
-        error.response_text = 'Mock failure message'
+        error = CLCException()
+        error.message = 'Mock failure message'
         mock_server = mock.MagicMock()
         mock_server.id = 'server1'
         mock_server.ExecutePackage.side_effect = error
