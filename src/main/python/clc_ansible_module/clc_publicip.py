@@ -89,8 +89,8 @@ EXAMPLES = '''
         ports:
             - 80
         server_ids:
-            - UC1ACCTSRVR01
-            - UC1ACCTSRVR02
+            - UC1TEST-SVR01
+            - UC1TEST-SVR02
         state: present
       register: clc
 
@@ -105,13 +105,30 @@ EXAMPLES = '''
     - name: Create Public IP For Servers
       clc_publicip:
         server_ids:
-            - UC1ACCTSRVR01
-            - UC1ACCTSRVR02
+            - UC1TEST-SVR01
+            - UC1TEST-SVR02
         state: absent
       register: clc
 
     - name: debug
       debug: var=clc
+'''
+
+RETURN = '''
+changed:
+    description: A flag indicating if any change was made or not
+    returned: success
+    type: boolean
+    sample: True
+server_ids:
+    description: The list of server ids that are changed
+    returned: success
+    type: list
+    sample:
+        [
+            "UC1TEST-SVR01",
+            "UC1TEST-SVR02"
+        ]
 '''
 
 __version__ = '${version}'

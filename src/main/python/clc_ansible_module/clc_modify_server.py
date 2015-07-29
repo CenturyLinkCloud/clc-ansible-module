@@ -160,6 +160,180 @@ EXAMPLES = '''
     state: present
 '''
 
+RETURN = '''
+changed:
+    description: A flag indicating if any change was made or not
+    returned: success
+    type: boolean
+    sample: True
+server_ids:
+    description: The list of server ids that are changed
+    returned: success
+    type: list
+    sample:
+        [
+            "UC1TEST-SVR01",
+            "UC1TEST-SVR02"
+        ]
+servers:
+    description: The list of server objects that are changed
+    returned: success
+    type: list
+    sample:
+        [
+           {
+              "changeInfo":{
+                 "createdBy":"service.wfad",
+                 "createdDate":1438196820,
+                 "modifiedBy":"service.wfad",
+                 "modifiedDate":1438196820
+              },
+              "description":"test-server",
+              "details":{
+                 "alertPolicies":[
+
+                 ],
+                 "cpu":1,
+                 "customFields":[
+
+                 ],
+                 "diskCount":3,
+                 "disks":[
+                    {
+                       "id":"0:0",
+                       "partitionPaths":[
+
+                       ],
+                       "sizeGB":1
+                    },
+                    {
+                       "id":"0:1",
+                       "partitionPaths":[
+
+                       ],
+                       "sizeGB":2
+                    },
+                    {
+                       "id":"0:2",
+                       "partitionPaths":[
+
+                       ],
+                       "sizeGB":14
+                    }
+                 ],
+                 "hostName":"",
+                 "inMaintenanceMode":false,
+                 "ipAddresses":[
+                    {
+                       "internal":"10.1.1.1"
+                    }
+                 ],
+                 "memoryGB":1,
+                 "memoryMB":1024,
+                 "partitions":[
+
+                 ],
+                 "powerState":"started",
+                 "snapshots":[
+
+                 ],
+                 "storageGB":17
+              },
+              "groupId":"086ac1dfe0b6411989e8d1b77c4065f0",
+              "id":"test-server",
+              "ipaddress":"10.120.45.23",
+              "isTemplate":false,
+              "links":[
+                 {
+                    "href":"/v2/servers/wfad/test-server",
+                    "id":"test-server",
+                    "rel":"self",
+                    "verbs":[
+                       "GET",
+                       "PATCH",
+                       "DELETE"
+                    ]
+                 },
+                 {
+                    "href":"/v2/groups/wfad/086ac1dfe0b6411989e8d1b77c4065f0",
+                    "id":"086ac1dfe0b6411989e8d1b77c4065f0",
+                    "rel":"group"
+                 },
+                 {
+                    "href":"/v2/accounts/wfad",
+                    "id":"wfad",
+                    "rel":"account"
+                 },
+                 {
+                    "href":"/v2/billing/wfad/serverPricing/test-server",
+                    "rel":"billing"
+                 },
+                 {
+                    "href":"/v2/servers/wfad/test-server/publicIPAddresses",
+                    "rel":"publicIPAddresses",
+                    "verbs":[
+                       "POST"
+                    ]
+                 },
+                 {
+                    "href":"/v2/servers/wfad/test-server/credentials",
+                    "rel":"credentials"
+                 },
+                 {
+                    "href":"/v2/servers/wfad/test-server/statistics",
+                    "rel":"statistics"
+                 },
+                 {
+                    "href":"/v2/servers/wfad/510ec21ae82d4dc89d28479753bf736a/upcomingScheduledActivities",
+                    "rel":"upcomingScheduledActivities"
+                 },
+                 {
+                    "href":"/v2/servers/wfad/510ec21ae82d4dc89d28479753bf736a/scheduledActivities",
+                    "rel":"scheduledActivities",
+                    "verbs":[
+                       "GET",
+                       "POST"
+                    ]
+                 },
+                 {
+                    "href":"/v2/servers/wfad/test-server/capabilities",
+                    "rel":"capabilities"
+                 },
+                 {
+                    "href":"/v2/servers/wfad/test-server/alertPolicies",
+                    "rel":"alertPolicyMappings",
+                    "verbs":[
+                       "POST"
+                    ]
+                 },
+                 {
+                    "href":"/v2/servers/wfad/test-server/antiAffinityPolicy",
+                    "rel":"antiAffinityPolicyMapping",
+                    "verbs":[
+                       "PUT",
+                       "DELETE"
+                    ]
+                 },
+                 {
+                    "href":"/v2/servers/wfad/test-server/cpuAutoscalePolicy",
+                    "rel":"cpuAutoscalePolicyMapping",
+                    "verbs":[
+                       "PUT",
+                       "DELETE"
+                    ]
+                 }
+              ],
+              "locationId":"UC1",
+              "name":"test-server",
+              "os":"ubuntu14_64Bit",
+              "osType":"Ubuntu 14 64-bit",
+              "status":"active",
+              "storageType":"standard",
+              "type":"standard"
+           }
+        ]
+'''
+
 __version__ = '${version}'
 
 from distutils.version import LooseVersion
@@ -230,12 +404,12 @@ class ClcModifyServer:
                 msg='server_ids needs to be a list of instances to modify: %s' %
                 server_ids)
 
-        (changed, server_dict_array, new_server_ids) = self._modify_servers(
+        (changed, server_dict_array, changed_server_ids) = self._modify_servers(
             server_ids=server_ids)
 
         self.module.exit_json(
             changed=changed,
-            server_ids=new_server_ids,
+            server_ids=changed_server_ids,
             servers=server_dict_array)
 
     @staticmethod

@@ -117,6 +117,110 @@ EXAMPLES = '''
 
 '''
 
+RETURN = '''
+changed:
+    description: A flag indicating if any change was made or not
+    returned: success
+    type: boolean
+    sample: True
+group:
+    description: The group information
+    returned: success
+    type: dict
+    sample:
+        {
+           "changeInfo":{
+              "createdBy":"service.wfad",
+              "createdDate":"2015-07-29T18:52:47Z",
+              "modifiedBy":"service.wfad",
+              "modifiedDate":"2015-07-29T18:52:47Z"
+           },
+           "customFields":[
+
+           ],
+           "description":"test group",
+           "groups":[
+
+           ],
+           "id":"bb5f12a3c6044ae4ad0a03e73ae12cd1",
+           "links":[
+              {
+                 "href":"/v2/groups/wfad",
+                 "rel":"createGroup",
+                 "verbs":[
+                    "POST"
+                 ]
+              },
+              {
+                 "href":"/v2/servers/wfad",
+                 "rel":"createServer",
+                 "verbs":[
+                    "POST"
+                 ]
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1",
+                 "rel":"self",
+                 "verbs":[
+                    "GET",
+                    "PATCH",
+                    "DELETE"
+                 ]
+              },
+              {
+                 "href":"/v2/groups/wfad/086ac1dfe0b6411989e8d1b77c4065f0",
+                 "id":"086ac1dfe0b6411989e8d1b77c4065f0",
+                 "rel":"parentGroup"
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/defaults",
+                 "rel":"defaults",
+                 "verbs":[
+                    "GET",
+                    "POST"
+                 ]
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/billing",
+                 "rel":"billing"
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/archive",
+                 "rel":"archiveGroupAction"
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/statistics",
+                 "rel":"statistics"
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/upcomingScheduledActivities",
+                 "rel":"upcomingScheduledActivities"
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/horizontalAutoscalePolicy",
+                 "rel":"horizontalAutoscalePolicyMapping",
+                 "verbs":[
+                    "GET",
+                    "PUT",
+                    "DELETE"
+                 ]
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/scheduledActivities",
+                 "rel":"scheduledActivities",
+                 "verbs":[
+                    "GET",
+                    "POST"
+                 ]
+              }
+           ],
+           "locationId":"UC1",
+           "name":"test group",
+           "status":"active",
+           "type":"default"
+        }
+'''
+
 __version__ = '${version}'
 
 from distutils.version import LooseVersion
