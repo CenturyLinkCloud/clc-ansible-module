@@ -399,7 +399,7 @@ class ClcModifyServer:
     @staticmethod
     def _modify_clc_server(clc, module, server_id, cpu, memory):
         """
-        Modify the memory or CPU on a clc server.  This function is not yet implemented.
+        Modify the memory or CPU of a clc server.
         :param clc: the clc-sdk instance to use
         :param module: the AnsibleModule object
         :param server_id: id of the server to modify
