@@ -103,44 +103,58 @@ EXAMPLES = '''
 # Note - You must set the CLC_V2_API_USERNAME And CLC_V2_API_PASSWD Environment variables before running these examples
 
 - name: set the cpu count to 4 on a server
-  clc_server:
-    server_ids: ['UC1ACCTTEST01']
+  clc_modify_server:
+    server_ids:
+        - UC1TESTSVR01
+        - UC1TESTSVR02
     cpu: 4
     state: present
 
 - name: set the memory to 8GB on a server
-  clc_server:
-    server_ids: ['UC1ACCTTEST01']
+  clc_modify_server:
+    server_ids:
+        - UC1TESTSVR01
+        - UC1TESTSVR02
     memory: 8
     state: present
 
 - name: set the anti affinity policy on a server
-  clc_server:
-    server_ids: ['UC1ACCTTEST01']
+  clc_modify_server:
+    server_ids:
+        - UC1TESTSVR01
+        - UC1TESTSVR02
     anti_affinity_policy_name: 'aa_policy'
     state: present
 
 - name: remove the anti affinity policy on a server
-  clc_server:
-    server_ids: ['UC1ACCTTEST01']
+  clc_modify_server:
+    server_ids:
+        - UC1TESTSVR01
+        - UC1TESTSVR02
     anti_affinity_policy_name: 'aa_policy'
     state: absent
 
 - name: add the alert policy on a server
-  clc_server:
-    server_ids: ['UC1ACCTTEST01']
+  clc_modify_server:
+    server_ids:
+        - UC1TESTSVR01
+        - UC1TESTSVR02
     alert_policy_name: 'alert_policy'
     state: present
 
 - name: remove the alert policy on a server
-  clc_server:
-    server_ids: ['UC1ACCTTEST01']
+  clc_modify_server:
+    server_ids:
+        - UC1TESTSVR01
+        - UC1TESTSVR02
     alert_policy_name: 'alert_policy'
     state: absent
 
 - name: set the memory to 16GB and cpu to 8 core on a lust if servers
-  clc_server:
-    server_ids: ['UC1ACCTTEST01','UC1ACCTTEST02']
+  clc_modify_server:
+    server_ids:
+        - UC1TESTSVR01
+        - UC1TESTSVR02
     cpu: 8
     memory: 16
     state: present
