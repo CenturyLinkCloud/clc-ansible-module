@@ -1,0 +1,103 @@
+---
+- name: Start a Server
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  vars:
+    public_key: "YOUR_PUBLIC_KEY_GOES_HERE"
+    server_to_start: uc1acctsrvr01
+    server_password: PASSWORD_HERE
+  tasks:
+    - name: Start Server
+      clc_server:
+        server_ids: "{{ server_to_start }}"
+        state: started
+      register: start_server
+
+    - name: Wait for SSH to Come up on Started Servers
+      wait_for: host={{ item.details.ipAddresses[0].internal }} port=22 delay=5 timeout=320 state=started
+      with_flattened:
+        - start_server.servers
+
+    - name: Update known_hosts With Started Server
+      shell: "ssh-keygen -R {{ item.details.ipAddresses[0].internal }} && ssh-keyscan -t rsa -H {{ item.details.ipAddresses[0].internal }} >> ~/.ssh/known_hosts"
+      with_items: start_server.servers
+
+    - name: Deploy SSH Key to New Servers (Ubuntu)
+      shell: "echo '{{ public_key }}'|sshpass -p '{{ server_password }}' ssh root@{{ item.details.ipAddresses[0].internal }} 'cat >> ~/.ssh/authorized_keys'"
+      with_flattened:
+        - start_server.servers
+
+    - name: Add New Servers to an in-memory Group
+      add_host:
+        name={{ item.name }}
+        ansible_ssh_host={{ item.details.ipAddresses[0].internal }}
+        ansible_ssh_user=root
+        groupname=SERVERS_GRP
+      with_items: start_server.servers
+
+- name: Install Some Stuff
+  hosts: SERVERS_GRP
+  gather_facts: True
+  remote_user: root
+  tasks:
+    - name: Set MongoDb 10Gen signing key
+      apt_key:
+        keyserver='hkp://keyserver.ubuntu.com:80'
+        id=7F0CEB10
+
+    - name: Add Repos
+      apt_repository: repo='{{ item }}' update_cache=no
+      with_items:
+        - ppa:fish-shell/release-2
+        - ppa:webupd8team/sublime-text-3
+        - ppa:git-core/ppa
+        - ppa:webupd8team/atom
+        - ppa:webupd8team/java
+        - ppa:chris-lea/node.js
+        - deb http://repo.mongodb.org/apt/ubuntu trusty/mongodb-org/3.0 multiverse
+
+    - name: Update Cache
+      apt: update_cache=yes
+
+    - name: Accept license for Oracle Java
+      debconf:
+        name='oracle-java7-installer'
+        question='shared/accepted-oracle-license-v1-1'
+        value='true'
+        vtype='select'
+
+    - name: Install Oracle Java 7
+      apt:
+        name=oracle-java7-installer
+        force=yes
+
+    - name: Install a bunch of apps
+      apt:
+        name='{{ item }}'
+        force=yes
+      with_items:
+        - fish
+        - git
+        - atom
+        - sublime-text-installer
+        - curl
+        - xrdp
+        - xfce4
+        - nodejs
+        - mongodb-org
+        - mysql-server
+        - python-mysqldb
+
+    - name: Create a MYSQL DB
+      mysql_db: name=test_db state=present
+
+    - name: NPM Install Strongloop
+      npm:
+        name=strongloop
+        global=yes
+
+    - name: Ensure Mongo daemon is running
+      service:
+        name=mongod
+        state=started
