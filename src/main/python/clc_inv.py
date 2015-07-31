@@ -113,9 +113,27 @@ def _find_groups_for_datacenter(datacenter):
     :param datacenter: The datacenter to use for finding groups
     :return: dictionary of { '<GROUP NAME>': 'hosts': [SERVERS]}
     '''
+    result = {}
     groups = datacenter.Groups().groups
+    result = _find_all_servers_for_group( datacenter, groups )
+    if result:
+        return result
+
+def _find_all_servers_for_group( datacenter, groups):
+    '''
+    recursively walk down all groups retrieving server information.
+    :param datacenter: The datacenter being search.
+    :param groups: The current group level which is being searched.
+    :return: dictionary of {'<GROUP NAME>': 'hosts': [SERVERS]}
+    '''
     result = {}
     for group in groups:
+        sub_groups = group.Subgroups().groups
+        if ( len(sub_groups) > 0 ):
+            sub_result = {}
+            sub_result = _find_all_servers_for_group( datacenter, sub_groups )
+            if sub_result is not None:
+                result.update( sub_result )
 
         if group.type != 'default':
             continue
