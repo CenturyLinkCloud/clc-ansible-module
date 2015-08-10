@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import clc_inv as clc_inv
-import clc as clc_sdk
 from clc import CLCException
 import mock
 from mock import patch
@@ -122,6 +121,36 @@ class TestClcInvFunctions(unittest.TestCase):
             res = clc_inv._build_hostvars_dynamic_groups(input)
             self.assertEqual(res, {'status': 'OK'})
 
+    @patch('clc_inv.clc')
+    def test_add_windows_hostvars(self, mock_clc_sdk):
+        server = mock.MagicMock()
+        server.name = 'testWindowsServer'
+        server.data = {'clc_data': {
+            'os': 'windows_os_image'
+        }}
+        hostvars = {server.name: { 'clc_data': {
+            'os': 'windows_os_image'
+        }}}
 
+        mock_clc_sdk.v2.Server.return_value = server
+        result = clc_inv._add_windows_hostvars(hostvars, server)
+        self.assertEquals(result[server.name]['ansible_ssh_port'], 5986)
+        self.assertEquals(result[server.name]['ansible_connection'], 'winrm')
+
+    @patch('clc_inv.clc')
+    def test_add_windows_hostvars_to_linux(self, mock_clc_sdk):
+        server = mock.MagicMock()
+        server.name = 'testWindowsServer'
+        server.data = {'clc_data': {
+            'os': 'linux_os_image'
+        }}
+        hostvars = {server.name: { 'clc_data': {
+            'os': 'linux_os_image'
+        }}}
+
+        mock_clc_sdk.v2.Server.return_value = server
+        result = clc_inv._add_windows_hostvars(hostvars, server)
+        self.assertNotIn('ansible_ssh_port', result[server.name])
+        self.assertNotIn('ansible_connection', result[server.name])
 if __name__ == '__main__':
     unittest.main()
