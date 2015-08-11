@@ -15,6 +15,7 @@
 
 import clc_inv as clc_inv
 from clc import CLCException
+import clc as clc_sdk
 import mock
 from mock import patch
 from mock import create_autospec
