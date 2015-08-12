@@ -43,7 +43,8 @@ default_task="publish"
 @init
 def initialize( project ):
 	#  define unit test preferences and behavours:
-	project.set_property("run_unit_tests_command", "export PYTHONPATH=src/main/python:$PYTHONPATH:%s;nosetests -w %s --exe -v --with-xunit --xunit-file=target/reports/nosetests_results.xml" % (project.expand_path("$dir_source_main_python"), project.expand_path("$dir_source_unittest_python")))
+	# project.set_property("run_unit_tests_command", "export PYTHONPATH=$PYTHONPATH:%s nosetests -w src/unittest/python" % project.expand_path("$dir_source_main_python"))
+	project.set_property("run_unit_tests_command", "export PYTHONPATH=$PYTHONPATH:%s;PYTHONPATH=src/main/python nosetests -w %s --exe -v --with-xunit --xunit-file=target/reports/nosetests_results.xml" % (project.expand_path("$dir_source_main_python"), project.expand_path("$dir_source_unittest_python")))
 	project.set_property("run_unit_tests_propagate_stdout", True)
 	project.set_property("run_unit_tests_propagate_stderr", True)
 	project.set_property('unittest_module_glob','test_*')

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import clc_inv as clc_inv
+import clc_inv
 from clc import CLCException
 import clc as clc_sdk
 import mock
@@ -122,8 +122,9 @@ class TestClcInvFunctions(unittest.TestCase):
             res = clc_inv._build_hostvars_dynamic_groups(input)
             self.assertEqual(res, {'status': 'OK'})
 
+    @patch('clc_inv._add_windows_hostvars')
     @patch('clc_inv.clc')
-    def test_add_windows_hostvars(self, mock_clc_sdk):
+    def test_add_windows_hostvars(self, mock_clc_sdk, mock_add_windows_hostvars):
         server = mock.MagicMock()
         server.name = 'testWindowsServer'
         server.data = {'clc_data': {
@@ -132,14 +133,16 @@ class TestClcInvFunctions(unittest.TestCase):
         hostvars = {server.name: { 'clc_data': {
             'os': 'windows_os_image'
         }}}
+        mock_add_windows_hostvars.return_value = { 'testWindowsServer': {'ansible_ssh_port': 5986, 'clc_data': {'os': 'windows_os_image'}, 'ansible_connection': 'winrm'} }
 
         mock_clc_sdk.v2.Server.return_value = server
         result = clc_inv._add_windows_hostvars(hostvars, server)
         self.assertEquals(result[server.name]['ansible_ssh_port'], 5986)
         self.assertEquals(result[server.name]['ansible_connection'], 'winrm')
 
+    @patch('clc_inv._add_windows_hostvars')
     @patch('clc_inv.clc')
-    def test_add_windows_hostvars_to_linux(self, mock_clc_sdk):
+    def test_add_windows_hostvars_to_linux(self, mock_clc_sdk, mock_add_windows_hostvars):
         server = mock.MagicMock()
         server.name = 'testLinuxServer'
         server.data = {'clc_data': {
@@ -148,6 +151,7 @@ class TestClcInvFunctions(unittest.TestCase):
         hostvars = {server.name: { 'clc_data': {
             'os': 'linux_os_image'
         }}}
+        mock_add_windows_hostvars.return_value = { 'testLinuxServer': {'clc_data': {'os': 'linux_os_image'}} }
 
         mock_clc_sdk.v2.Server.return_value = server
         result = clc_inv._add_windows_hostvars(hostvars, server)
