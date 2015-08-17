@@ -201,10 +201,25 @@ def _find_hostvars_single_server(server_id):
             'clc_data': server.data,
             'clc_custom_fields': server.data['details']['customFields']
         }
+        result = _add_windows_hostvars(result, server)
     except (CLCException, APIFailedResponse, KeyError):
         return  # Skip any servers that return bad data or an api exception
 
     return result
+
+def _add_windows_hostvars(hostvars, server):
+    '''
+    Add windows specific hostvars if the OS is windows
+    :param server_id: the id of the server being checked
+    :return: a dictionary of windows specific hostvars
+    '''
+    if 'windows' in hostvars[server.name]['clc_data']['os']:
+        windows_hostvars = {
+            'ansible_ssh_port': 5986,
+            'ansible_connection': 'winrm'
+        }
+        hostvars[server.name].update(windows_hostvars)
+    return hostvars
 
 
 def _build_hostvars_dynamic_groups(hostvars):
