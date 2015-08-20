@@ -40,8 +40,9 @@ options:
     required: False
   ports:
     description:
-      - A list of ports to expose.
-    required: True
+      - A list of ports to expose. This is required when state is 'present'
+    required: False
+    default: None
   server_ids:
     description:
       - A list of servers to create public ips on.
@@ -210,7 +211,7 @@ class ClcPublicIp(object):
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
             protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
-            ports=dict(type='list', required=True),
+            ports=dict(type='list'),
             wait=dict(type='bool', default=True),
             state=dict(default='present', choices=['present', 'absent']),
         )
