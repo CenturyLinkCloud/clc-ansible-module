@@ -27,9 +27,10 @@
 
 DOCUMENTATION = '''
 module: clc_aa_policy
-short_descirption: Create or Delete Anti Affinity Policies at CenturyLink Cloud.
+short_description: Create or Delete Anti Affinity Policies at CenturyLink Cloud.
 description:
   - An Ansible module to Create or Delete Anti Affinity Policies at CenturyLink Cloud.
+version_added: "2.0"
 options:
   name:
     description:
@@ -47,11 +48,24 @@ options:
     choices: ['present','absent']
   wait:
     description:
-      - Whether to wait for the provisioning tasks to finish before returning.
+      - Whether to wait for the tasks to finish before returning.
     default: True
     required: False
-    choices: [ True, False]
-    aliases: []
+    choices: [True, False]
+requirements:
+    - python = 2.7
+    - requests >= 2.5.0
+    - clc-sdk
+notes:
+    - To use this module, it is required to set the below environment variables which enables access to the
+      Centurylink Cloud
+          - CLC_V2_API_USERNAME, the account login id for the centurylink cloud
+          - CLC_V2_API_PASSWORD, the account password for the centurylink cloud
+    - Alternatively, the module accepts the API token and account alias. The API token can be generated using the
+      CLC account login and password via the HTTP api call @ https://api.ctl.io/v2/authentication/login
+          - CLC_V2_API_TOKEN, the API token generated from https://api.ctl.io/v2/authentication/login
+          - CLC_ACCT_ALIAS, the account alias associated with the centurylink cloud
+    - Users can set CLC_V2_API_URL to specify an endpoint for pointing to a different CLC environment.
 '''
 
 EXAMPLES = '''
@@ -90,9 +104,51 @@ EXAMPLES = '''
       debug: var=policy
 '''
 
+RETURN = '''
+changed:
+    description: A flag indicating if any change was made or not
+    returned: success
+    type: boolean
+    sample: True
+policy:
+    description: The anti affinity policy information
+    returned: success
+    type: dict
+    sample:
+        {
+           "id":"1a28dd0988984d87b9cd61fa8da15424",
+           "name":"test_aa_policy",
+           "location":"UC1",
+           "links":[
+              {
+                 "rel":"self",
+                 "href":"/v2/antiAffinityPolicies/wfad/1a28dd0988984d87b9cd61fa8da15424",
+                 "verbs":[
+                    "GET",
+                    "DELETE",
+                    "PUT"
+                 ]
+              },
+              {
+                 "rel":"location",
+                 "href":"/v2/datacenters/wfad/UC1",
+                 "id":"uc1",
+                 "name":"UC1 - US West (Santa Clara)"
+              }
+           ]
+        }
+'''
+
 __version__ = '${version}'
 
-import requests
+from distutils.version import LooseVersion
+
+try:
+    import requests
+except ImportError:
+    REQUESTS_FOUND = False
+else:
+    REQUESTS_FOUND = True
 
 #
 #  Requires the clc-python-sdk.
@@ -102,13 +158,13 @@ try:
     import clc as clc_sdk
     from clc import CLCException
 except ImportError:
-    clc_found = False
+    CLC_FOUND = False
     clc_sdk = None
 else:
-    clc_found = True
+    CLC_FOUND = True
 
 
-class ClcAntiAffinityPolicy():
+class ClcAntiAffinityPolicy:
 
     clc = clc_sdk
     module = None
@@ -120,9 +176,15 @@ class ClcAntiAffinityPolicy():
         self.module = module
         self.policy_dict = {}
 
-        if not clc_found:
+        if not CLC_FOUND:
             self.module.fail_json(
                 msg='clc-python-sdk required for this module')
+        if not REQUESTS_FOUND:
+            self.module.fail_json(
+                msg='requests library is required for this module')
+        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
+            self.module.fail_json(
+                msg='requests library  version should be >= 2.5.0')
 
         self._set_user_agent(self.clc)
 
@@ -135,7 +197,6 @@ class ClcAntiAffinityPolicy():
         argument_spec = dict(
             name=dict(required=True),
             location=dict(required=True),
-            alias=dict(default=None),
             wait=dict(default=True),
             state=dict(default='present', choices=['present', 'absent']),
         )
@@ -148,10 +209,6 @@ class ClcAntiAffinityPolicy():
         :return: Returns with either an exit_json or fail_json
         """
         p = self.module.params
-
-        if not clc_found:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
 
         self._set_clc_credentials_from_env()
         self.policy_dict = self._get_policies_for_datacenter(p)
@@ -212,13 +269,18 @@ class ClcAntiAffinityPolicy():
 
     def _create_policy(self, p):
         """
-        Create an Anti Affinnity Policy using the CLC API.
+        Create an Anti Affinity Policy using the CLC API.
         :param p: datacenter to create policy in
         :return: response dictionary from the CLC API.
         """
-        return self.clc.v2.AntiAffinity.Create(
-            name=p['name'],
-            location=p['location'])
+        try:
+            return self.clc.v2.AntiAffinity.Create(
+                name=p['name'],
+                location=p['location'])
+        except CLCException, ex:
+            self.module.fail_json(msg='Failed to create anti affinity policy : {0}. {1}'.format(
+                p['name'], ex.response_text
+            ))
 
     def _delete_policy(self, p):
         """
@@ -226,8 +288,13 @@ class ClcAntiAffinityPolicy():
         :param p: datacenter to delete a policy from
         :return: none
         """
-        policy = self.policy_dict[p['name']]
-        policy.Delete()
+        try:
+            policy = self.policy_dict[p['name']]
+            policy.Delete()
+        except CLCException, ex:
+            self.module.fail_json(msg='Failed to delete anti affinity policy : {0}. {1}'.format(
+                p['name'], ex.response_text
+            ))
 
     def _policy_exists(self, policy_name):
         """
@@ -256,7 +323,7 @@ class ClcAntiAffinityPolicy():
     def _ensure_policy_is_present(self, p):
         """
         Ensures that a policy is present
-        :param p: dictonary of a policy name
+        :param p: dictionary of a policy name
         :return: tuple of if an addition occurred and the name of the policy that was added
         """
         changed = False

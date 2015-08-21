@@ -120,9 +120,44 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         # Under Test
         with mock.patch('__builtin__.__import__', side_effect=mock_import):
             reload(clc_publicip)
-            clc_publicip.ClcPublicIp(self.module)
+            ClcPublicIp(self.module)
         # Assert Expected Behavior
         self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
+        reload(clc_publicip)
+
+
+    def test_requests_invalid_version(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.4.0'
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_publicip)
+            ClcPublicIp(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library  version should be >= 2.5.0')
+        reload(clc_publicip)
+
+    def test_requests_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.7.0'
+                raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_publicip)
+            ClcPublicIp(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library is required for this module')
+        reload(clc_publicip)
 
 
     def test_set_clc_credentials_w_token(self):
@@ -182,6 +217,35 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         under_test = ClcPublicIp(self.module)
         under_test._get_servers_from_clc(['TESTSVR1', 'TESTSVR2'], 'FAILED TO OBTAIN LIST')
         self.module.fail_json.assert_called_once_with(msg='FAILED TO OBTAIN LIST: Server Not Found')
+
+    @patch.object(ClcPublicIp, 'clc')
+    def test_add_publicip_to_server_exception(self, mock_clc_sdk):
+        error = CLCException("Failed")
+        error.response_text = 'Mock failure message'
+        mock_server = mock.MagicMock()
+        mock_server.id = 'TESTSVR1'
+        mock_server.data = {'details': {'ipAddresses': [{'internal': '1.2.3.4'}]}}
+        mock_server.PublicIPs().Add.side_effect = error
+        under_test = ClcPublicIp(self.module)
+        under_test._add_publicip_to_server(mock_server, 'ports')
+        self.module.fail_json.assert_called_once_with(
+            msg='Failed to add public ip to the server : TESTSVR1. Mock failure message')
+
+    @patch.object(ClcPublicIp, 'clc')
+    def test_remove_publicip_from_server_exception(self, mock_clc_sdk):
+        error = CLCException("Failed")
+        error.response_text = 'Mock failure message'
+        mock_server = mock.MagicMock()
+        mock_server.id = 'TESTSVR1'
+        ip = mock.MagicMock()
+        ip.ipAddresses = [{'internal': '1.2.3.4'}]
+        ip.Delete.side_effect = error
+        mock_server.data = {'details': ip}
+        mock_server.PublicIPs().public_ips = [ip]
+        under_test = ClcPublicIp(self.module)
+        under_test._remove_publicip_from_server(mock_server)
+        self.module.fail_json.assert_called_once_with(
+            msg='Failed to remove public ip from the server : TESTSVR1. Mock failure message')
 
     @patch.object(ClcPublicIp, 'ensure_public_ip_present')
     @patch.object(ClcPublicIp, '_set_clc_credentials_from_env')
@@ -296,6 +360,15 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         under_test._wait_for_requests_to_complete(requests)
         self.assertTrue(self.module.fail_json.called)
 
+    def test_wait_for_requests_no_wait(self):
+        mock_request = mock.MagicMock()
+        mock_request.WaitUntilComplete.return_value = True
+        self.module.params = {
+            'wait': False
+        }
+        under_test = ClcPublicIp(self.module)
+        under_test._wait_for_requests_to_complete([mock_request])
+        self.assertFalse(self.module.fail_json.called)
 
 
     @patch.object(clc_publicip, 'AnsibleModule')

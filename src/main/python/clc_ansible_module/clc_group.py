@@ -28,28 +28,53 @@
 
 DOCUMENTATION = '''
 module: clc_group
-short_desciption: Create/delete Server Groups at Centurylink Cloud
+short_description: Create/delete Server Groups at Centurylink Cloud
 description:
   - Create or delete Server Groups at Centurylink Centurylink Cloud
+version_added: "2.0"
 options:
   name:
     description:
       - The name of the Server Group
+    required: True
   description:
     description:
       - A description of the Server Group
+    required: False
   parent:
     description:
-      - The parent group of the server group
+      - The parent group of the server group. If parent is not provided, it creates the group at top level.
+    required: False
   location:
     description:
-      - Datacenter to create the group in
+      - Datacenter to create the group in. If location is not provided, the group gets created in the default datacenter
+        associated with the account
+    required: False
   state:
     description:
       - Whether to create or delete the group
     default: present
     choices: ['present', 'absent']
-
+  wait:
+    description:
+      - Whether to wait for the tasks to finish before returning.
+    choices: [ True, False ]
+    default: True
+    required: False
+requirements:
+    - python = 2.7
+    - requests >= 2.5.0
+    - clc-sdk
+notes:
+    - To use this module, it is required to set the below environment variables which enables access to the
+      Centurylink Cloud
+          - CLC_V2_API_USERNAME, the account login id for the centurylink cloud
+          - CLC_V2_API_PASSWORD, the account password for the centurylink cloud
+    - Alternatively, the module accepts the API token and account alias. The API token can be generated using the
+      CLC account login and password via the HTTP api call @ https://api.ctl.io/v2/authentication/login
+          - CLC_V2_API_TOKEN, the API token generated from https://api.ctl.io/v2/authentication/login
+          - CLC_ACCT_ALIAS, the account alias associated with the centurylink cloud
+    - Users can set CLC_V2_API_URL to specify an endpoint for pointing to a different CLC environment.
 '''
 
 EXAMPLES = '''
@@ -92,9 +117,120 @@ EXAMPLES = '''
 
 '''
 
+RETURN = '''
+changed:
+    description: A flag indicating if any change was made or not
+    returned: success
+    type: boolean
+    sample: True
+group:
+    description: The group information
+    returned: success
+    type: dict
+    sample:
+        {
+           "changeInfo":{
+              "createdBy":"service.wfad",
+              "createdDate":"2015-07-29T18:52:47Z",
+              "modifiedBy":"service.wfad",
+              "modifiedDate":"2015-07-29T18:52:47Z"
+           },
+           "customFields":[
+
+           ],
+           "description":"test group",
+           "groups":[
+
+           ],
+           "id":"bb5f12a3c6044ae4ad0a03e73ae12cd1",
+           "links":[
+              {
+                 "href":"/v2/groups/wfad",
+                 "rel":"createGroup",
+                 "verbs":[
+                    "POST"
+                 ]
+              },
+              {
+                 "href":"/v2/servers/wfad",
+                 "rel":"createServer",
+                 "verbs":[
+                    "POST"
+                 ]
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1",
+                 "rel":"self",
+                 "verbs":[
+                    "GET",
+                    "PATCH",
+                    "DELETE"
+                 ]
+              },
+              {
+                 "href":"/v2/groups/wfad/086ac1dfe0b6411989e8d1b77c4065f0",
+                 "id":"086ac1dfe0b6411989e8d1b77c4065f0",
+                 "rel":"parentGroup"
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/defaults",
+                 "rel":"defaults",
+                 "verbs":[
+                    "GET",
+                    "POST"
+                 ]
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/billing",
+                 "rel":"billing"
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/archive",
+                 "rel":"archiveGroupAction"
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/statistics",
+                 "rel":"statistics"
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/upcomingScheduledActivities",
+                 "rel":"upcomingScheduledActivities"
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/horizontalAutoscalePolicy",
+                 "rel":"horizontalAutoscalePolicyMapping",
+                 "verbs":[
+                    "GET",
+                    "PUT",
+                    "DELETE"
+                 ]
+              },
+              {
+                 "href":"/v2/groups/wfad/bb5f12a3c6044ae4ad0a03e73ae12cd1/scheduledActivities",
+                 "rel":"scheduledActivities",
+                 "verbs":[
+                    "GET",
+                    "POST"
+                 ]
+              }
+           ],
+           "locationId":"UC1",
+           "name":"test group",
+           "status":"active",
+           "type":"default"
+        }
+'''
+
 __version__ = '${version}'
 
-import requests
+from distutils.version import LooseVersion
+
+try:
+    import requests
+except ImportError:
+    REQUESTS_FOUND = False
+else:
+    REQUESTS_FOUND = True
 
 #
 #  Requires the clc-python-sdk.
@@ -126,6 +262,12 @@ class ClcGroup(object):
         if not CLC_FOUND:
             self.module.fail_json(
                 msg='clc-python-sdk required for this module')
+        if not REQUESTS_FOUND:
+            self.module.fail_json(
+                msg='requests library is required for this module')
+        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
+            self.module.fail_json(
+                msg='requests library  version should be >= 2.5.0')
 
         self._set_user_agent(self.clc)
 
@@ -145,23 +287,18 @@ class ClcGroup(object):
             datacenter=location)
 
         if state == "absent":
-            changed, group, response = self._ensure_group_is_absent(
+            changed, group, requests = self._ensure_group_is_absent(
                 group_name=group_name, parent_name=parent_name)
-
+            if requests:
+                self._wait_for_requests_to_complete(requests)
         else:
-            changed, group, response = self._ensure_group_is_present(
+            changed, group = self._ensure_group_is_present(
                 group_name=group_name, parent_name=parent_name, group_description=group_description)
-
         try:
             group = group.data
         except AttributeError:
             group = group_name
-
         self.module.exit_json(changed=changed, group=group)
-
-    #
-    #  Functions to define the Ansible module and its arguments
-    #
 
     @staticmethod
     def _define_module_argument_spec():
@@ -174,16 +311,10 @@ class ClcGroup(object):
             description=dict(default=None),
             parent=dict(default=None),
             location=dict(default=None),
-            alias=dict(default=None),
-            custom_fields=dict(type='list', default=[]),
-            server_ids=dict(type='list', default=[]),
-            state=dict(default='present', choices=['present', 'absent']))
+            state=dict(default='present', choices=['present', 'absent']),
+            wait=dict(type='bool', default=True))
 
         return argument_spec
-
-    #
-    #   Module Behavior Functions
-    #
 
     def _set_clc_credentials_from_env(self):
         """
@@ -227,9 +358,8 @@ class ClcGroup(object):
         if self._group_exists(group_name=group_name, parent_name=parent_name):
             if not self.module.check_mode:
                 group.append(group_name)
-                for g in group:
-                    result = self._delete_group(group_name)
-                    results.append(result)
+                result = self._delete_group(group_name)
+                results.append(result)
             changed = True
         return changed, group, results
 
@@ -239,8 +369,14 @@ class ClcGroup(object):
         :param group_name: string - the server group to delete
         :return: none
         """
+        response = None
         group, parent = self.group_dict.get(group_name)
-        response = group.Delete()
+        try:
+            response = group.Delete()
+        except CLCException, ex:
+            self.module.fail_json(msg='Failed to delete group :{0}. {1}'.format(
+                group_name, ex.response_text
+            ))
         return response
 
     def _ensure_group_is_present(
@@ -261,8 +397,6 @@ class ClcGroup(object):
         parent = parent_name if parent_name is not None else self.root_group.name
         description = group_description
         changed = False
-        results = []
-        groups = []
         group = group_name
 
         parent_exists = self._group_exists(group_name=parent, parent_name=None)
@@ -275,13 +409,10 @@ class ClcGroup(object):
             changed = False
         elif parent_exists and not child_exists:
             if not self.module.check_mode:
-                groups.append(group_name)
-                for g in groups:
-                    group = self._create_group(
-                        group=group,
-                        parent=parent,
-                        description=description)
-                    results.append(group)
+                group = self._create_group(
+                    group=group,
+                    parent=parent,
+                    description=description)
             changed = True
         else:
             self.module.fail_json(
@@ -289,7 +420,7 @@ class ClcGroup(object):
                 parent +
                 " does not exist")
 
-        return changed, group, results
+        return changed, group
 
     def _create_group(self, group, parent, description):
         """
@@ -299,13 +430,14 @@ class ClcGroup(object):
         :param description: string - a text description of the group
         :return: clc_sdk.Group - the created group
         """
-
+        response = None
         (parent, grandparent) = self.group_dict[parent]
-        return parent.Create(name=group, description=description)
-
-    #
-    #   Utility Functions
-    #
+        try:
+            response = parent.Create(name=group, description=description)
+        except CLCException, ex:
+            self.module.fail_json(msg='Failed to create group :{0}. {1}'.format(
+                group, ex.response_text))
+        return response
 
     def _group_exists(self, group_name, parent_name):
         """
@@ -321,11 +453,10 @@ class ClcGroup(object):
                 result = True
         return result
 
-    def _get_group_tree_for_datacenter(self, datacenter=None, alias=None):
+    def _get_group_tree_for_datacenter(self, datacenter=None):
         """
         Walk the tree of groups for a datacenter
         :param datacenter: string - the datacenter to walk (ex: 'UC1')
-        :param alias: string - the account alias to search. Defaults to the current user's account
         :return: a dictionary of groups and parents
         """
         self.root_group = self.clc.v2.Datacenter(
@@ -350,6 +481,21 @@ class ClcGroup(object):
 
                 result.update(self._walk_groups_recursive(child_group, group))
         return result
+
+    def _wait_for_requests_to_complete(self, requests_lst):
+        """
+        Waits until the CLC requests are complete if the wait argument is True
+        :param requests_lst: The list of CLC request objects
+        :return: none
+        """
+        if not self.module.params['wait']:
+            return
+        for request in requests_lst:
+            request.WaitUntilComplete()
+            for request_details in request.requests:
+                if request_details.Status() != 'succeeded':
+                    self.module.fail_json(
+                        msg='Unable to process group request')
 
     @staticmethod
     def _set_user_agent(clc):
