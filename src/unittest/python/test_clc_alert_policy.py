@@ -15,17 +15,15 @@
 
 import clc_ansible_module.clc_alert_policy as clc_alert_policy
 from clc_ansible_module.clc_alert_policy import ClcAlertPolicy
-import clc as clc_sdk
+from clc import APIFailedResponse
 import mock
-from mock import patch, create_autospec
-import os
+from mock import patch
 import unittest
 
 # This is a pretty brute-force attack at unit testing.
 # This is my first stab, so anyone reading this who is more Python-inclined
 # is both welcome and encouraged to make it better.
 
-        # self.clc.v2.SetCredentials.assert_called_once_with(api_username='hansolo', api_passwd='falcon')
 def FakeAnsibleModule():
     module = mock.MagicMock()
     module.check_mode = False
@@ -39,8 +37,6 @@ class TestClcAlertPolicy(unittest.TestCase):
         self.module = FakeAnsibleModule()
         self.policy = ClcAlertPolicy(self.module)
         self.policy.module.exit_json = mock.MagicMock()
-
-
 
     def notestNoCreds(self):
         self.policy.module.fail_json = mock.MagicMock(side_effect=Exception('nocreds'))
@@ -97,6 +93,54 @@ class TestClcAlertPolicy(unittest.TestCase):
             under_test = ClcAlertPolicy(self.module)
             under_test._set_clc_credentials_from_env()
         self.assertEqual(self.module.fail_json.called, True)
+
+    def test_clc_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'clc': raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_alert_policy)
+            ClcAlertPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
+        reload(clc_alert_policy)
+
+    def test_requests_invalid_version(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.4.0'
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_alert_policy)
+            ClcAlertPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library  version should be >= 2.5.0')
+        reload(clc_alert_policy)
+
+    def test_requests_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.7.0'
+                raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_alert_policy)
+            ClcAlertPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library is required for this module')
+        reload(clc_alert_policy)
 
     @patch.object(clc_alert_policy, 'AnsibleModule')
     @patch.object(clc_alert_policy, 'ClcAlertPolicy')
@@ -423,7 +467,7 @@ class TestClcAlertPolicy(unittest.TestCase):
         under_test.policy_dict = {'12345': {'id': '12345', 'name': 'test1'},
                                   '23456': {'id': '23456', 'name': 'test1'}}
         policy_id = under_test._get_alert_policy_id(self.module, 'test1')
-        self.module.fail_json.assert_called_once_with(msg='mutiple alert policies were found with policy name : test1')
+        self.module.fail_json.assert_called_once_with(msg='multiple alert policies were found with policy name : test1')
 
     @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
     def test_alert_policy_exists_true(self, mock_set_clc_creds):
@@ -436,7 +480,7 @@ class TestClcAlertPolicy(unittest.TestCase):
         under_test = ClcAlertPolicy(self.module)
         under_test.policy_dict = {'12345': {'id': '12345', 'name': 'test1'},
                                   '23456': {'id': '23456', 'name': 'test2'}}
-        res = under_test._alert_policy_exists('testalias', 'test1')
+        res = under_test._alert_policy_exists('test1')
         self.assertEqual(res, {'id': '12345', 'name': 'test1'})
 
     @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
@@ -450,7 +494,7 @@ class TestClcAlertPolicy(unittest.TestCase):
         under_test = ClcAlertPolicy(self.module)
         under_test.policy_dict = {'12345': {'id': '12345', 'name': 'test1'},
                                   '23456': {'id': '23456', 'name': 'test2'}}
-        res = under_test._alert_policy_exists('testalias', 'notfound')
+        res = under_test._alert_policy_exists('notfound')
         self.assertEqual(res, False)
 
     @patch.object(clc_alert_policy, 'clc_sdk')
@@ -479,9 +523,11 @@ class TestClcAlertPolicy(unittest.TestCase):
         self.module.check_mode = False
         under_test = ClcAlertPolicy(self.module)
         under_test.clc = mock_clc_sdk
-        error = OSError('Failed')
+        error = APIFailedResponse('Failed')
+        error.response_text = 'Sorry'
         mock_clc_sdk.v2.API.Call.side_effect = error
-        self.assertRaises(OSError, under_test._delete_alert_policy, 'testalias', '12345')
+        under_test._delete_alert_policy('testalias', '12345')
+        self.module.fail_json.assert_called_once_with(msg='Unable to delete alert policy id "12345". Sorry')
 
     @patch.object(clc_alert_policy, 'clc_sdk')
     @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
@@ -519,9 +565,12 @@ class TestClcAlertPolicy(unittest.TestCase):
         self.module.check_mode = False
         under_test = ClcAlertPolicy(self.module)
         under_test.clc = mock_clc_sdk
-        error = OSError('Failed')
+        error = APIFailedResponse('Failed')
+        error.response_text = 'Sorry'
         mock_clc_sdk.v2.API.Call.side_effect = error
-        self.assertRaises(OSError, under_test._update_alert_policy, '12345')
+        under_test._update_alert_policy('12345')
+        self.module.fail_json.assert_called_once_with(msg='Unable to update alert policy "testname". Sorry')
+
 
     @patch.object(clc_alert_policy, 'clc_sdk')
     @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
@@ -559,9 +608,12 @@ class TestClcAlertPolicy(unittest.TestCase):
         self.module.check_mode = False
         under_test = ClcAlertPolicy(self.module)
         under_test.clc = mock_clc_sdk
-        error = OSError('Failed')
+        error = APIFailedResponse('Failed')
+        error.response_text = 'Sorry'
         mock_clc_sdk.v2.API.Call.side_effect = error
-        self.assertRaises(OSError, under_test._create_alert_policy)
+        under_test._create_alert_policy()
+        self.module.fail_json.assert_called_once_with(msg='Unable to create alert policy "testname". Sorry')
+
 
     @patch.object(clc_alert_policy, 'clc_sdk')
     @patch.object(ClcAlertPolicy, '_set_clc_credentials_from_env')
@@ -601,15 +653,13 @@ class TestClcAlertPolicy(unittest.TestCase):
         self.assertEqual(args, {'argument_spec':
                                     {'name': {'default': None},
                                      'metric': {'default': None,
-                                                'required': False,
                                                 'choices': ['cpu', 'memory', 'disk']},
                                      'alert_recipients': {'default': None,
-                                                          'required': False,
                                                           'type': 'list'},
                                      'alias': {'default': None, 'required': True},
                                      'state': {'default': 'present', 'choices': ['present', 'absent']},
-                                     'threshold': {'default': None, 'required': False, 'type': 'int'},
-                                     'duration': {'default': None, 'required': False, 'type': 'str'},
+                                     'threshold': {'default': None, 'type': 'int'},
+                                     'duration': {'default': None, 'type': 'str'},
                                      'id': {'default': None}}, 'mutually_exclusive': [['name', 'id']]})
 
 

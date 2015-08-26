@@ -71,20 +71,6 @@ class TestClcBluePrintPackageFunctions(unittest.TestCase):
         package2.package_params = {}
         return [mock_server1, mock_server2]
 
-    def test_clc_module_not_found(self):
-        # Setup Mock Import Function
-        import __builtin__ as builtins
-        real_import = builtins.__import__
-        def mock_import(name, *args):
-            if name == 'clc': raise ImportError
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_blueprint_package)
-            clc_blueprint_package.ClcBlueprintPackage(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
-
     @patch.object(clc_blueprint_package, 'clc_sdk')
     def test_set_user_agent(self, mock_clc_sdk):
         clc_blueprint_package.__version__ = "1"
@@ -123,6 +109,53 @@ class TestClcBluePrintPackageFunctions(unittest.TestCase):
             under_test._set_clc_credentials_from_env()
             self.assertEqual(under_test.clc.defaults.ENDPOINT_URL_V2, 'dummyapiurl')
 
+    def test_clc_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'clc': raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_blueprint_package)
+            ClcBlueprintPackage(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
+        reload(clc_blueprint_package)
+
+    def test_requests_invalid_version(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.4.0'
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_blueprint_package)
+            ClcBlueprintPackage(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library  version should be >= 2.5.0')
+        reload(clc_blueprint_package)
+
+    def test_requests_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.7.0'
+                raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_blueprint_package)
+            ClcBlueprintPackage(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library is required for this module')
+        reload(clc_blueprint_package)
 
     def test_define_argument_spec(self):
         result = ClcBlueprintPackage.define_argument_spec()
@@ -219,6 +252,17 @@ class TestClcBluePrintPackageFunctions(unittest.TestCase):
         under_test = ClcBlueprintPackage(self.module)
         under_test._wait_for_requests_to_complete(requests)
         self.assertTrue(self.module.fail_json.called)
+
+    def test_clc_install_package_exception(self):
+        self.module.check_mode = False
+        error = CLCException()
+        error.message = 'Mock failure message'
+        mock_server = mock.MagicMock()
+        mock_server.id = 'server1'
+        mock_server.ExecutePackage.side_effect = error
+        under_test = ClcBlueprintPackage(self.module)
+        under_test.clc_install_package(mock_server, 'package_id', {})
+        self.module.fail_json.assert_called_once_with(msg='Failed to install package : package_id to server server1. Mock failure message')
 
     @patch.object(clc_blueprint_package, 'AnsibleModule')
     @patch.object(clc_blueprint_package, 'ClcBlueprintPackage')

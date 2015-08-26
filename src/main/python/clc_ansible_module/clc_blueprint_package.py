@@ -28,28 +28,50 @@
 
 DOCUMENTATION = '''
 module: clc_blueprint_package
-short_desciption: deploys a blue print package on a set of servers in CenturyLink Cloud.
+short_description: deploys a blue print package on a set of servers in CenturyLink Cloud.
 description:
   - An Ansible module to deploy blue print package on a set of servers in CenturyLink Cloud.
+version_added: "2.0"
 options:
   server_ids:
     description:
       - A list of server Ids to deploy the blue print package.
-    default: []
     required: True
-    aliases: []
   package_id:
     description:
       - The package id of the blue print.
-    default: None
     required: True
-    aliases: []
   package_params:
     description:
       - The dictionary of arguments required to deploy the blue print.
     default: {}
     required: False
-    aliases: []
+  state:
+    description:
+      - Whether to install or un-install the package. Currently it supports only "present" for install action.
+    required: False
+    default: present
+    choices: ['present']
+  wait:
+    description:
+      - Whether to wait for the tasks to finish before returning.
+    choices: [ True, False ]
+    default: True
+    required: False
+requirements:
+    - python = 2.7
+    - requests >= 2.5.0
+    - clc-sdk
+notes:
+    - To use this module, it is required to set the below environment variables which enables access to the
+      Centurylink Cloud
+          - CLC_V2_API_USERNAME, the account login id for the centurylink cloud
+          - CLC_V2_API_PASSWORD, the account password for the centurylink cloud
+    - Alternatively, the module accepts the API token and account alias. The API token can be generated using the
+      CLC account login and password via the HTTP api call @ https://api.ctl.io/v2/authentication/login
+          - CLC_V2_API_TOKEN, the API token generated from https://api.ctl.io/v2/authentication/login
+          - CLC_ACCT_ALIAS, the account alias associated with the centurylink cloud
+    - Users can set CLC_V2_API_URL to specify an endpoint for pointing to a different CLC environment.
 '''
 
 EXAMPLES = '''
@@ -58,15 +80,39 @@ EXAMPLES = '''
 - name: Deploy package
       clc_blueprint_package:
         server_ids:
-            - UC1WFSDANS01
-            - UC1WFSDANS02
+            - UC1TEST-SERVER1
+            - UC1TEST-SERVER2
         package_id: 77abb844-579d-478d-3955-c69ab4a7ba1a
         package_params: {}
 '''
 
+RETURN = '''
+changed:
+    description: A flag indicating if any change was made or not
+    returned: success
+    type: boolean
+    sample: True
+server_ids:
+    description: The list of server ids that are changed
+    returned: success
+    type: list
+    sample:
+        [
+            "UC1TEST-SERVER1",
+            "UC1TEST-SERVER2"
+        ]
+'''
+
 __version__ = '${version}'
 
-import requests
+from distutils.version import LooseVersion
+
+try:
+    import requests
+except ImportError:
+    REQUESTS_FOUND = False
+else:
+    REQUESTS_FOUND = True
 
 #
 #  Requires the clc-python-sdk.
@@ -82,7 +128,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcBlueprintPackage():
+class ClcBlueprintPackage:
 
     clc = clc_sdk
     module = None
@@ -95,6 +141,13 @@ class ClcBlueprintPackage():
         if not CLC_FOUND:
             self.module.fail_json(
                 msg='clc-python-sdk required for this module')
+        if not REQUESTS_FOUND:
+            self.module.fail_json(
+                msg='requests library is required for this module')
+        if requests.__version__ and LooseVersion(
+                requests.__version__) < LooseVersion('2.5.0'):
+            self.module.fail_json(
+                msg='requests library  version should be >= 2.5.0')
 
         self._set_user_agent(self.clc)
 
@@ -104,28 +157,23 @@ class ClcBlueprintPackage():
         :return: Returns with either an exit_json or fail_json
         """
         p = self.module.params
-
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-
+        changed = False
+        changed_server_ids = []
         self._set_clc_credentials_from_env()
-
         server_ids = p['server_ids']
         package_id = p['package_id']
         package_params = p['package_params']
         state = p['state']
         if state == 'present':
-            changed, changed_server_ids, requests = self.ensure_package_installed(
+            changed, changed_server_ids, request_list = self.ensure_package_installed(
                 server_ids, package_id, package_params)
-            if not self.module.check_mode:
-                self._wait_for_requests_to_complete(requests)
+            self._wait_for_requests_to_complete(request_list)
         self.module.exit_json(changed=changed, server_ids=changed_server_ids)
 
     @staticmethod
     def define_argument_spec():
         """
-        This function defnines the dictionary object required for
+        This function defines the dictionary object required for
         package module
         :return: the package dictionary object
         """
@@ -142,56 +190,56 @@ class ClcBlueprintPackage():
         """
         Ensure the package is installed in the given list of servers
         :param server_ids: the server list where the package needs to be installed
-        :param package_id: the package id
+        :param package_id: the blueprint package id
         :param package_params: the package arguments
-        :return: (changed, server_ids)
+        :return: (changed, server_ids, request_list)
                     changed: A flag indicating if a change was made
-                    server_ids: The list of servers modfied
+                    server_ids: The list of servers modified
+                    request_list: The list of request objects from clc-sdk
         """
         changed = False
-        requests = []
+        request_list = []
         servers = self._get_servers_from_clc(
             server_ids,
             'Failed to get servers from CLC')
-        try:
-            for server in servers:
+        for server in servers:
+            if not self.module.check_mode:
                 request = self.clc_install_package(
                     server,
                     package_id,
                     package_params)
-                requests.append(request)
-                changed = True
-        except CLCException as ex:
-            self.module.fail_json(
-                msg='Failed while installing package : %s with Error : %s' %
-                (package_id, ex))
-        return changed, server_ids, requests
+                request_list.append(request)
+            changed = True
+        return changed, server_ids, request_list
 
     def clc_install_package(self, server, package_id, package_params):
         """
-        Read all servers from CLC and executes each package from package_list
-        :param server_list: The target list of servers where the packages needs to be installed
-        :param package_list: The list of packages to be installed
-        :return: (changed, server_ids)
-                    changed: A flag indicating if a change was made
-                    server_ids: The list of servers modfied
+        Install the package to a given clc server
+        :param server: The server object where the package needs to be installed
+        :param package_id: The blue print package id
+        :param package_params: the required argument dict for the package installation
+        :return: The result object from the CLC API call
         """
         result = None
-        if not self.module.check_mode:
+        try:
             result = server.ExecutePackage(
                 package_id=package_id,
                 parameters=package_params)
+        except CLCException as ex:
+            self.module.fail_json(msg='Failed to install package : {0} to server {1}. {2}'.format(
+                package_id, server.id, ex.message
+            ))
         return result
 
-    def _wait_for_requests_to_complete(self, requests_lst):
+    def _wait_for_requests_to_complete(self, request_lst):
         """
         Waits until the CLC requests are complete if the wait argument is True
-        :param requests_lst: The list of CLC request objects
+        :param request_lst: The list of CLC request objects
         :return: none
         """
         if not self.module.params['wait']:
             return
-        for request in requests_lst:
+        for request in request_lst:
             request.WaitUntilComplete()
             for request_details in request.requests:
                 if request_details.Status() != 'succeeded':
@@ -201,7 +249,8 @@ class ClcBlueprintPackage():
     def _get_servers_from_clc(self, server_list, message):
         """
         Internal function to fetch list of CLC server objects from a list of server ids
-        :param the list server ids
+        :param server_list: the list of server ids
+        :param message: the error message to raise if there is any error
         :return the list of CLC server objects
         """
         try:

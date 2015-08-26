@@ -28,7 +28,7 @@ use_plugin("exec")
 
 # define project level attributes:
 name = 'clc-ansible-module'
-version = '1.0.4'
+version = '1.0.5'
 summary = "Centurylink Cloud Ansible Modules"
 description = "Ansible extension modules which allow users to interact with Centurylink Cloud to define and manage cloud components."
 authors = [Author ("CenturyLink Cloud", "WFAAS-LLFT@centurylink.com")]
@@ -40,11 +40,11 @@ keywords = "centurylink cloud clc ansible modules"
 # 	clean	compile_sources	init	package	prepare
 #	publish	run_integration_tests	run_unit_tests	verify
 default_task="publish"
-
 @init
 def initialize( project ):
 	#  define unit test preferences and behavours:
-	project.set_property("run_unit_tests_command", "export PYTHONPATH=$PYTHONPATH:%s;nosetests -w %s --exe -v --with-xunit --xunit-file=target/reports/nosetests_results.xml" % (project.expand_path("$dir_source_main_python"), project.expand_path("$dir_source_unittest_python")))
+	# project.set_property("run_unit_tests_command", "export PYTHONPATH=$PYTHONPATH:%s nosetests -w src/unittest/python" % project.expand_path("$dir_source_main_python"))
+	project.set_property("run_unit_tests_command", "export PYTHONPATH=$PYTHONPATH:%s;PYTHONPATH=src/main/python nosetests -w %s --exe -v --with-xunit --xunit-file=target/reports/nosetests_results.xml" % (project.expand_path("$dir_source_main_python"), project.expand_path("$dir_source_unittest_python")))
 	project.set_property("run_unit_tests_propagate_stdout", True)
 	project.set_property("run_unit_tests_propagate_stderr", True)
 	project.set_property('unittest_module_glob','test_*')
@@ -55,7 +55,7 @@ def initialize( project ):
 	project.get_property('filter_resources_glob').append('**/clc_ansible_module/*.py')
 	# ----------------
 	# install clc-sdk during installation
-	project.depends_on("clc-sdk", "==2.25")
+	project.depends_on("clc-sdk", "==2.29")
 	# ----------------
 	# execute some installation scripts
 	project.set_property('dir_source_main_scripts', 'src/main/python')

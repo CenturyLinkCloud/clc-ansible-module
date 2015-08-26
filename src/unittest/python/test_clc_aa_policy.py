@@ -16,6 +16,7 @@
 import clc_ansible_module.clc_aa_policy as clc_aa_policy
 from clc_ansible_module.clc_aa_policy import ClcAntiAffinityPolicy
 import clc as clc_sdk
+from clc import CLCException
 import mock
 from mock import patch, create_autospec
 import os
@@ -39,6 +40,7 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
         self.module = FakeAnsibleModule()
         self.policy = ClcAntiAffinityPolicy(self.module)
         self.policy.module.exit_json = mock.MagicMock()
+        self.policy_dict = {}
 
 
 
@@ -73,7 +75,6 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
         self.assertEqual(args, dict(
             name=dict(required=True),
             location=dict(required=True),
-            alias=dict(default=None),
             state=dict(default='present', choices=['present', 'absent']),
             wait=dict(default=True)
         ))
@@ -141,6 +142,7 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
     def test_set_clc_credentials_from_env(self, mock_clc_sdk):
         with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',
                                        'CLC_ACCT_ALIAS': 'TEST'}):
+            self.module.fail_json.called = False
             under_test = ClcAntiAffinityPolicy(self.module)
             under_test._set_clc_credentials_from_env()
         self.assertEqual(under_test.clc._LOGIN_TOKEN_V2, 'dummyToken')
@@ -167,6 +169,54 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
             under_test._set_clc_credentials_from_env()
         self.assertEqual(self.module.fail_json.called, True)
 
+    def test_clc_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'clc': raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_aa_policy)
+            clc_aa_policy.ClcAntiAffinityPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
+        reload(clc_aa_policy)
+
+    def test_requests_invalid_version(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.4.0'
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_aa_policy)
+            clc_aa_policy.ClcAntiAffinityPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library  version should be >= 2.5.0')
+        reload(clc_aa_policy)
+
+    def test_requests_module_not_found(self):
+        # Setup Mock Import Function
+        import __builtin__ as builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args):
+            if name == 'requests':
+                args[0]['requests'].__version__ = '2.7.0'
+                raise ImportError
+            return real_import(name, *args)
+        # Under Test
+        with mock.patch('__builtin__.__import__', side_effect=mock_import):
+            reload(clc_aa_policy)
+            clc_aa_policy.ClcAntiAffinityPolicy(self.module)
+        # Assert Expected Behavior
+        self.module.fail_json.assert_called_with(msg='requests library is required for this module')
+        reload(clc_aa_policy)
+
     @patch.object(clc_aa_policy, 'AnsibleModule')
     @patch.object(clc_aa_policy, 'ClcAntiAffinityPolicy')
     def test_main(self, mock_ClcAAPolicy, mock_AnsibleModule):
@@ -179,6 +229,37 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
 
         mock_ClcAAPolicy.assert_called_once_with(mock_AnsibleModule_instance)
         mock_ClcAAPolicy_instance.process_request.assert_called_once()
+
+    @patch.object(clc_aa_policy, 'clc_sdk')
+    def test_create_aa_policy_error(self, mock_clc_sdk):
+        under_test = ClcAntiAffinityPolicy(self.module)
+        policy = {
+            'name': 'dummyname',
+            'location': 'dummylocation'
+        }
+        error = CLCException('Failed')
+        error.response_text = 'I am failed'
+        mock_clc_sdk.v2.AntiAffinity.Create.side_effect = error
+        under_test.clc = mock_clc_sdk
+        ret = under_test._create_policy(policy)
+        self.module.fail_json.assert_called_with(msg='Failed to create anti affinity policy : dummyname. I am failed')
+
+    @patch.object(clc_aa_policy, 'clc_sdk')
+    def test_delete_aa_policy_error(self, mock_clc_sdk):
+        under_test = ClcAntiAffinityPolicy(self.module)
+        error = CLCException('Failed')
+        error.response_text = 'I am failed'
+        policy_mock = mock.MagicMock()
+        policy_mock.Delete.side_effect = error
+        under_test.policy_dict['dummyname'] = policy_mock
+        under_test.clc = mock_clc_sdk
+        policy = {
+            'name': 'dummyname',
+            'location': 'dummylocation'
+        }
+        ret = under_test._delete_policy(policy)
+        self.module.fail_json.assert_called_with(msg='Failed to delete anti affinity policy : dummyname. I am failed')
+
 
 
 if __name__ == '__main__':

@@ -9,13 +9,13 @@
 # by the Workflow as a Service Team
 #
 # Copyright 2015 CenturyLink
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,37 +27,47 @@
 #
 
 DOCUMENTATION = '''
-module: clc_server
-short_desciption: Create, Delete and Restore server snapshots in CenturyLink Cloud.
+module: clc_server_snapshot
+short_description: Create, Delete and Restore server snapshots in CenturyLink Cloud.
 description:
   - An Ansible module to Create, Delete and Restore server snapshots in CenturyLink Cloud.
+version_added: "2.0"
 options:
   server_ids:
     description:
-      - A list of server Ids to snapshot.
-    default: []
+      - The list of CLC server Ids.
     required: True
-    aliases: []
   expiration_days:
     description:
       - The number of days to keep the server snapshot before it expires.
     default: 7
     required: False
-    aliases: []
   state:
     description:
       - The state to insure that the provided resources are in.
     default: 'present'
     required: False
     choices: ['present', 'absent', 'restore']
-    aliases: []
   wait:
     description:
       - Whether to wait for the provisioning tasks to finish before returning.
     default: True
     required: False
-    choices: [ True, False]
-    aliases: []
+    choices: [True, False]
+requirements:
+    - python = 2.7
+    - requests >= 2.5.0
+    - clc-sdk
+notes:
+    - To use this module, it is required to set the below environment variables which enables access to the
+      Centurylink Cloud
+          - CLC_V2_API_USERNAME, the account login id for the centurylink cloud
+          - CLC_V2_API_PASSWORD, the account password for the centurylink cloud
+    - Alternatively, the module accepts the API token and account alias. The API token can be generated using the
+      CLC account login and password via the HTTP api call @ https://api.ctl.io/v2/authentication/login
+          - CLC_V2_API_TOKEN, the API token generated from https://api.ctl.io/v2/authentication/login
+          - CLC_ACCT_ALIAS, the account alias associated with the centurylink cloud
+    - Users can set CLC_V2_API_URL to specify an endpoint for pointing to a different CLC environment.
 '''
 
 EXAMPLES = '''
@@ -66,8 +76,8 @@ EXAMPLES = '''
 - name: Create server snapshot
   clc_server_snapshot:
     server_ids:
-        - UC1WFSDTEST01
-        - UC1WFSDTEST02
+        - UC1TEST-SVR01
+        - UC1TEST-SVR02
     expiration_days: 10
     wait: True
     state: present
@@ -75,23 +85,47 @@ EXAMPLES = '''
 - name: Restore server snapshot
   clc_server_snapshot:
     server_ids:
-        - UC1WFSDTEST01
-        - UC1WFSDTEST02
+        - UC1TEST-SVR01
+        - UC1TEST-SVR02
     wait: True
     state: restore
 
 - name: Delete server snapshot
   clc_server_snapshot:
     server_ids:
-        - UC1WFSDTEST01
-        - UC1WFSDTEST02
+        - UC1TEST-SVR01
+        - UC1TEST-SVR02
     wait: True
     state: absent
 '''
 
+RETURN = '''
+changed:
+    description: A flag indicating if any change was made or not
+    returned: success
+    type: boolean
+    sample: True
+server_ids:
+    description: The list of server ids that are changed
+    returned: success
+    type: list
+    sample:
+        [
+            "UC1TEST-SVR01",
+            "UC1TEST-SVR02"
+        ]
+'''
+
 __version__ = '${version}'
 
-import requests
+from distutils.version import LooseVersion
+
+try:
+    import requests
+except ImportError:
+    REQUESTS_FOUND = False
+else:
+    REQUESTS_FOUND = True
 
 #
 #  Requires the clc-python-sdk.
@@ -101,13 +135,13 @@ try:
     import clc as clc_sdk
     from clc import CLCException
 except ImportError:
-    clc_found = False
+    CLC_FOUND = False
     clc_sdk = None
 else:
     CLC_FOUND = True
 
 
-class ClcSnapshot():
+class ClcSnapshot:
 
     clc = clc_sdk
     module = None
@@ -117,9 +151,17 @@ class ClcSnapshot():
         Construct module
         """
         self.module = module
+
         if not CLC_FOUND:
             self.module.fail_json(
                 msg='clc-python-sdk required for this module')
+        if not REQUESTS_FOUND:
+            self.module.fail_json(
+                msg='requests library is required for this module')
+        if requests.__version__ and LooseVersion(
+                requests.__version__) < LooseVersion('2.5.0'):
+            self.module.fail_json(
+                msg='requests library  version should be >= 2.5.0')
 
         self._set_user_agent(self.clc)
 
@@ -129,32 +171,26 @@ class ClcSnapshot():
         :return: Returns with either an exit_json or fail_json
         """
         p = self.module.params
-
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-
         server_ids = p['server_ids']
         expiration_days = p['expiration_days']
         state = p['state']
-
-        if not server_ids:
-            return self.module.fail_json(msg='List of Server ids are required')
+        request_list = []
+        changed = False
+        changed_servers = []
 
         self._set_clc_credentials_from_env()
         if state == 'present':
-            changed, requests, changed_servers = self.ensure_server_snapshot_present(server_ids=server_ids,
-                                                                                     expiration_days=expiration_days)
+            changed, request_list, changed_servers = self.ensure_server_snapshot_present(
+                server_ids=server_ids,
+                expiration_days=expiration_days)
         elif state == 'absent':
-            changed, requests, changed_servers = self.ensure_server_snapshot_absent(
+            changed, request_list, changed_servers = self.ensure_server_snapshot_absent(
                 server_ids=server_ids)
         elif state == 'restore':
-            changed, requests, changed_servers = self.ensure_server_snapshot_restore(
+            changed, request_list, changed_servers = self.ensure_server_snapshot_restore(
                 server_ids=server_ids)
-        else:
-            return self.module.fail_json(msg="Unknown State: " + state)
 
-        self._wait_for_requests_to_complete(requests)
+        self._wait_for_requests_to_complete(request_list)
         return self.module.exit_json(
             changed=changed,
             server_ids=changed_servers)
@@ -164,12 +200,12 @@ class ClcSnapshot():
         Ensures the given set of server_ids have the snapshots created
         :param server_ids: The list of server_ids to create the snapshot
         :param expiration_days: The number of days to keep the snapshot
-        :return: (changed, result, changed_servers)
+        :return: (changed, request_list, changed_servers)
                  changed: A flag indicating whether any change was made
-                 result: the list of clc request objects from CLC API call
+                 request_list: the list of clc request objects from CLC API call
                  changed_servers: The list of servers ids that are modified
         """
-        result = []
+        request_list = []
         changed = False
         servers = self._get_servers_from_clc(
             server_ids,
@@ -180,24 +216,40 @@ class ClcSnapshot():
         for server in servers_to_change:
             changed = True
             if not self.module.check_mode:
-                res = server.CreateSnapshot(
-                    delete_existing=True,
-                    expiration_days=expiration_days)
-                result.append(res)
+                request = self._create_server_snapshot(server, expiration_days)
+                request_list.append(request)
         changed_servers = [
             server.id for server in servers_to_change if server.id]
-        return changed, result, changed_servers
+        return changed, request_list, changed_servers
+
+    def _create_server_snapshot(self, server, expiration_days):
+        """
+        Create the snapshot for the CLC server
+        :param server: the CLC server object
+        :param expiration_days: The number of days to keep the snapshot
+        :return: the create request object from CLC API Call
+        """
+        result = None
+        try:
+            result = server.CreateSnapshot(
+                delete_existing=True,
+                expiration_days=expiration_days)
+        except CLCException as ex:
+            self.module.fail_json(msg='Failed to create snapshot for server : {0}. {1}'.format(
+                server.id, ex.response_text
+            ))
+        return result
 
     def ensure_server_snapshot_absent(self, server_ids):
         """
         Ensures the given set of server_ids have the snapshots removed
         :param server_ids: The list of server_ids to delete the snapshot
-        :return: (changed, result, changed_servers)
+        :return: (changed, request_list, changed_servers)
                  changed: A flag indicating whether any change was made
-                 result: the list of clc request objects from CLC API call
+                 request_list: the list of clc request objects from CLC API call
                  changed_servers: The list of servers ids that are modified
         """
-        result = []
+        request_list = []
         changed = False
         servers = self._get_servers_from_clc(
             server_ids,
@@ -208,22 +260,37 @@ class ClcSnapshot():
         for server in servers_to_change:
             changed = True
             if not self.module.check_mode:
-                res = server.DeleteSnapshot()
-                result.append(res)
+                request = self._delete_server_snapshot(server)
+                request_list.append(request)
         changed_servers = [
             server.id for server in servers_to_change if server.id]
-        return changed, result, changed_servers
+        return changed, request_list, changed_servers
+
+    def _delete_server_snapshot(self, server):
+        """
+        Delete snapshot for the CLC server
+        :param server: the CLC server object
+        :return: the delete snapshot request object from CLC API
+        """
+        result = None
+        try:
+            result = server.DeleteSnapshot()
+        except CLCException as ex:
+            self.module.fail_json(msg='Failed to delete snapshot for server : {0}. {1}'.format(
+                server.id, ex.response_text
+            ))
+        return result
 
     def ensure_server_snapshot_restore(self, server_ids):
         """
         Ensures the given set of server_ids have the snapshots restored
         :param server_ids: The list of server_ids to delete the snapshot
-        :return: (changed, result, changed_servers)
+        :return: (changed, request_list, changed_servers)
                  changed: A flag indicating whether any change was made
-                 result: the list of clc request objects from CLC API call
+                 request_list: the list of clc request objects from CLC API call
                  changed_servers: The list of servers ids that are modified
         """
-        result = []
+        request_list = []
         changed = False
         servers = self._get_servers_from_clc(
             server_ids,
@@ -234,11 +301,26 @@ class ClcSnapshot():
         for server in servers_to_change:
             changed = True
             if not self.module.check_mode:
-                res = server.RestoreSnapshot()
-                result.append(res)
+                request = self._restore_server_snapshot(server)
+                request_list.append(request)
         changed_servers = [
             server.id for server in servers_to_change if server.id]
-        return changed, result, changed_servers
+        return changed, request_list, changed_servers
+
+    def _restore_server_snapshot(self, server):
+        """
+        Restore snapshot for the CLC server
+        :param server: the CLC server object
+        :return: the restore snapshot request object from CLC API
+        """
+        result = None
+        try:
+            result = server.RestoreSnapshot()
+        except CLCException as ex:
+            self.module.fail_json(msg='Failed to restore snapshot for server : {0}. {1}'.format(
+                server.id, ex.response_text
+            ))
+        return result
 
     def _wait_for_requests_to_complete(self, requests_lst):
         """
@@ -258,7 +340,7 @@ class ClcSnapshot():
     @staticmethod
     def define_argument_spec():
         """
-        This function defnines the dictionary object required for
+        This function defines the dictionary object required for
         package module
         :return: the package dictionary object
         """
@@ -278,7 +360,8 @@ class ClcSnapshot():
     def _get_servers_from_clc(self, server_list, message):
         """
         Internal function to fetch list of CLC server objects from a list of server ids
-        :param the list server ids
+        :param server_list: The list of server ids
+        :param message: The error message to throw in case of any error
         :return the list of CLC server objects
         """
         try:

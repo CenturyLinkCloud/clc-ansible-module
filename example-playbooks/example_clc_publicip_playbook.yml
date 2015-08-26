@@ -23,7 +23,7 @@
         ports:
             - 80
         server_ids:
-            - UC1NJSTTEST04
-            - UC1NJSTTEST05
+            - UC1WFADTST01
+            - UC1WFADTST02
         state: present
       register: clc
