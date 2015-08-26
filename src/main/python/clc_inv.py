@@ -292,7 +292,7 @@ def _is_list_flat(lst):
     :param lst: list to check
     :return: True if any value in the list is not an iterable
     '''
-    result = False
+    result = True if len(lst) == 0 else False 
     i = 0
     while i < len(lst) and not result:
         result |= (
