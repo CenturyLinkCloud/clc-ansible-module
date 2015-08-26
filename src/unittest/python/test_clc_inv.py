@@ -68,6 +68,11 @@ class TestClcInvFunctions(unittest.TestCase):
         list = [1,2,3]
         res = clc_inv._is_list_flat(list)
         self.assertEqual(res, True)
+    
+    def test_is_list_flat_empty_list(self):
+        list = []
+        res = clc_inv._is_list_flat(list)
+        self.assertEqual(res, True)
 
     def test_flatten_list(self):
         list = [1,2,3]
