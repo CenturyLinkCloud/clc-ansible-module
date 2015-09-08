@@ -652,7 +652,6 @@ class ClcServer:
         v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
         clc_alias = env.get('CLC_ACCT_ALIAS', False)
         api_url = env.get('CLC_V2_API_URL', False)
-
         if api_url:
             self.clc.defaults.ENDPOINT_URL_V2 = api_url
 
@@ -710,9 +709,12 @@ class ClcServer:
         """
         location = module.params.get('location')
         try:
-            datacenter = clc.v2.Datacenter(location)
-            return datacenter
-        except CLCException:
+            if not location:
+                account = clc.v2.Account()
+                location = account.data.get('primaryDataCenter')
+            data_center = clc.v2.Datacenter(location)
+            return data_center
+        except CLCException as ex:
             module.fail_json(
                 msg=str(
                     "Unable to find location: {0}".format(location)))

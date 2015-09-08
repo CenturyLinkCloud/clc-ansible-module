@@ -841,6 +841,23 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_with(msg='Unable to create the server: test server. Mock failure message')
 
     @patch.object(clc_server, 'clc_sdk')
+    def test_find_datacenter_no_location(self, mock_clc_sdk):
+        error = CLCException()
+        mock_account = mock.MagicMock()
+        mock_account.data = {
+            'primaryDataCenter': 'TESTDC'
+        }
+        mock_clc_sdk.v2.Account.return_value = mock_account
+        mock_clc_sdk.v2.Datacenter.return_value = 'DCRESULT'
+        params = {
+            'state': 'present',
+        }
+        self.module.params = params
+        under_test = ClcServer(self.module)
+        ret = under_test._find_datacenter(mock_clc_sdk, self.module)
+        self.assertEqual(ret, 'DCRESULT')
+
+    @patch.object(clc_server, 'clc_sdk')
     def test_find_datacenter_exception(self, mock_clc_sdk):
         error = CLCException()
         mock_clc_sdk.v2.Datacenter.side_effect = error
