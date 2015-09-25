@@ -142,7 +142,9 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 | `storage_type:` | N | `standard` |`standard`, `ssd` | The type of storage to attach to the server.
 | `template:` | Y |  | any valid template | The template to user for server creation.  Will search for a template if a partial string is provided.  Example: `ubuntu-14-64` will build an Ubuntu 14.04 64bit server.
 | `ttl:` | N | | Any valid int > 3600 | The time to live for the server.  The server will be deleted when this expires. |
-| `type:` | N | `standard` | `standard`, `hyperscale`| The type of server to create.
+| `type:` | N | `standard` | `standard`, `hyperscale`, `bareMetal`| The type of server to create.
+| `configuration_id:` | N | |  | The identifier for the specific configuration type of bare metal server to deploy. |
+| `os_type:` | N |  | `redHat6_64Bit`, `centOS6_64Bit`, `windows2012R2Standard_64Bit`, `ubuntu14_64Bit`| The OS to provision with the bare metal server.
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
