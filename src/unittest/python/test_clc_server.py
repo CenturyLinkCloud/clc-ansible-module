@@ -366,6 +366,81 @@ class TestClcServerFunctions(unittest.TestCase):
                                                       server_ids=['TEST_SERVER'],
                                                       partially_created_server_ids=[])
 
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_process_request_count_1_bare_metal_server(self,
+                                                          mock_clc_sdk,
+                                                          mock_set_clc_creds):
+        # Setup Fixture
+        self.module.params = {
+            'state': 'present',
+            'name': 'TEST',
+            'location': 'UC1',
+            'type': 'bareMetal',
+            'wait': True,
+            'count': 1,
+            'count_group': 'Default Group',
+            'configuration_id': 'test bare metal config',
+            'os_type': 'ubuntu14_64Bit'
+        }
+
+        # Define Mock Objects
+        mock_server = mock.MagicMock()
+        mock_requests = mock.MagicMock()
+        mock_single_request = mock.MagicMock()
+        mock_group = mock.MagicMock()
+        mock_template = mock.MagicMock()
+        mock_network = mock.MagicMock()
+
+        # Set Mock Server Return Values
+        mock_server.id = 'TEST_SERVER'
+        mock_server.data = {'name': 'TEST_SERVER'}
+        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
+
+        # Set Mock Request Return Values
+        mock_single_request.Server.return_value = mock_server
+        mock_requests.WaitUntilComplete.return_value = 0
+        mock_requests.requests = [mock_single_request]
+
+        # Set Mock Template / Network Values
+        mock_template.id = 'TEST_TEMPLATE'
+        mock_network.id = '12345'
+
+        # Set Mock Group Values
+        mock_group.Defaults.return_value = 1
+        mock_group.id = '12345'
+
+        # Setup Mock API Responses
+        def _api_call_return_values(*args, **kwargs):
+            if kwargs.get('method') == 'GET':
+                return {'id': '12345','name': 'test'}
+            if kwargs.get('method') == 'POST':
+                return {'links': [{'rel': 'self', 'id': '12345'}]}
+
+        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+        mock_clc_sdk.v2.Group.return_value = mock_group
+        mock_clc_sdk.v2.Server.return_value = mock_server
+        mock_clc_sdk.v2.Account.GetAlias.return_value = 'TST'
+        mock_clc_sdk.v2.Datacenter().Templates().Search().__getitem__.return_value = mock_template
+        mock_clc_sdk.v2.Datacenter().Networks().networks.__getitem__.return_value = mock_network
+        mock_clc_sdk.v2.Requests.return_value = mock_requests
+        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
+
+        self.module.check_mode = False
+
+        # Test
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+
+        #Assert
+        #self.assertFalse(self.module.fail_json.called)
+        self.assertTrue(self.module.exit_json.called)
+        self.module.exit_json.assert_called_once_with(changed=True,
+                                                      servers=[{'ipaddress': '1.2.3.4',
+                                                                'name': 'TEST_SERVER'}],
+                                                      server_ids=['TEST_SERVER'],
+                                                      partially_created_server_ids=[])
+
 
     @patch.object(ClcServer, '_set_clc_credentials_from_env')
     @patch.object(clc_server, 'clc_sdk')
