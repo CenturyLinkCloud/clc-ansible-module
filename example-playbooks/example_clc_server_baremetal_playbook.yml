@@ -24,10 +24,10 @@
       clc_server:
         name: BMSVR
         count: "{{ server_count }}"
-        group: "{{ server_group }}"
-        configuration_id: 529e2592a3e640a7c2617b5e8bc8feaed94eac22
+        configuration_id: f24b18ba2ce23657657444601649c7b8b7f9b60c
         os_type: 'ubuntu14_64Bit'
         type: 'bareMetal'
+        location: VA1
       register: clc
 
     - name: debug
