@@ -200,7 +200,7 @@ options:
       - The template to use for server creation.  Will search for a template if a partial string is provided.
         This is required when state is 'present'
     default: None
-    required: false
+    required: False
   ttl:
     description:
       - The time to live for the server in seconds.  The server will be deleted when this time expires.
@@ -211,7 +211,20 @@ options:
       - The type of server to create.
     default: 'standard'
     required: False
-    choices: ['standard', 'hyperscale']
+    choices: ['standard', 'hyperscale', 'bareMetal']
+  configuration_id:
+    description:
+      -  Only required for bare metal servers.
+         Specifies the identifier for the specific configuration type of bare metal server to deploy.
+    default: None
+    required: False
+  os_type:
+    description:
+      - Only required for bare metal servers.
+        Specifies the OS to provision with the bare metal server.
+    default: None
+    required: False
+    choices: ['redHat6_64Bit', 'centOS6_64Bit', 'windows2012R2Standard_64Bit', 'ubuntu14_64Bit']
   wait:
     description:
       - Whether to wait for the provisioning tasks to finish before returning.
@@ -551,7 +564,7 @@ class ClcServer:
 
         elif state == 'present':
             # Changed is always set to true when provisioning new instances
-            if not p.get('template'):
+            if not p.get('template') and p.get('type') != 'bareMetal':
                 return self.module.fail_json(
                     msg='template parameter is required for new instance')
 
@@ -596,7 +609,7 @@ class ClcServer:
                 choices=[
                     'standard',
                     'hyperscale']),
-            type=dict(default='standard', choices=['standard', 'hyperscale']),
+            type=dict(default='standard', choices=['standard', 'hyperscale', 'bareMetal']),
             primary_dns=dict(default=None),
             secondary_dns=dict(default=None),
             additional_disks=dict(type='list', default=[]),
@@ -630,6 +643,14 @@ class ClcServer:
                     'UDP',
                     'ICMP']),
             public_ip_ports=dict(type='list', default=[]),
+            configuration_id=dict(default=None),
+            os_type=dict(default=None,
+                         choices=[
+                             'redHat6_64Bit',
+                             'centOS6_64Bit',
+                             'windows2012R2Standard_64Bit',
+                             'ubuntu14_64Bit'
+                         ]),
             wait=dict(type='bool', default=True))
 
         mutually_exclusive = [
@@ -860,9 +881,10 @@ class ClcServer:
         """
         lookup_template = module.params.get('template')
         state = module.params.get('state')
+        type = module.params.get('type')
         result = None
 
-        if state == 'present':
+        if state == 'present' and type != 'bareMetal':
             try:
                 result = datacenter.Templates().Search(lookup_template)[0].id
             except CLCException:
@@ -985,7 +1007,9 @@ class ClcServer:
             'source_server_password': p.get('source_server_password'),
             'cpu_autoscale_policy_id': p.get('cpu_autoscale_policy_id'),
             'anti_affinity_policy_id': p.get('anti_affinity_policy_id'),
-            'packages': p.get('packages')
+            'packages': p.get('packages'),
+            'configuration_id': p.get('configuration_id'),
+            'os_type': p.get('os_type')
         }
 
         count = override_count if override_count else p.get('count')
@@ -1443,7 +1467,9 @@ class ClcServer:
                         'customFields': server_params.get('custom_fields'),
                         'additionalDisks': server_params.get('additional_disks'),
                         'ttl': server_params.get('ttl'),
-                        'packages': server_params.get('packages')}))
+                        'packages': server_params.get('packages'),
+                        'configurationId': server_params.get('configuration_id'),
+                        'osType': server_params.get('os_type')}))
 
             result = clc.v2.Requests(res)
         except APIFailedResponse as ex:
