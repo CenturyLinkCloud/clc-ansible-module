@@ -1340,7 +1340,12 @@ class ClcServer:
             if state == 'started':
                 result = server.PowerOn()
             else:
-                result = server.PowerOff()
+                # Try to shut down the server and fall back to power off when unable to shut down.
+                result = server.ShutDown()
+                if result and hasattr(result, 'requests') and result.requests[0]:
+                    return result
+                else:
+                    result = server.PowerOff()
         except CLCException:
             module.fail_json(
                 msg='Unable to change power state for server {0}'.format(

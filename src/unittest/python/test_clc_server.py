@@ -1118,6 +1118,7 @@ class TestClcServerFunctions(unittest.TestCase):
     @patch.object(clc_server, 'clc_sdk')
     def test_change_server_power_state_stopped(self, mock_clc_sdk, mock_ansible_module):
         server = mock.MagicMock()
+        server.ShutDown.return_value = None
         server.PowerOff.return_value = 'OK'
         result = ClcServer._change_server_power_state(mock_ansible_module, server, 'stopped')
         self.assertEqual(result, 'OK')
@@ -1129,6 +1130,7 @@ class TestClcServerFunctions(unittest.TestCase):
         error = CLCException('Failed')
         server = mock.MagicMock()
         server.id = 'server1'
+        server.ShutDown.return_value = None
         server.PowerOff.side_effect = error
         result = ClcServer._change_server_power_state(mock_ansible_module, server, 'stopped')
         self.assertEqual(result, None)
