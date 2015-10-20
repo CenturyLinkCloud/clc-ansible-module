@@ -105,6 +105,18 @@ options:
         creating and deleting them to reach that count.  Requires count_group to be set.
     default: None
     required: False
+  min_count:
+    description:
+      - Run in idempotent mode. Will ensure that there are least this number of servers running in the provided group,
+        creating them to reach that count. Requires count_group to be set.
+    default: None
+    required: False
+  max_count:
+    description:
+      - Run in idempotent mode. Will ensure that there are no more than this number of servers running in the provided
+        group, deleting them to reach that count. Requires count_group to be set.
+    default: None
+    required: False
   group:
     description:
       - The Server Group to create servers under.
@@ -280,6 +292,13 @@ EXAMPLES = '''
   clc_server:
     server_ids: ['UC1ACCT-TEST01']
     state: absent
+
+- name: Ensure 'Default Group' has at least 3 servers
+  clc_server:
+    name: test
+    template: ubuntu-14-64
+    min_count: 3
+    count_group: 'Default Group'
 '''
 
 RETURN = '''
