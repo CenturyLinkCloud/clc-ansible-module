@@ -441,12 +441,13 @@ class TestClcServerFunctions(unittest.TestCase):
                                                       server_ids=['TEST_SERVER'],
                                                       partially_created_server_ids=[])
 
-
+    @patch.object(ClcServer, '_enforce_count')
     @patch.object(ClcServer, '_set_clc_credentials_from_env')
     @patch.object(clc_server, 'clc_sdk')
     def test_process_request_exact_count_delete_1_server(self,
                                                          mock_clc_sdk,
-                                                         mock_set_clc_creds):
+                                                         mock_set_clc_creds,
+                                                         mock_enforce_count):
         # Setup Fixture
         self.module.params = {
             'state': 'present',
@@ -462,19 +463,13 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Define Mock Objects
         mock_server = mock.MagicMock()
-        mock_group = mock.MagicMock()
 
         # Set Mock Server Return Values
         mock_server.id = 'TEST_SERVER'
         mock_server.status = 'active'
         mock_server.powerState = 'started'
 
-        # Set Mock Group Values
-        mock_group.Servers().Servers.return_value = [mock_server]
-
-        # Setup Mock API Calls
-        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
-        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+        mock_enforce_count.return_value = ([], [mock_server.id], [], True)
 
         # Test
         under_test = ClcServer(self.module)

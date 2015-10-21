@@ -729,6 +729,7 @@ class ClcServer:
 
         ClcServer._validate_types(module)
         ClcServer._validate_name(module)
+        ClcServer._validate_counts(module)
 
         params['alias'] = ClcServer._find_alias(clc, module)
         params['cpu'] = ClcServer._find_cpu(clc, module)
@@ -880,6 +881,19 @@ class ClcServer:
                 len(server_name) < 1 or len(server_name) > 6):
             module.fail_json(msg=str(
                 "When state = 'present', name must be a string with a minimum length of 1 and a maximum length of 6"))
+
+    @staticmethod
+    def _validate_counts(module):
+        """
+        Validate that min_count and max_count are valid, fail if it's not
+        :param module: the module to validate
+        :return: none
+        """
+        min_count = module.params.get('min_count')
+        max_count = module.params.get('max_count')
+
+        if min_count and max_count and min_count > max_count:
+            module.fail_json(msg=str("min_count can't be greater than max_count"))
 
     @staticmethod
     def _find_ttl(clc, module):
@@ -1095,7 +1109,7 @@ class ClcServer:
         p = module.params
         changed = False
         count_group = p.get('count_group')
-        datacenter = ClcServer._find_datacenter(clc, module)
+        datacenter = self._find_datacenter(clc, module)
         exact_count = p.get('exact_count')
         min_count = p.get('min_count')
         max_count = p.get('max_count')
@@ -1117,14 +1131,11 @@ class ClcServer:
             return module.fail_json(
                 msg="you must use the 'count_group option with max_count")
 
-        servers, running_servers = ClcServer._find_running_servers_by_group(
+        servers, running_servers = self._find_running_servers_by_group(
             module, datacenter, count_group)
 
         if exact_count:
-            if len(running_servers) == exact_count:
-                changed = False
-
-            elif len(running_servers) < exact_count:
+            if len(running_servers) < exact_count:
                 to_create = exact_count - len(running_servers)
                 server_dict_array, changed_server_ids, partial_servers_ids, changed \
                     = self._create_servers(module, clc, override_count=to_create)
@@ -1148,8 +1159,6 @@ class ClcServer:
 
                 for server in server_dict_array:
                     running_servers.append(server)
-            else:
-                changed = False
 
         if max_count:
             if len(running_servers) > max_count:
@@ -1159,8 +1168,6 @@ class ClcServer:
 
                 changed, server_dict_array, changed_server_ids \
                     = self._delete_servers(module, clc, remove_ids)
-            else:
-                changed = False
 
 
         return server_dict_array, changed_server_ids, partial_servers_ids, changed
