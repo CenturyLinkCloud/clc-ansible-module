@@ -441,12 +441,13 @@ class TestClcServerFunctions(unittest.TestCase):
                                                       server_ids=['TEST_SERVER'],
                                                       partially_created_server_ids=[])
 
-
+    @patch.object(ClcServer, '_enforce_count')
     @patch.object(ClcServer, '_set_clc_credentials_from_env')
     @patch.object(clc_server, 'clc_sdk')
     def test_process_request_exact_count_delete_1_server(self,
                                                          mock_clc_sdk,
-                                                         mock_set_clc_creds):
+                                                         mock_set_clc_creds,
+                                                         mock_enforce_count):
         # Setup Fixture
         self.module.params = {
             'state': 'present',
@@ -462,19 +463,13 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Define Mock Objects
         mock_server = mock.MagicMock()
-        mock_group = mock.MagicMock()
 
         # Set Mock Server Return Values
         mock_server.id = 'TEST_SERVER'
         mock_server.status = 'active'
         mock_server.powerState = 'started'
 
-        # Set Mock Group Values
-        mock_group.Servers().Servers.return_value = [mock_server]
-
-        # Setup Mock API Calls
-        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
-        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+        mock_enforce_count.return_value = ([], [mock_server.id], [], True)
 
         # Test
         under_test = ClcServer(self.module)
@@ -1264,6 +1259,44 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(len(failed_servers), 1)
         self.assertEqual(failed_servers[0].id, 'server1')
+
+    @patch.object(ClcServer, '_create_servers')
+    @patch.object(ClcServer, '_find_running_servers_by_group')
+    def test_enforce_count_min_count(self, mock_running_servers, mock_create_servers):
+        mock_server_list = [mock.MagicMock()]
+        mock_create_servers.return_value = ('test_server', mock_server_list, mock_server_list, True)
+        mock_running_servers.return_value = (mock_server_list, mock_server_list)
+        params = {
+            'min_count': 2,
+            'count_group': 'test'
+        }
+        self.module.params = params
+        under_test = ClcServer(self.module)
+        server_dict_array, changed_server_ids, partial_servers_ids, changed = \
+            under_test._enforce_count(self.module, self.clc)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(changed, True)
+        self.assertEqual(server_dict_array, 'test_server')
+
+    @patch.object(ClcServer, '_delete_servers')
+    @patch.object(ClcServer, '_find_running_servers_by_group')
+    def test_enforce_count_max_count(self, mock_running_servers, mock_delete_servers):
+        mock_server_list = [mock.MagicMock()]
+        mock_server_list[0].id = 'mockid1'
+        mock_server_list.append(mock.MagicMock())
+        mock_server_list[1].id = 'mockid2'
+        mock_delete_servers.return_value = (True, {}, 'mockid1')
+        mock_running_servers.return_value = (mock_server_list, mock_server_list)
+        params = {
+            'max_count': 1,
+            'count_group': 'test'
+        }
+        self.module.params = params
+        under_test = ClcServer(self.module)
+        server_dict_array, changed_server_ids, partial_servers_ids, changed = \
+            under_test._enforce_count(self.module, self.clc)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(changed, True)
 
     @patch.object(clc_server, 'clc_sdk')
     def test_delete_servers(self, mock_clc_sdk):
