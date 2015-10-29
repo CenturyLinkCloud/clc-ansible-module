@@ -366,12 +366,88 @@ class TestClcServerFunctions(unittest.TestCase):
                                                       server_ids=['TEST_SERVER'],
                                                       partially_created_server_ids=[])
 
+    @patch.object(ClcServer, '_set_clc_credentials_from_env')
+    @patch.object(clc_server, 'clc_sdk')
+    def test_process_request_count_1_bare_metal_server(self,
+                                                          mock_clc_sdk,
+                                                          mock_set_clc_creds):
+        # Setup Fixture
+        self.module.params = {
+            'state': 'present',
+            'name': 'TEST',
+            'location': 'UC1',
+            'type': 'bareMetal',
+            'wait': True,
+            'count': 1,
+            'count_group': 'Default Group',
+            'configuration_id': 'test bare metal config',
+            'os_type': 'ubuntu14_64Bit'
+        }
 
+        # Define Mock Objects
+        mock_server = mock.MagicMock()
+        mock_requests = mock.MagicMock()
+        mock_single_request = mock.MagicMock()
+        mock_group = mock.MagicMock()
+        mock_template = mock.MagicMock()
+        mock_network = mock.MagicMock()
+
+        # Set Mock Server Return Values
+        mock_server.id = 'TEST_SERVER'
+        mock_server.data = {'name': 'TEST_SERVER'}
+        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
+
+        # Set Mock Request Return Values
+        mock_single_request.Server.return_value = mock_server
+        mock_requests.WaitUntilComplete.return_value = 0
+        mock_requests.requests = [mock_single_request]
+
+        # Set Mock Template / Network Values
+        mock_template.id = 'TEST_TEMPLATE'
+        mock_network.id = '12345'
+
+        # Set Mock Group Values
+        mock_group.Defaults.return_value = 1
+        mock_group.id = '12345'
+
+        # Setup Mock API Responses
+        def _api_call_return_values(*args, **kwargs):
+            if kwargs.get('method') == 'GET':
+                return {'id': '12345','name': 'test'}
+            if kwargs.get('method') == 'POST':
+                return {'links': [{'rel': 'self', 'id': '12345'}]}
+
+        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+        mock_clc_sdk.v2.Group.return_value = mock_group
+        mock_clc_sdk.v2.Server.return_value = mock_server
+        mock_clc_sdk.v2.Account.GetAlias.return_value = 'TST'
+        mock_clc_sdk.v2.Datacenter().Templates().Search().__getitem__.return_value = mock_template
+        mock_clc_sdk.v2.Datacenter().Networks().networks.__getitem__.return_value = mock_network
+        mock_clc_sdk.v2.Requests.return_value = mock_requests
+        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
+
+        self.module.check_mode = False
+
+        # Test
+        under_test = ClcServer(self.module)
+        under_test.process_request()
+
+        #Assert
+        #self.assertFalse(self.module.fail_json.called)
+        self.assertTrue(self.module.exit_json.called)
+        self.module.exit_json.assert_called_once_with(changed=True,
+                                                      servers=[{'ipaddress': '1.2.3.4',
+                                                                'name': 'TEST_SERVER'}],
+                                                      server_ids=['TEST_SERVER'],
+                                                      partially_created_server_ids=[])
+
+    @patch.object(ClcServer, '_enforce_count')
     @patch.object(ClcServer, '_set_clc_credentials_from_env')
     @patch.object(clc_server, 'clc_sdk')
     def test_process_request_exact_count_delete_1_server(self,
                                                          mock_clc_sdk,
-                                                         mock_set_clc_creds):
+                                                         mock_set_clc_creds,
+                                                         mock_enforce_count):
         # Setup Fixture
         self.module.params = {
             'state': 'present',
@@ -387,19 +463,13 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Define Mock Objects
         mock_server = mock.MagicMock()
-        mock_group = mock.MagicMock()
 
         # Set Mock Server Return Values
         mock_server.id = 'TEST_SERVER'
         mock_server.status = 'active'
         mock_server.powerState = 'started'
 
-        # Set Mock Group Values
-        mock_group.Servers().Servers.return_value = [mock_server]
-
-        # Setup Mock API Calls
-        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
-        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+        mock_enforce_count.return_value = ([], [mock_server.id], [], True)
 
         # Test
         under_test = ClcServer(self.module)
@@ -841,6 +911,23 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_with(msg='Unable to create the server: test server. Mock failure message')
 
     @patch.object(clc_server, 'clc_sdk')
+    def test_find_datacenter_no_location(self, mock_clc_sdk):
+        error = CLCException()
+        mock_account = mock.MagicMock()
+        mock_account.data = {
+            'primaryDataCenter': 'TESTDC'
+        }
+        mock_clc_sdk.v2.Account.return_value = mock_account
+        mock_clc_sdk.v2.Datacenter.return_value = 'DCRESULT'
+        params = {
+            'state': 'present',
+        }
+        self.module.params = params
+        under_test = ClcServer(self.module)
+        ret = under_test._find_datacenter(mock_clc_sdk, self.module)
+        self.assertEqual(ret, 'DCRESULT')
+
+    @patch.object(clc_server, 'clc_sdk')
     def test_find_datacenter_exception(self, mock_clc_sdk):
         error = CLCException()
         mock_clc_sdk.v2.Datacenter.side_effect = error
@@ -1026,6 +1113,7 @@ class TestClcServerFunctions(unittest.TestCase):
     @patch.object(clc_server, 'clc_sdk')
     def test_change_server_power_state_stopped(self, mock_clc_sdk, mock_ansible_module):
         server = mock.MagicMock()
+        server.ShutDown.return_value = None
         server.PowerOff.return_value = 'OK'
         result = ClcServer._change_server_power_state(mock_ansible_module, server, 'stopped')
         self.assertEqual(result, 'OK')
@@ -1037,6 +1125,7 @@ class TestClcServerFunctions(unittest.TestCase):
         error = CLCException('Failed')
         server = mock.MagicMock()
         server.id = 'server1'
+        server.ShutDown.return_value = None
         server.PowerOff.side_effect = error
         result = ClcServer._change_server_power_state(mock_ansible_module, server, 'stopped')
         self.assertEqual(result, None)
@@ -1170,6 +1259,44 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(len(failed_servers), 1)
         self.assertEqual(failed_servers[0].id, 'server1')
+
+    @patch.object(ClcServer, '_create_servers')
+    @patch.object(ClcServer, '_find_running_servers_by_group')
+    def test_enforce_count_min_count(self, mock_running_servers, mock_create_servers):
+        mock_server_list = [mock.MagicMock()]
+        mock_create_servers.return_value = ('test_server', mock_server_list, mock_server_list, True)
+        mock_running_servers.return_value = (mock_server_list, mock_server_list)
+        params = {
+            'min_count': 2,
+            'count_group': 'test'
+        }
+        self.module.params = params
+        under_test = ClcServer(self.module)
+        server_dict_array, changed_server_ids, partial_servers_ids, changed = \
+            under_test._enforce_count(self.module, self.clc)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(changed, True)
+        self.assertEqual(server_dict_array, 'test_server')
+
+    @patch.object(ClcServer, '_delete_servers')
+    @patch.object(ClcServer, '_find_running_servers_by_group')
+    def test_enforce_count_max_count(self, mock_running_servers, mock_delete_servers):
+        mock_server_list = [mock.MagicMock()]
+        mock_server_list[0].id = 'mockid1'
+        mock_server_list.append(mock.MagicMock())
+        mock_server_list[1].id = 'mockid2'
+        mock_delete_servers.return_value = (True, {}, 'mockid1')
+        mock_running_servers.return_value = (mock_server_list, mock_server_list)
+        params = {
+            'max_count': 1,
+            'count_group': 'test'
+        }
+        self.module.params = params
+        under_test = ClcServer(self.module)
+        server_dict_array, changed_server_ids, partial_servers_ids, changed = \
+            under_test._enforce_count(self.module, self.clc)
+        self.assertFalse(self.module.fail_json.called)
+        self.assertEqual(changed, True)
 
     @patch.object(clc_server, 'clc_sdk')
     def test_delete_servers(self, mock_clc_sdk):

@@ -105,6 +105,18 @@ options:
         creating and deleting them to reach that count.  Requires count_group to be set.
     default: None
     required: False
+  min_count:
+    description:
+      - Run in idempotent mode. Will ensure that there are least this number of servers running in the provided group,
+        creating them to reach that count. Requires count_group to be set.
+    default: None
+    required: False
+  max_count:
+    description:
+      - Run in idempotent mode. Will ensure that there are no more than this number of servers running in the provided
+        group, deleting them to reach that count. Requires count_group to be set.
+    default: None
+    required: False
   group:
     description:
       - The Server Group to create servers under.
@@ -200,7 +212,7 @@ options:
       - The template to use for server creation.  Will search for a template if a partial string is provided.
         This is required when state is 'present'
     default: None
-    required: false
+    required: False
   ttl:
     description:
       - The time to live for the server in seconds.  The server will be deleted when this time expires.
@@ -211,7 +223,20 @@ options:
       - The type of server to create.
     default: 'standard'
     required: False
-    choices: ['standard', 'hyperscale']
+    choices: ['standard', 'hyperscale', 'bareMetal']
+  configuration_id:
+    description:
+      -  Only required for bare metal servers.
+         Specifies the identifier for the specific configuration type of bare metal server to deploy.
+    default: None
+    required: False
+  os_type:
+    description:
+      - Only required for bare metal servers.
+        Specifies the OS to provision with the bare metal server.
+    default: None
+    required: False
+    choices: ['redHat6_64Bit', 'centOS6_64Bit', 'windows2012R2Standard_64Bit', 'ubuntu14_64Bit']
   wait:
     description:
       - Whether to wait for the provisioning tasks to finish before returning.
@@ -267,6 +292,13 @@ EXAMPLES = '''
   clc_server:
     server_ids: ['UC1ACCT-TEST01']
     state: absent
+
+- name: Ensure 'Default Group' has at least 3 servers
+  clc_server:
+    name: test
+    template: ubuntu-14-64
+    min_count: 3
+    count_group: 'Default Group'
 '''
 
 RETURN = '''
@@ -551,11 +583,11 @@ class ClcServer:
 
         elif state == 'present':
             # Changed is always set to true when provisioning new instances
-            if not p.get('template'):
+            if not p.get('template') and p.get('type') != 'bareMetal':
                 return self.module.fail_json(
                     msg='template parameter is required for new instance')
 
-            if p.get('exact_count') is None:
+            if p.get('exact_count') is None and p.get('min_count') is None and p.get('max_count') is None:
                 (server_dict_array,
                  new_server_ids,
                  partial_servers_ids,
@@ -596,7 +628,7 @@ class ClcServer:
                 choices=[
                     'standard',
                     'hyperscale']),
-            type=dict(default='standard', choices=['standard', 'hyperscale']),
+            type=dict(default='standard', choices=['standard', 'hyperscale', 'bareMetal']),
             primary_dns=dict(default=None),
             secondary_dns=dict(default=None),
             additional_disks=dict(type='list', default=[]),
@@ -620,6 +652,8 @@ class ClcServer:
                     'stopped']),
             count=dict(type='int', default=1),
             exact_count=dict(type='int', default=None),
+            min_count=dict(type='int', default=None),
+            max_count=dict(type='int', default=None),
             count_group=dict(),
             server_ids=dict(type='list', default=[]),
             add_public_ip=dict(type='bool', default=False),
@@ -630,11 +664,25 @@ class ClcServer:
                     'UDP',
                     'ICMP']),
             public_ip_ports=dict(type='list', default=[]),
+            configuration_id=dict(default=None),
+            os_type=dict(default=None,
+                         choices=[
+                             'redHat6_64Bit',
+                             'centOS6_64Bit',
+                             'windows2012R2Standard_64Bit',
+                             'ubuntu14_64Bit'
+                         ]),
             wait=dict(type='bool', default=True))
 
         mutually_exclusive = [
             ['exact_count', 'count'],
             ['exact_count', 'state'],
+            ['min_count', 'exact_count'],
+            ['min_count', 'count'],
+            ['min_count', 'state'],
+            ['max_count', 'exact_count'],
+            ['max_count', 'count'],
+            ['max_count', 'state'],
             ['anti_affinity_policy_id', 'anti_affinity_policy_name'],
             ['alert_policy_id', 'alert_policy_name'],
         ]
@@ -652,7 +700,6 @@ class ClcServer:
         v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
         clc_alias = env.get('CLC_ACCT_ALIAS', False)
         api_url = env.get('CLC_V2_API_URL', False)
-
         if api_url:
             self.clc.defaults.ENDPOINT_URL_V2 = api_url
 
@@ -682,6 +729,7 @@ class ClcServer:
 
         ClcServer._validate_types(module)
         ClcServer._validate_name(module)
+        ClcServer._validate_counts(module)
 
         params['alias'] = ClcServer._find_alias(clc, module)
         params['cpu'] = ClcServer._find_cpu(clc, module)
@@ -710,9 +758,12 @@ class ClcServer:
         """
         location = module.params.get('location')
         try:
-            datacenter = clc.v2.Datacenter(location)
-            return datacenter
-        except CLCException:
+            if not location:
+                account = clc.v2.Account()
+                location = account.data.get('primaryDataCenter')
+            data_center = clc.v2.Datacenter(location)
+            return data_center
+        except CLCException as ex:
             module.fail_json(
                 msg=str(
                     "Unable to find location: {0}".format(location)))
@@ -832,6 +883,19 @@ class ClcServer:
                 "When state = 'present', name must be a string with a minimum length of 1 and a maximum length of 6"))
 
     @staticmethod
+    def _validate_counts(module):
+        """
+        Validate that min_count and max_count are valid, fail if it's not
+        :param module: the module to validate
+        :return: none
+        """
+        min_count = module.params.get('min_count')
+        max_count = module.params.get('max_count')
+
+        if min_count and max_count and min_count > max_count:
+            module.fail_json(msg=str("min_count can't be greater than max_count"))
+
+    @staticmethod
     def _find_ttl(clc, module):
         """
         Validate that TTL is > 3600 if set, and fail if not
@@ -858,9 +922,10 @@ class ClcServer:
         """
         lookup_template = module.params.get('template')
         state = module.params.get('state')
+        type = module.params.get('type')
         result = None
 
-        if state == 'present':
+        if state == 'present' and type != 'bareMetal':
             try:
                 result = datacenter.Templates().Search(lookup_template)[0].id
             except CLCException:
@@ -983,7 +1048,9 @@ class ClcServer:
             'source_server_password': p.get('source_server_password'),
             'cpu_autoscale_policy_id': p.get('cpu_autoscale_policy_id'),
             'anti_affinity_policy_id': p.get('anti_affinity_policy_id'),
-            'packages': p.get('packages')
+            'packages': p.get('packages'),
+            'configuration_id': p.get('configuration_id'),
+            'os_type': p.get('os_type')
         }
 
         count = override_count if override_count else p.get('count')
@@ -1042,8 +1109,10 @@ class ClcServer:
         p = module.params
         changed = False
         count_group = p.get('count_group')
-        datacenter = ClcServer._find_datacenter(clc, module)
+        datacenter = self._find_datacenter(clc, module)
         exact_count = p.get('exact_count')
+        min_count = p.get('min_count')
+        max_count = p.get('max_count')
         server_dict_array = []
         partial_servers_ids = []
         changed_server_ids = []
@@ -1054,27 +1123,52 @@ class ClcServer:
             return module.fail_json(
                 msg="you must use the 'count_group' option with exact_count")
 
-        servers, running_servers = ClcServer._find_running_servers_by_group(
+        if min_count and count_group is None:
+            return module.fail_json(
+                msg="you must use the 'count_group' option with min_count")
+
+        if max_count and count_group is None:
+            return module.fail_json(
+                msg="you must use the 'count_group option with max_count")
+
+        servers, running_servers = self._find_running_servers_by_group(
             module, datacenter, count_group)
 
-        if len(running_servers) == exact_count:
-            changed = False
+        if exact_count:
+            if len(running_servers) < exact_count:
+                to_create = exact_count - len(running_servers)
+                server_dict_array, changed_server_ids, partial_servers_ids, changed \
+                    = self._create_servers(module, clc, override_count=to_create)
 
-        elif len(running_servers) < exact_count:
-            to_create = exact_count - len(running_servers)
-            server_dict_array, changed_server_ids, partial_servers_ids, changed \
-                = self._create_servers(module, clc, override_count=to_create)
+                for server in server_dict_array:
+                    running_servers.append(server)
 
-            for server in server_dict_array:
-                running_servers.append(server)
+            elif len(running_servers) > exact_count:
+                to_remove = len(running_servers) - exact_count
+                all_server_ids = sorted([x.id for x in running_servers])
+                remove_ids = all_server_ids[0:to_remove]
 
-        elif len(running_servers) > exact_count:
-            to_remove = len(running_servers) - exact_count
-            all_server_ids = sorted([x.id for x in running_servers])
-            remove_ids = all_server_ids[0:to_remove]
+                (changed, server_dict_array, changed_server_ids) \
+                    = ClcServer._delete_servers(module, clc, remove_ids)
 
-            (changed, server_dict_array, changed_server_ids) \
-                = ClcServer._delete_servers(module, clc, remove_ids)
+        if min_count:
+            if len(running_servers) < min_count:
+                to_create = min_count - len(running_servers)
+                server_dict_array, changed_server_ids, partial_servers_ids, changed \
+                    = self._create_servers(module, clc, override_count=to_create)
+
+                for server in server_dict_array:
+                    running_servers.append(server)
+
+        if max_count:
+            if len(running_servers) > max_count:
+                to_remove = len(running_servers) - max_count
+                all_server_ids = sorted([x.id for x in running_servers])
+                remove_ids = all_server_ids[0:to_remove]
+
+                changed, server_dict_array, changed_server_ids \
+                    = self._delete_servers(module, clc, remove_ids)
+
 
         return server_dict_array, changed_server_ids, partial_servers_ids, changed
 
@@ -1314,7 +1408,12 @@ class ClcServer:
             if state == 'started':
                 result = server.PowerOn()
             else:
-                result = server.PowerOff()
+                # Try to shut down the server and fall back to power off when unable to shut down.
+                result = server.ShutDown()
+                if result and hasattr(result, 'requests') and result.requests[0]:
+                    return result
+                else:
+                    result = server.PowerOff()
         except CLCException:
             module.fail_json(
                 msg='Unable to change power state for server {0}'.format(
@@ -1441,7 +1540,9 @@ class ClcServer:
                         'customFields': server_params.get('custom_fields'),
                         'additionalDisks': server_params.get('additional_disks'),
                         'ttl': server_params.get('ttl'),
-                        'packages': server_params.get('packages')}))
+                        'packages': server_params.get('packages'),
+                        'configurationId': server_params.get('configuration_id'),
+                        'osType': server_params.get('os_type')}))
 
             result = clc.v2.Requests(res)
         except APIFailedResponse as ex:

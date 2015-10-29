@@ -51,7 +51,7 @@ Create, delete, start, or stop a server at CLC.  This module can be run in two m
 
 If you just specify *count* instead of *exact_count*, the module runs in non-idempotent mode.  It will create *count* number of VMs every time it's run.
 
-###Example Playbook
+###Example Playbooks
 ```yaml
 ---
 - name: deploy ubuntu hosts at CLC (Yay!)
@@ -88,12 +88,31 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
     - name: debug
       debug: var=clc.server_ids
 ```
+```yaml
+---
+- name: Create a Linux Server with 3 GBs of app space
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create Server
+      clc_server:
+        name: test
+        template: ubuntu-14-64
+        count: 1
+        group: 'Default Group'
+        additional_disks:
+          - {path: /myApp, sizeGB: 3, type: partitioned}
+      register: clc
+    - name: debug
+      debug: var=clc
+```
 
 ###Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
-| `additional_disks:` | N | | | Specify additional disks for the server
+| `additional_disks:` | N | | | Specify additional disks for the server.  
 | `alias:` | N | Username's Alias | | The account alias to provision the servers under.  If an alias is not provided, it will use the account alias of whatever api credentials are provided
 | `anti_affinity_policy_id:` | N | | | The anti-affinity policy id to assign to the server. This is mutually exclusive with `anti_affinity_policy_name:`
 | `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server. This is mutually exclusive with `anti_affinity_policy_id:`
@@ -123,7 +142,9 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 | `storage_type:` | N | `standard` |`standard`, `ssd` | The type of storage to attach to the server.
 | `template:` | Y |  | any valid template | The template to user for server creation.  Will search for a template if a partial string is provided.  Example: `ubuntu-14-64` will build an Ubuntu 14.04 64bit server.
 | `ttl:` | N | | Any valid int > 3600 | The time to live for the server.  The server will be deleted when this expires. |
-| `type:` | N | `standard` | `standard`, `hyperscale`| The type of server to create.
+| `type:` | N | `standard` | `standard`, `hyperscale`, `bareMetal`| The type of server to create.
+| `configuration_id:` | N | |  | The identifier for the specific configuration type of bare metal server to deploy. |
+| `os_type:` | N |  | `redHat6_64Bit`, `centOS6_64Bit`, `windows2012R2Standard_64Bit`, `ubuntu14_64Bit`| The OS to provision with the bare metal server.
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
