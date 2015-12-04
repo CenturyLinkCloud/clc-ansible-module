@@ -946,6 +946,10 @@ class ClcServer:
         :return: a valid network id
         """
         network_id = module.params.get('network_id')
+        # Validates provided network id
+        # Allows lookup of network by id, name, or cidr notation
+        if network_id:
+          network_id = datacenter.Networks(forced_load=True).Get(network_id).id
 
         if not network_id:
             try:
