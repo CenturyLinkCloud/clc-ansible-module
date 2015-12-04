@@ -809,6 +809,23 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(result, mock_network.id)
         self.assertEqual(self.module.fail_json.called, False)
 
+    def test_find_network_id_by_id(self):
+        # Setup
+        mock_network = mock.MagicMock()
+        mock_network.id = UUID('12345678123456781234567812345678')
+        self.module.params = {"network_id": "AwesomeIdHere"}
+        self.datacenter.Networks().Get = mock.MagicMock(return_value=mock_network)
+
+        # Function Under Test
+        result = ClcServer._find_network_id(self.module, self.datacenter)
+
+        # Assert Result
+        self.datacenter.Networks.assert_called_with(forced_load=True)
+        self.datacenter.Networks().Get.assert_called_once_with('AwesomeIdHere')
+        self.assertEqual(result, mock_network.id)
+        self.assertEqual(self.module.fail_json.called, False)  
+
+
     def test_find_network_id_not_found(self):
         # Setup
         self.datacenter.Networks = mock.MagicMock(side_effect=clc_sdk.CLCException("Network not found"))
@@ -1175,7 +1192,7 @@ class TestClcServerFunctions(unittest.TestCase):
         clc_server.main()
 
         mock_ClcServer.assert_called_once_with(mock_AnsibleModule_instance)
-        mock_ClcServer_instance.process_request.assert_called_once
+        assert mock_ClcServer_instance.process_request.call_count == 1
 
     @patch.object(ClcServer, '_wait_for_requests')
     @patch.object(ClcServer, '_create_clc_server')

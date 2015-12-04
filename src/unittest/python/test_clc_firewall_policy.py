@@ -1,12 +1,12 @@
 #!/usr/bin/python
 # Copyright 2015 CenturyLink
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -157,7 +157,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             firewall_dict=firewall_dict)
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(response, mock_firewall_response)
-        test_firewall.clc.v2.API.Call.assert_called_once
+        assert test_firewall.clc.v2.API.Call.call_count == 1
 
     @patch.object(clc_firewall_policy, 'clc_sdk')
     def test_delete_firewall_policy_fail(self, mock_clc_sdk):
@@ -330,7 +330,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             firewall_dict=firewall_dict)
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(response, mock_firewall_response)
-        test_firewall.clc.v2.API.Call.assert_called_once
+        assert test_firewall.clc.v2.API.Call.call_count == 1
 
     @patch.object(clc_firewall_policy, 'clc_sdk')
     def test_update_firewall_policy_fail(self, mock_clc_sdk):
@@ -410,7 +410,8 @@ class TestClcFirewallPolicy(unittest.TestCase):
 
         mock_ClcFirewallPolicy.assert_called_once_with(
             mock_AnsibleModule_instance)
-        mock_ClcFirewallPolicy_instance.process_request.assert_called_once
+        assert mock_ClcFirewallPolicy_instance.process_request.call_count == 1
+
 
     @patch.object(ClcFirewallPolicy, '_ensure_firewall_policy_is_present')
     @patch.object(ClcFirewallPolicy, '_set_clc_credentials_from_env')
