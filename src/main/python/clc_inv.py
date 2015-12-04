@@ -71,8 +71,8 @@ def print_inventory_json():
     groups = _find_all_groups()
     servers = _get_servers_from_groups(groups)
     hostvars = _find_all_hostvars_for_servers(servers)
-#    dynamic_groups = _build_hostvars_dynamic_groups(hostvars)
-#    groups.update(dynamic_groups)
+    dynamic_groups = _build_hostvars_dynamic_groups(hostvars)
+    groups.update(dynamic_groups)
 
     result = groups
     result['_meta'] = hostvars
