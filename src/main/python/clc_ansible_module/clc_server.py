@@ -883,7 +883,7 @@ class ClcServer:
         if state == 'present' and (
                 len(server_name) < 1 or (len(server_name) + len(alias)) > 10):
             module.fail_json(msg=str(
-                "When state = 'present', name must be a string with a minimum length of 1 and a maximum length of 6"))
+                "When state = 'present', length of account alias + name must be a string with a minimum length of 1 and a maximum length of 10"))
 
     @staticmethod
     def _validate_counts(module):
