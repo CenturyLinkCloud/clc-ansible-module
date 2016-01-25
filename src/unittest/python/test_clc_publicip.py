@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 # Copyright 2015 CenturyLink
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -314,6 +314,21 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         self.module.check_mode = False
         under_test = ClcPublicIp(self.module)
         under_test.ensure_public_ip_present(server_ids, protocol, ports)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcPublicIp, '_get_servers_from_clc')
+    def test_ensure_server_publicip_present_w_mock_server_restrictions(self,mock_get_servers):
+        server_ids = ['TESTSVR1']
+        mock_get_servers.return_value=[mock.MagicMock()]
+        protocol = 'TCP'
+        ports = [80]
+        restrictions = ['1.1.1.1/24', '2.2.2.0/36']
+        self.module.check_mode = False
+        under_test = ClcPublicIp(self.module)
+        under_test.ensure_public_ip_present(server_ids=server_ids,
+                                            protocol=protocol,
+                                            ports=ports,
+                                            source_restrictions=restrictions)
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcPublicIp, '_get_servers_from_clc')
