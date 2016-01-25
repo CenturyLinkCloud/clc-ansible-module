@@ -839,10 +839,10 @@ class TestClcServerFunctions(unittest.TestCase):
 
     def test_validate_name(self):
         # Setup
-        self.module.params = {"name": "MyName", "state": "present"}  # Name is 6 Characters - Pass
+        self.module.params = {"name": "MyName", "state": "present"}  # Name is <=6 Characters - Pass
 
         # Function Under Test
-        ClcServer._validate_name(self.module)
+        ClcServer._validate_name(self.module, 'aa')
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, False)
@@ -852,7 +852,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = {"name": "MyNameIsTooLong", "state": "present"}  # Name is >6 Characters - Fail
 
         # Function Under Test
-        result = ClcServer._validate_name(self.module)
+        result = ClcServer._validate_name(self.module, 'hi')
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)
@@ -862,7 +862,37 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = {"name": "", "state": "present"}  # Name is <1 Characters - Fail
 
         # Function Under Test
-        result = ClcServer._validate_name(self.module)
+        result = ClcServer._validate_name(self.module, 'n/a')
+
+        # Assert Result
+        self.assertEqual(self.module.fail_json.called, True)
+
+    def test_validate_name_acct_alias_2_server_name_8(self):
+        # Setup
+        self.module.params = {"name": "12345678", "state": "present"}  # AA = 2 chars; name = 8 chars -> pass
+
+        # Function Under Test
+        result = ClcServer._validate_name(self.module, "AB")
+
+        # Assert Result
+        self.assertEqual(self.module.fail_json.called, False)
+
+    def test_validate_name_acct_alias_3_server_name_7(self):
+        # Setup
+        self.module.params = {"name": "1234567", "state": "present"}  # AA = 3 chars; name = 7 chars -> pass
+
+        # Function Under Test
+        result = ClcServer._validate_name(self.module, "ABC")
+
+        # Assert Result
+        self.assertEqual(self.module.fail_json.called, False)
+
+    def test_validate_name_acct_alias_6_server_name_5(self):
+        # Setup
+        self.module.params = {"name": "12345", "state": "present"}  # AA = 6 chars; name = 5 chars -> fail
+
+        # Function Under Test
+        result = ClcServer._validate_name(self.module, "ABCDEF")
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)

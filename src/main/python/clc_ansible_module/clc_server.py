@@ -727,11 +727,14 @@ class ClcServer:
         params = module.params
         datacenter = ClcServer._find_datacenter(clc, module)
 
+        # Grab the alias so that we can properly validate server name
+        alias = ClcServer._find_alias(clc, module)
+
         ClcServer._validate_types(module)
-        ClcServer._validate_name(module)
+        ClcServer._validate_name(module, alias)
         ClcServer._validate_counts(module)
 
-        params['alias'] = ClcServer._find_alias(clc, module)
+        params['alias'] = alias
         params['cpu'] = ClcServer._find_cpu(clc, module)
         params['memory'] = ClcServer._find_memory(clc, module)
         params['description'] = ClcServer._find_description(module)
@@ -868,7 +871,7 @@ class ClcServer:
                     msg=str("Hyperscale VMs must have storage_type = 'hyperscale'"))
 
     @staticmethod
-    def _validate_name(module):
+    def _validate_name(module, alias):
         """
         Validate that name is the correct length if provided, fail if it's not
         :param module: the module to validate
@@ -878,9 +881,9 @@ class ClcServer:
         state = module.params.get('state')
 
         if state == 'present' and (
-                len(server_name) < 1 or len(server_name) > 6):
+                len(server_name) < 1 or (len(server_name) + len(alias)) > 10):
             module.fail_json(msg=str(
-                "When state = 'present', name must be a string with a minimum length of 1 and a maximum length of 6"))
+                "When state = 'present', length of account alias + name must be a string with a minimum length of 1 and a maximum length of 10"))
 
     @staticmethod
     def _validate_counts(module):
