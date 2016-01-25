@@ -361,6 +361,9 @@ Creates a public ip on an existing server or servers.
         server_ids:
             - UC1ACCTSRVR01
             - UC1ACCTSRVR02
+        source_restrictions:
+            - 1.1.1.0/24
+            - 2.2.2.0/32
         state: present
       register: clc
 
@@ -392,6 +395,7 @@ Creates a public ip on an existing server or servers.
 | `protocol:` | N |TCP | | The Protocol that the public IP will listen for |
 | `ports:` | Y | | | A list of ports to expose|
 | `server_ids:` | Y |  |  | A list of servers to create public ips on. |
+| `source_restrictions:` | N |  |  | A list of IP range allowed to access the public IP which is specified using CIDR notation. |
 | `state:` | N | `present` | `present`,`absent` | Determine whether to create or delete public IPs.  If `present` module will not create a second public ip if one already exists. |
 | `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
 

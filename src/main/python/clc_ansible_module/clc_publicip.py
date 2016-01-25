@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
 # CenturyLink Cloud Ansible Modules.
 #
@@ -47,6 +47,13 @@ options:
     description:
       - A list of servers to create public ips on.
     required: True
+  source_restrictions:
+    description:
+      - The source IP address range allowed to access the new public IP address.
+        Used to restrict access to only the specified range of source IPs.
+        The IP range allowed to access the public IP should be specified using CIDR notation.
+    required: False
+    default: None
   state:
     description:
       - Determine whether to create or delete public IPs. If present module will not create a second public ip if one
@@ -188,11 +195,12 @@ class ClcPublicIp(object):
         server_ids = params['server_ids']
         ports = params['ports']
         protocol = params['protocol']
+        restrictions = params.get('source_restrictions')
         state = params['state']
 
         if state == 'present':
             changed, changed_server_ids, requests = self.ensure_public_ip_present(
-                server_ids=server_ids, protocol=protocol, ports=ports)
+                server_ids=server_ids, protocol=protocol, ports=ports, source_restrictions=restrictions)
         elif state == 'absent':
             changed, changed_server_ids, requests = self.ensure_public_ip_absent(
                 server_ids=server_ids)
@@ -212,17 +220,19 @@ class ClcPublicIp(object):
             server_ids=dict(type='list', required=True),
             protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
             ports=dict(type='list'),
+            source_restrictions=dict(type='list'),
             wait=dict(type='bool', default=True),
             state=dict(default='present', choices=['present', 'absent']),
         )
         return argument_spec
 
-    def ensure_public_ip_present(self, server_ids, protocol, ports):
+    def ensure_public_ip_present(self, server_ids, protocol, ports, source_restrictions=None):
         """
         Ensures the given server ids having the public ip available
         :param server_ids: the list of server ids
         :param protocol: the ip protocol
         :param ports: the list of ports to expose
+        :param source_restrictions: The list of IP range allowed to access the public IP, specified using CIDR notation.
         :return: (changed, changed_server_ids, results)
                   changed: A flag indicating if there is any change
                   changed_server_ids : the list of server ids that are changed
@@ -231,6 +241,7 @@ class ClcPublicIp(object):
         changed = False
         results = []
         changed_server_ids = []
+        restrictions_list = []
         servers = self._get_servers_from_clc(
             server_ids,
             'Failed to obtain server list from the CLC API')
@@ -239,18 +250,20 @@ class ClcPublicIp(object):
                 server.PublicIPs().public_ips) == 0]
         ports_to_expose = [{'protocol': protocol, 'port': port}
                            for port in ports]
+        if source_restrictions:
+            restrictions_list = [{'cidr': cidr} for cidr in source_restrictions]
         for server in servers_to_change:
             if not self.module.check_mode:
-                result = self._add_publicip_to_server(server, ports_to_expose)
+                result = self._add_publicip_to_server(server, ports_to_expose, source_restrictions=restrictions_list)
                 results.append(result)
             changed_server_ids.append(server.id)
             changed = True
         return changed, changed_server_ids, results
 
-    def _add_publicip_to_server(self, server, ports_to_expose):
+    def _add_publicip_to_server(self, server, ports_to_expose, source_restrictions=None):
         result = None
         try:
-            result = server.PublicIPs().Add(ports_to_expose)
+            result = server.PublicIPs().Add(ports=ports_to_expose, source_restrictions=source_restrictions)
         except CLCException, ex:
             self.module.fail_json(msg='Failed to add public ip to the server : {0}. {1}'.format(
                 server.id, ex.response_text

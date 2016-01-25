@@ -23,7 +23,10 @@
         ports:
             - 80
         server_ids:
-            - UC1WFADTST01
-            - UC1WFADTST02
+            - UC1WFADTEST01
+            - UC1WFADTEST02
+        source_restrictions:
+            - 70.100.60.140/32
+            - 71.100.60.0/24
         state: present
       register: clc
