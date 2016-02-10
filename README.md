@@ -228,6 +228,20 @@ This module can be used to modify server configuration in CLC.
         state: present
 ```
 
+```yaml
+---
+- name: modify clc server example - add nic
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: add secondary nic
+      clc_modify_server:
+        server_ids:
+            - UC1ACCTSRVR01
+        network_id: 613a25aff2124d10a71b16cd6fb28975
+        state: present
+
 ###Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
@@ -235,6 +249,7 @@ This module can be used to modify server configuration in CLC.
 | `server_ids:` | Y |  |  | The lis of servers to be modified.
 | `cpu:` | N |  | valid int value | How many CPUs to set on the server.
 | `memory:` | N |  | valid int value | Memory in GB.
+| `network_id:` | N | | network ID or name | Add a secondary NIC assigned to specified network.
 | `anti_affinity_policy_id:` | N | | | The anti-affinity policy id to assign to the server. This is mutually exclusive with `anti_affinity_policy_name:`
 | `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server. This is mutually exclusive with `anti_affinity_policy_id:`
 | `alert_policy_id:` | N | | | The alert policy id to assign to the server. This is mutually exclusive with `alert_policy_name:`

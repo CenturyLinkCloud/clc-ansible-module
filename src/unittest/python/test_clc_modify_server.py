@@ -770,6 +770,19 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         self.assertEqual(changed, False)
         self.assertEqual(res, None)
 
+    @patch.object(ClcModifyServer, '_modify_clc_server')
+    def test_add_second_nic(self, mock_modify_server):
+        mock_modify_server.retrun_value = 'OK'
+        mock_server = mock.MagicMock()
+        server_params = {
+            'network_id': 'Test Network'
+        }
+        self.module.check_mode = False
+        under_test = ClcModifyServer(self.module)
+        changed, res = under_test._ensure_server_config(mock_server, server_params)
+        self.assertEqual(changed, False)
+        self.assertEqual(res, None)
+
     @patch.object(clc_modify_server, 'clc_sdk')
     def test_get_servers_from_clc_exception(self, mock_clc_sdk):
         error = CLCException()

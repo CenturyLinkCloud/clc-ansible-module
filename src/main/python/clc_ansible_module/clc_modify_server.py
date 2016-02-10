@@ -118,6 +118,14 @@ EXAMPLES = '''
     memory: 8
     state: present
 
+- name: add a secondary nic
+  clc_modify_server:
+    server_ids:
+        - UC1TESTSVR01
+        - UC1TESTSVR02
+    network_id: 613a25aff2124d10a71b16cd6fb28975
+    state: present
+
 - name: set the anti affinity policy on a server
   clc_modify_server:
     server_ids:
