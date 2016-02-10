@@ -628,17 +628,41 @@ class ClcModifyServer:
         """
         result = None
         acct_alias = clc.v2.Account.GetAlias()
-        network_id = clc._find_network_id(module, datacenter=server_id[:3])
+        datacenter = ClcModifyServer._find_datacenter(clc, module)
+        network_id = ClcModifyServer._find_network_id(module, datacenter)
         try:
             job_obj = clc.v2.Server(alias=acct_alias, id=server_id). \
                 AddNIC(network_id=network_id). \
                 WaitUntilComplete()
             result = job_obj
         except APIFailedResponse as ex:
-            module.fail_json(
-                msg='Unable to add nic to : "{0}" . {1}'.format(
-                    server_id, str(ex.response_text)))
+            if "already has an adapter" in str(ex.response_text):
+                result = str(ex.response_text)
+            else:
+                module.fail_json(
+                    msg='Unable to update the server configuration for server : "{0}". {1}'.format(
+                        server_id, str(ex.response_text)))
         return result
+
+    @staticmethod
+    def _find_datacenter(clc, module):
+        """
+        Find the datacenter by calling the CLC API.
+        :param clc: clc-sdk instance to use
+        :param module: module to validate
+        :return: clc-sdk.Datacenter instance
+        """
+        location = module.params.get('location')
+        try:
+            if not location:
+                account = clc.v2.Account()
+                location = account.data.get('primaryDataCenter')
+            data_center = clc.v2.Datacenter(location)
+            return data_center
+        except CLCException as ex:
+            module.fail_json(
+                msg=str(
+                    "Unable to find location: {0}".format(location)))
 
     @staticmethod
     def _find_network_id(module, datacenter):
@@ -649,6 +673,7 @@ class ClcModifyServer:
         :return: a valid network id
         """
         network_id = module.params.get('network_id')
+
         # Validates provided network id
         # Allows lookup of network by id, name, or cidr notation
         if network_id:
@@ -670,7 +695,6 @@ class ClcModifyServer:
 
         return network_id
 
-    @staticmethod
     def _ensure_nic_present(self, server, server_params):
         """
 
@@ -687,7 +711,7 @@ class ClcModifyServer:
                 self.clc,
                 self.module,
                 server.id)
-            if add_nic == '0':
+            if add_nic == 0:
                 changed = True
         return changed
 
