@@ -249,7 +249,7 @@ This module can be used to modify server configuration in CLC.
 | `server_ids:` | Y |  |  | The lis of servers to be modified.
 | `cpu:` | N |  | valid int value | How many CPUs to set on the server.
 | `memory:` | N |  | valid int value | Memory in GB.
-| `network_id:` | N | | network ID or name | Add a secondary NIC assigned to specified network.
+| `network_id:` | N |  | network ID or name | Add a secondary NIC assigned to specified network.
 | `anti_affinity_policy_id:` | N | | | The anti-affinity policy id to assign to the server. This is mutually exclusive with `anti_affinity_policy_name:`
 | `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server. This is mutually exclusive with `anti_affinity_policy_id:`
 | `alert_policy_id:` | N | | | The alert policy id to assign to the server. This is mutually exclusive with `alert_policy_name:`
