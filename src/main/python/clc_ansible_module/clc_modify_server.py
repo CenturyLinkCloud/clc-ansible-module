@@ -427,7 +427,9 @@ class ClcModifyServer:
             anti_affinity_policy_name=dict(),
             alert_policy_id=dict(),
             alert_policy_name=dict(),
-            wait=dict(type='bool', default=True)
+            wait=dict(type='bool', default=True),
+            network_id=dict(),
+            add_nic=dict(default='absent', choices=['present', 'absent'])
         )
         mutually_exclusive = [
             ['anti_affinity_policy_id', 'anti_affinity_policy_name'],
@@ -491,11 +493,14 @@ class ClcModifyServer:
             'anti_affinity_policy_name': p.get('anti_affinity_policy_name'),
             'alert_policy_id': p.get('alert_policy_id'),
             'alert_policy_name': p.get('alert_policy_name'),
+            'network_id': p.get('network_id'),
+            'add_nic': p.get('add_nic'),
         }
         changed = False
         server_changed = False
         aa_changed = False
         ap_changed = False
+        nic_changed = False
         server_dict_array = []
         result_server_ids = []
         request_list = []
@@ -520,6 +525,9 @@ class ClcModifyServer:
                 ap_changed = self._ensure_alert_policy_present(
                     server,
                     server_params)
+                nic_changed = self._ensure_nic_present(
+                    server,
+                    server_params)
             elif state == 'absent':
                 aa_changed = self._ensure_aa_policy_absent(
                     server,
@@ -527,7 +535,7 @@ class ClcModifyServer:
                 ap_changed = self._ensure_alert_policy_absent(
                     server,
                     server_params)
-            if server_changed or aa_changed or ap_changed:
+            if server_changed or aa_changed or ap_changed or nic_changed:
                 changed_servers.append(server)
                 changed = True
 
@@ -600,6 +608,80 @@ class ClcModifyServer:
                 msg='Unable to update the server configuration for server : "{0}". {1}'.format(
                     server_id, str(ex.response_text)))
         return result
+
+    @staticmethod
+    def _modify_add_nic(clc, module, server_id):
+        """
+        Add a secondary nic to existing clc server
+        :param clc: the clc-sdk instance to use
+        :param module: the AnsibleModule object
+        :param server_id: id of the server to modify
+        :return:
+        """
+        result = None
+        acct_alias = clc.v2.Account.GetAlias()
+        network_id = clc._find_network_id(module, datacenter=server_id[:3])
+        try:
+            job_obj = clc.v2.Server(alias=acct_alias, id=server_id). \
+                AddNIC(network_id=network_id). \
+                WaitUntilComplete()
+            result = job_obj
+        except APIFailedResponse as ex:
+            module.fail_json(
+                msg='Unable to add nic to : "{0}" . {1}'.format(
+                    server_id, str(ex.response_text)))
+        return result
+
+    @staticmethod
+    def _find_network_id(module, datacenter):
+        """
+        Validate the provided network id or return a default.
+        :param module: the module to validate
+        :param datacenter: the datacenter to search for a network id
+        :return: a valid network id
+        """
+        network_id = module.params.get('network_id')
+        # Validates provided network id
+        # Allows lookup of network by id, name, or cidr notation
+        if network_id:
+          network_id = datacenter.Networks(forced_load=True).Get(network_id).id
+
+        if not network_id:
+            try:
+                network_id = datacenter.Networks().networks[0].id
+                # -- added for clc-sdk 2.23 compatibility
+                # datacenter_networks = clc_sdk.v2.Networks(
+                #   networks_lst=datacenter._DeploymentCapabilities()['deployableNetworks'])
+                # network_id = datacenter_networks.networks[0].id
+                # -- end
+            except CLCException:
+                module.fail_json(
+                    msg=str(
+                        "Unable to find a network in location: " +
+                        datacenter.id))
+
+        return network_id
+
+    @staticmethod
+    def _ensure_nic_present(self, server, server_params):
+        """
+
+        :param server: server to add nic
+        :param server_params: add_nic method
+        :return:
+        """
+
+        changed = False
+
+        add_nic = server_params.get('add_nic')
+        if add_nic == 'present':
+            add_nic = self._modify_add_nic(
+                self.clc,
+                self.module,
+                server.id)
+            if add_nic == '0':
+                changed = True
+        return changed
 
     @staticmethod
     def _wait_for_requests(module, request_list):
