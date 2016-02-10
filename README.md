@@ -241,6 +241,7 @@ This module can be used to modify server configuration in CLC.
             - UC1ACCTSRVR01
         network_id: '613a25aff2124d10a71b16cd6fb28975'
         add_nic: 'present'
+```
 
 ###Available Parameters
 
@@ -249,6 +250,8 @@ This module can be used to modify server configuration in CLC.
 | `server_ids:` | Y |  |  | The lis of servers to be modified.
 | `cpu:` | N |  | valid int value | How many CPUs to set on the server.
 | `memory:` | N |  | valid int value | Memory in GB.
+| `add_nic:` | N |  |  | Add a secondary nic to server.
+| `network_id:` | N |  | ID or Name of network. Required when adding a secondary nic.
 | `anti_affinity_policy_id:` | N | | | The anti-affinity policy id to assign to the server. This is mutually exclusive with `anti_affinity_policy_name:`
 | `anti_affinity_policy_name:` | N | | | The anti-affinity policy name to assign to the server. This is mutually exclusive with `anti_affinity_policy_id:`
 | `alert_policy_id:` | N | | | The alert policy id to assign to the server. This is mutually exclusive with `alert_policy_name:`
