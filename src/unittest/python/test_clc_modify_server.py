@@ -903,5 +903,90 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         under_test._refresh_servers(self.module, mock_servers)
         self.module.fail_json.assert_called_with(msg='Unable to refresh the server mock_server_id. Mock fail message')
 
+    def test_find_network_id_existing_different(self):
+        params = {
+            'additional_network': 'test2'
+        }
+        self.module.params = params
+        mock_datacenter = mock.MagicMock()
+        mock_network1 = mock.MagicMock()
+        mock_network1.id = 'test1'
+        mock_network2 = mock.MagicMock()
+        mock_network2.id = 'test2'
+        mock_datacenter.Networks().Get.return_value = mock_network1
+        ret = ClcModifyServer._find_network_id(self.module, mock_datacenter)
+        self.assertEqual(ret, 'test1')
+        self.assertEqual(self.module.fail_json.called, False)
+
+    def test_find_network_id_no_network(self):
+        params = {
+            'additional_network': 'test1'
+        }
+        self.module.params = params
+        mock_datacenter = mock.MagicMock()
+        mock_datacenter.id = 'DC1'
+        mock_network1 = mock.MagicMock()
+        mock_network1.id = 'test1'
+        mock_network2 = mock.MagicMock()
+        mock_network2.id = 'test2'
+        mock_datacenter.Networks().Get.return_value = None
+        ClcModifyServer._find_network_id(self.module, mock_datacenter)
+        self.module.fail_json.assert_called_with(msg='Unable to find a network with name/id "test1" at location: DC1')
+
+    def test_find_datacenter(self):
+        mock_account = mock.MagicMock()
+        self.module.params = {}
+        mock_account.data = {
+            'primaryDataCenter' : 'LOC1'
+        }
+        self.clc.v2.Account.return_value = mock_account
+        self.clc.v2.Datacenter.return_value = 'DC1'
+        ret = ClcModifyServer._find_datacenter(self.clc, self.module)
+        self.assertEqual(ret, 'DC1')
+
+    def test_find_datacenter_error(self):
+        self.module.params = {
+            'location': 'test'
+        }
+        mock_account = mock.MagicMock()
+        self.clc.v2.Account.return_value = mock_account
+        error = CLCException()
+        error.message = 'Mock failure message'
+        self.clc.v2.Datacenter.side_effect = error
+        ret = ClcModifyServer._find_datacenter(self.clc, self.module)
+        self.module.fail_json.assert_called_with(msg='Unable to find location: test. Mock failure message')
+        self.assertEqual(ret, None)
+
+    @patch.object(ClcModifyServer, '_modify_add_nic')
+    def test_ensure_nic_present_change(self, add_nic):
+        add_nic.return_value = 0
+        mock_server = mock.MagicMock()
+        mock_server_params = {
+            'additional_network': 'test'
+        }
+        under_test = ClcModifyServer(self.module)
+        changed = under_test._ensure_nic_present(mock_server, mock_server_params)
+        self.assertEqual(changed, True)
+
+    @patch.object(ClcModifyServer, '_modify_add_nic')
+    def test_ensure_nic_present_no_change(self, add_nic):
+        add_nic.return_value = 1
+        mock_server = mock.MagicMock()
+        mock_server_params = {
+            'additional_network': 'test'
+        }
+        under_test = ClcModifyServer(self.module)
+        changed = under_test._ensure_nic_present(mock_server, mock_server_params)
+        self.assertEqual(changed, False)
+
+    @patch.object(ClcModifyServer, '_find_datacenter')
+    @patch.object(ClcModifyServer, '_find_network_id')
+    def test_modify_add_nic_no_error(self, mock_network, mock_dc):
+        #self.clc.v2.Server.return_value='mock_job'
+        self.module.clc = self.clc
+        under_test = ClcModifyServer(self.module)
+        under_test._modify_add_nic(self.clc, self.module, 'server_id')
+        self.assertEqual(self.module.fail_json.called, False)
+
 if __name__ == '__main__':
     unittest.main()

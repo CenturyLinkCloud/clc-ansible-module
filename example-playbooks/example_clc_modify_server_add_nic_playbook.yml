@@ -17,13 +17,13 @@
   gather_facts: False
   connection: local
   tasks:
-    - name: Modify Servers at CLC
+    - name: add additional network
       clc_modify_server:
         server_ids:
-            - UC1WFADTEST24
-            - UC1WFADTEST25
-        add_nic: 'present'
-        network_id: '613a25aff2124d10a71b16cd6fb28975'
+            - UC1WFADTEST01
+            - UC1WFADTEST02
+        additional_network: 'IT Network'
+        state: 'present'
       register: clc
 
     - name: debug

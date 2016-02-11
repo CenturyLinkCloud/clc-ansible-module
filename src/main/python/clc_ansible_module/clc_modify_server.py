@@ -71,6 +71,11 @@ options:
         This is mutually exclusive with 'alert_policy_id'
     required: False
     default: None
+  additional_network:
+    description:
+      - The additional network id/name that needs to be added to the server
+    required: False
+    default: None
   state:
     description:
       - The state to insure that the provided resources are in.
@@ -616,7 +621,7 @@ class ClcModifyServer:
         return result
 
     @staticmethod
-    def  _modify_add_nic(clc, module, server_id):
+    def _modify_add_nic(clc, module, server_id):
         """
         Add a secondary nic to existing clc server
         :param clc: the clc-sdk instance to use
@@ -660,7 +665,7 @@ class ClcModifyServer:
         except CLCException as ex:
             module.fail_json(
                 msg=str(
-                    "Unable to find location: {0}".format(location)))
+                    "Unable to find location: {0}. {1}".format(location, ex.message)))
 
     @staticmethod
     def _find_network_id(module, datacenter):
