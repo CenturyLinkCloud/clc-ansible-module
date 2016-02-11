@@ -123,7 +123,7 @@ EXAMPLES = '''
     server_ids:
         - UC1TESTSVR01
         - UC1TESTSVR02
-    network_id: 613a25aff2124d10a71b16cd6fb28975
+    additional_network: 613a25aff2124d10a71b16cd6fb28975
     state: present
 
 - name: set the anti affinity policy on a server
@@ -436,8 +436,7 @@ class ClcModifyServer:
             alert_policy_id=dict(),
             alert_policy_name=dict(),
             wait=dict(type='bool', default=True),
-            network_id=dict(),
-            add_nic=dict(default='absent', choices=['present', 'absent'])
+            additional_network=dict(),
         )
         mutually_exclusive = [
             ['anti_affinity_policy_id', 'anti_affinity_policy_name'],
@@ -501,8 +500,7 @@ class ClcModifyServer:
             'anti_affinity_policy_name': p.get('anti_affinity_policy_name'),
             'alert_policy_id': p.get('alert_policy_id'),
             'alert_policy_name': p.get('alert_policy_name'),
-            'network_id': p.get('network_id'),
-            'add_nic': p.get('add_nic'),
+            'additional_network': p.get('additional_network'),
         }
         changed = False
         server_changed = False
@@ -629,10 +627,10 @@ class ClcModifyServer:
         result = None
         acct_alias = clc.v2.Account.GetAlias()
         datacenter = ClcModifyServer._find_datacenter(clc, module)
-        network_id = ClcModifyServer._find_network_id(module, datacenter)
+        additional_network = ClcModifyServer._find_network_id(module, datacenter)
         try:
             job_obj = clc.v2.Server(alias=acct_alias, id=server_id). \
-                AddNIC(network_id=network_id). \
+                AddNIC(network_id=additional_network). \
                 WaitUntilComplete()
             result = job_obj
         except APIFailedResponse as ex:
@@ -672,7 +670,7 @@ class ClcModifyServer:
         :param datacenter: the datacenter to search for a network id
         :return: a valid network id
         """
-        network_id = module.params.get('network_id')
+        network_id = module.params.get('additional_network')
 
         # Validates provided network id
         # Allows lookup of network by id, name, or cidr notation
@@ -705,8 +703,8 @@ class ClcModifyServer:
 
         changed = False
 
-        add_nic = server_params.get('add_nic')
-        if add_nic == 'present':
+        additional_network = server_params.get('additional_network')
+        if additional_network:
             add_nic = self._modify_add_nic(
                 self.clc,
                 self.module,
