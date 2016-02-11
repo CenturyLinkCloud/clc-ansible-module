@@ -55,7 +55,7 @@ def initialize( project ):
 	project.get_property('filter_resources_glob').append('**/clc_ansible_module/*.py')
 	# ----------------
 	# install clc-sdk during installation
-	project.depends_on("clc-sdk", "==2.37")
+	project.depends_on("clc-sdk", "==2.42")
 	# ----------------
 	# execute some installation scripts
 	project.set_property('dir_source_main_scripts', 'src/main/python')
