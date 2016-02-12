@@ -43,9 +43,9 @@ options:
       - A list of ports to expose. This is required when state is 'present'
     required: False
     default: None
-  server_ids:
+  server_id:
     description:
-      - A list of servers to create public ips on.
+      - The server on which to create a public ip
     required: True
   source_restrictions:
     description:
@@ -96,9 +96,7 @@ EXAMPLES = '''
         protocol: 'TCP'
         ports:
             - 80
-        server_ids:
-            - UC1TEST-SVR01
-            - UC1TEST-SVR02
+        server_id: UC1TEST-SVR01
         state: present
       register: clc
 
@@ -112,9 +110,7 @@ EXAMPLES = '''
   tasks:
     - name: Delete Public IP For Servers
       clc_publicip:
-        server_ids:
-            - UC1TEST-SVR01
-            - UC1TEST-SVR02
+        server_id: UC1TEST-SVR01
         state: absent
       register: clc
 
@@ -128,15 +124,12 @@ changed:
     returned: success
     type: boolean
     sample: True
-server_ids:
-    description: The list of server ids that are changed
+server_id:
+    description: The server id that is changed
     returned: success
     type: list
     sample:
-        [
-            "UC1TEST-SVR01",
-            "UC1TEST-SVR02"
-        ]
+        "UC1TEST-SVR01"
 '''
 
 __version__ = '${version}'
@@ -192,23 +185,23 @@ class ClcPublicIp(object):
         """
         self._set_clc_credentials_from_env()
         params = self.module.params
-        server_ids = params['server_ids']
+        server_id = params['server_id']
         ports = params['ports']
         protocol = params['protocol']
         restrictions = params.get('source_restrictions')
         state = params['state']
 
         if state == 'present':
-            changed, changed_server_ids, requests = self.ensure_public_ip_present(
-                server_ids=server_ids, protocol=protocol, ports=ports, source_restrictions=restrictions)
+            changed, changed_server_id, request = self.ensure_public_ip_present(
+                server_id=server_id, protocol=protocol, ports=ports, source_restrictions=restrictions)
         elif state == 'absent':
-            changed, changed_server_ids, requests = self.ensure_public_ip_absent(
-                server_ids=server_ids)
+            changed, changed_server_id, request = self.ensure_public_ip_absent(
+                server_id=server_id)
         else:
             return self.module.fail_json(msg="Unknown State: " + state)
-        self._wait_for_requests_to_complete(requests)
+        self._wait_for_request_to_complete(request)
         return self.module.exit_json(changed=changed,
-                                     server_ids=changed_server_ids)
+                                     server_id=changed_server_id)
 
     @staticmethod
     def _define_module_argument_spec():
@@ -217,7 +210,7 @@ class ClcPublicIp(object):
         :return: argument spec dictionary
         """
         argument_spec = dict(
-            server_ids=dict(type='list', required=True),
+            server_id=dict(required=True),
             protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
             ports=dict(type='list'),
             source_restrictions=dict(type='list'),
@@ -226,39 +219,37 @@ class ClcPublicIp(object):
         )
         return argument_spec
 
-    def ensure_public_ip_present(self, server_ids, protocol, ports, source_restrictions=None):
+    def ensure_public_ip_present(self, server_id, protocol, ports, source_restrictions=None):
         """
         Ensures the given server ids having the public ip available
-        :param server_ids: the list of server ids
+        :param server_id: the server id
         :param protocol: the ip protocol
         :param ports: the list of ports to expose
         :param source_restrictions: The list of IP range allowed to access the public IP, specified using CIDR notation.
-        :return: (changed, changed_server_ids, results)
+        :return: (changed, changed_server_id, results)
                   changed: A flag indicating if there is any change
-                  changed_server_ids : the list of server ids that are changed
+                  changed_server_id : the server id that is changed
                   results: The result list from clc public ip call
         """
         changed = False
         results = []
-        changed_server_ids = []
+        changed_server_id = ""
         restrictions_list = []
-        servers = self._get_servers_from_clc(
-            server_ids,
-            'Failed to obtain server list from the CLC API')
-        servers_to_change = [
-            server for server in servers if len(
-                server.PublicIPs().public_ips) == 0]
+        server = self._get_server_from_clc(
+            server_id,
+            'Failed to obtain server from the CLC API')
         ports_to_expose = [{'protocol': protocol, 'port': port}
                            for port in ports]
+
         if source_restrictions:
             restrictions_list = [{'cidr': cidr} for cidr in source_restrictions]
-        for server in servers_to_change:
-            if not self.module.check_mode:
-                result = self._add_publicip_to_server(server, ports_to_expose, source_restrictions=restrictions_list)
-                results.append(result)
-            changed_server_ids.append(server.id)
-            changed = True
-        return changed, changed_server_ids, results
+
+        if not self.module.check_mode:
+            result = self._add_publicip_to_server(server, ports_to_expose, source_restrictions=restrictions_list)
+            results.append(result)
+        changed_server_id = server.id
+        changed = True
+        return changed, changed_server_id, results
 
     def _add_publicip_to_server(self, server, ports_to_expose, source_restrictions=None):
         result = None
@@ -270,31 +261,27 @@ class ClcPublicIp(object):
             ))
         return result
 
-    def ensure_public_ip_absent(self, server_ids):
+    def ensure_public_ip_absent(self, server_id):
         """
         Ensures the given server ids having the public ip removed if there is any
-        :param server_ids: the list of server ids
-        :return: (changed, changed_server_ids, results)
+        :param server_id: the server id
+        :return: (changed, changed_server_id, results)
                   changed: A flag indicating if there is any change
-                  changed_server_ids : the list of server ids that are changed
+                  changed_server_id : the changed server id
                   results: The result list from clc public ip call
         """
         changed = False
         results = []
-        changed_server_ids = []
-        servers = self._get_servers_from_clc(
-            server_ids,
-            'Failed to obtain server list from the CLC API')
-        servers_to_change = [
-            server for server in servers if len(
-                server.PublicIPs().public_ips) > 0]
-        for server in servers_to_change:
-            if not self.module.check_mode:
-                result = self._remove_publicip_from_server(server)
-                results.append(result)
-            changed_server_ids.append(server.id)
-            changed = True
-        return changed, changed_server_ids, results
+        changed_server_id = ""
+        server  = self._get_server_from_clc(
+            server_id,
+            'Failed to obtain server from the CLC API')
+        if not self.module.check_mode:
+            result = self._remove_publicip_from_server(server)
+            results.append(result)
+        changed_server_id = server.id
+        changed = True
+        return changed, changed_server_id, results
 
     def _remove_publicip_from_server(self, server):
         result = None
@@ -307,20 +294,19 @@ class ClcPublicIp(object):
             ))
         return result
 
-    def _wait_for_requests_to_complete(self, requests_lst):
+    def _wait_for_request_to_complete(self, request):
         """
-        Waits until the CLC requests are complete if the wait argument is True
-        :param requests_lst: The list of CLC request objects
+        Waits until the CLC request is complete if the wait argument is True
+        :param request: The CLC request objects
         :return: none
         """
         if not self.module.params['wait']:
             return
-        for request in requests_lst:
-            request.WaitUntilComplete()
-            for request_details in request.requests:
-                if request_details.Status() != 'succeeded':
-                    self.module.fail_json(
-                        msg='Unable to process public ip request')
+        request.WaitUntilComplete()
+        for request_details in request.requests:
+            if request_details.Status() != 'succeeded':
+                self.module.fail_json(
+                    msg='Unable to process public ip request')
 
     def _set_clc_credentials_from_env(self):
         """
@@ -350,12 +336,12 @@ class ClcPublicIp(object):
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
 
-    def _get_servers_from_clc(self, server_ids, message):
+    def _get_server_from_clc(self, server_id, message):
         """
         Gets list of servers form CLC api
         """
         try:
-            return self.clc.v2.Servers(server_ids).servers
+            return self.clc.v2.Server(server_id)
         except CLCException as exception:
             self.module.fail_json(msg=message + ': %s' % exception)
 

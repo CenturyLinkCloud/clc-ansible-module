@@ -73,7 +73,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         assert mock_server.PublicIPs().Add()\
             , "Mock must contain valid mocked server with a PublicIPs().Add() function"
 
-        mock_request = server.PublicIPs().Add()
+        mock_request = mock_server.PublicIPs().Add()
         mock_request.Status.return_value = status
         return mock_request
 
@@ -84,7 +84,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         assert mock_server.PublicIPs().public_ips[0].Delete()\
             , "Mock must contain valid mocked server with a PublicIPs().Add() function"
 
-        mock_request = server.PublicIPs().public_ips[0].Delete()
+        mock_request = mock_server.PublicIPs().public_ips[0].Delete()
         mock_request.Status.return_value = status
         return mock_request
 
@@ -203,7 +203,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
 
     @patch.object(ClcPublicIp, 'clc')
     def test_get_server_from_clc_api(self, mock_clc_sdk):
-        mock_clc_sdk.v2.Servers.side_effect = CLCException("Server Not Found")
+        mock_clc_sdk.v2.Server.side_effect = CLCException("Server Not Found")
         under_test = ClcPublicIp(self.module)
         under_test._get_server_from_clc('TESTSVR1', 'FAILED TO OBTAIN SERVER')
         self.module.fail_json.assert_called_once_with(msg='FAILED TO OBTAIN SERVER: Server Not Found')
@@ -247,7 +247,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
             ,'wait': True
             ,'state': 'present'
         }
-        mock_public_ip.return_value = True, ['TESTSVR1'], mock.MagicMock()
+        mock_public_ip.return_value = True, 'TESTSVR1', mock.MagicMock()
         self.module.params = test_params
         self.module.check_mode = False
 
@@ -295,7 +295,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_once_with(msg='Unknown State: INVALID')
         self.assertFalse(self.module.exit_json.called)
 
-    @patch.object(ClcPublicIp, '_get_servers_from_clc')
+    @patch.object(ClcPublicIp, '_get_server_from_clc')
     def test_ensure_server_publicip_present_w_mock_server(self,mock_get_server):
         server_id = 'TESTSVR1'
         mock_get_server.return_value=mock.MagicMock()
@@ -306,7 +306,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         under_test.ensure_public_ip_present(server_id, protocol, ports)
         self.assertFalse(self.module.fail_json.called)
 
-    @patch.object(ClcPublicIp, '_get_servers_from_clc')
+    @patch.object(ClcPublicIp, '_get_server_from_clc')
     def test_ensure_server_publicip_present_w_mock_server_restrictions(self,mock_get_server):
         server_id = 'TESTSVR1'
         mock_get_server.return_value=mock.MagicMock()
@@ -321,7 +321,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
                                             source_restrictions=restrictions)
         self.assertFalse(self.module.fail_json.called)
 
-    @patch.object(ClcPublicIp, '_get_servers_from_clc')
+    @patch.object(ClcPublicIp, '_get_server_from_clc')
     def test_ensure_server_absent_absent_w_mock_server(self,mock_get_server):
         server_id = ['TESTSVR1']
         mock_server1 = mock.MagicMock()
@@ -331,14 +331,14 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         ip.Delete.return_value = 'success'
         public_ips_obj.public_ips = [ip]
         mock_server1.PublicIPs.return_value = public_ips_obj
-        mock_get_server.return_value=[mock_server1]
+        mock_get_server.return_value = mock_server1
         self.module.check_mode = False
 
         under_test = ClcPublicIp(self.module)
-        changed, servers_modified, requests = under_test.ensure_public_ip_absent(server_id)
+        changed, server_modified, request = under_test.ensure_public_ip_absent(server_id)
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, True)
-        self.assertEqual(servers_modified, ['TESTSVR1'])
+        self.assertEqual(server_modified, 'TESTSVR1')
 
     def test_wait_for_request_w_mock_request(self):
         mock_r1 = mock.MagicMock()
@@ -349,12 +349,12 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         under_test._wait_for_request_to_complete(mock_r1)
         self.assertFalse(self.module.fail_json.called)
 
-    def test_wait_for_requests_w_mock_request_fail(self):
+    def test_wait_for_request_w_mock_request_fail(self):
         mock_request = mock.MagicMock()
         mock_request.WaitUntilComplete.return_value = True
         mock_response = mock.MagicMock()
         mock_response.Status.return_value = 'Failed'
-        mock_request.request = mock_response
+        mock_request.requests = [mock_response]
         self.module.wait = True
 
         under_test = ClcPublicIp(self.module)
