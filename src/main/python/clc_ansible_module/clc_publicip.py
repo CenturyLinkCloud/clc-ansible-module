@@ -8,7 +8,7 @@
 # This file is part of CenturyLink Cloud, and is maintained
 # by the Workflow as a Service Team
 #
-# Copyright 2015 CenturyLink 
+# Copyright 2015 CenturyLink
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -110,7 +110,7 @@ EXAMPLES = '''
   gather_facts: False
   connection: local
   tasks:
-    - name: Create Public IP For Servers
+    - name: Delete Public IP For Servers
       clc_publicip:
         server_ids:
             - UC1TEST-SVR01
