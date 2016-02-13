@@ -232,7 +232,7 @@ class ClcPublicIp(object):
                   results: The result list from clc public ip call
         """
         changed = False
-        results = []
+        result  = ""
         changed_server_id = ""
         restrictions_list = []
         server = self._get_server_from_clc(
@@ -246,10 +246,9 @@ class ClcPublicIp(object):
 
         if not self.module.check_mode:
             result = self._add_publicip_to_server(server, ports_to_expose, source_restrictions=restrictions_list)
-            results.append(result)
         changed_server_id = server.id
         changed = True
-        return changed, changed_server_id, results
+        return changed, changed_server_id, result
 
     def _add_publicip_to_server(self, server, ports_to_expose, source_restrictions=None):
         result = None
@@ -271,17 +270,16 @@ class ClcPublicIp(object):
                   results: The result list from clc public ip call
         """
         changed = False
-        results = []
+        result  = ""
         changed_server_id = ""
         server  = self._get_server_from_clc(
             server_id,
             'Failed to obtain server from the CLC API')
         if not self.module.check_mode:
             result = self._remove_publicip_from_server(server)
-            results.append(result)
         changed_server_id = server.id
         changed = True
-        return changed, changed_server_id, results
+        return changed, changed_server_id, result
 
     def _remove_publicip_from_server(self, server):
         result = None

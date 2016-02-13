@@ -307,6 +307,23 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcPublicIp, '_get_server_from_clc')
+    def test_ensure_server_publicip_present_returns_expected_data(self,mock_get_server):
+        server_id = 'TESTSVR1'
+        mock_server = mock.MagicMock()
+        mock_server.id = server_id
+        mock_server.PublicIPs().Add.return_value = 'Awesome Result'
+        mock_get_server.return_value=mock_server
+
+        self.module.check_mode = False
+        under_test = ClcPublicIp(self.module)
+
+        changed, changed_server_id, result = under_test.ensure_public_ip_present(server_id, 'TCP', [80])
+
+        self.assertEqual(True, changed)
+        self.assertEqual(server_id, changed_server_id)
+        self.assertEqual('Awesome Result', result)
+
+    @patch.object(ClcPublicIp, '_get_server_from_clc')
     def test_ensure_server_publicip_present_w_mock_server_restrictions(self,mock_get_server):
         server_id = 'TESTSVR1'
         mock_get_server.return_value=mock.MagicMock()
@@ -360,6 +377,27 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         under_test = ClcPublicIp(self.module)
         under_test._wait_for_request_to_complete(mock_request)
         self.assertTrue(self.module.fail_json.called)
+
+    @patch.object(ClcPublicIp, '_get_server_from_clc')
+    def test_ensure_server_publicip_absent_returns_expected_data(self,mock_get_server):
+        server_id = 'TESTSVR1'
+        mock_server = mock.MagicMock()
+        mock_server.id = server_id
+        ip1 = mock.MagicMock()
+        ip2 = mock.MagicMock()
+        ip1.Delete = mock.MagicMock(return_value="Hell0")
+        ip2.Delete = mock.MagicMock(return_value="More Awesome Result")
+        mock_server.PublicIPs().public_ips = [ip1, ip2]
+        mock_get_server.return_value=mock_server
+
+        self.module.check_mode = False
+        under_test = ClcPublicIp(self.module)
+
+        changed, changed_server_id, result = under_test.ensure_public_ip_absent(server_id)
+
+        self.assertEqual(True, changed)
+        self.assertEqual(server_id, changed_server_id)
+        self.assertEqual('More Awesome Result', result)
 
     def test_wait_for_request_no_wait(self):
         mock_request = mock.MagicMock()
