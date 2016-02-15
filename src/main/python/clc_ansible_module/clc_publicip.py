@@ -32,6 +32,14 @@ description:
   - An Ansible module to add or delete public ip addresses on an existing server or servers in CenturyLink Cloud.
 version_added: "2.0"
 options:
+  private_ip:
+    description:
+      - The private ip to which the public IP should be NAT'd.
+        If not provided, a private ip will be provisioned on the server's
+        primary network
+    default: None
+    choices: Any private ip belonging to the server
+    required: False
   protocol:
     description:
       - The protocol that the public IP will listen for.
@@ -185,15 +193,20 @@ class ClcPublicIp(object):
         """
         self._set_clc_credentials_from_env()
         params = self.module.params
-        server_id = params['server_id']
-        ports = params['ports']
-        protocol = params['protocol']
+
+        server_id = params.get('server_id')
+        private_ip = params.get('private_ip')
+        ports = params.get('ports')
         restrictions = params.get('source_restrictions')
-        state = params['state']
+        state = params.get('state')
 
         if state == 'present':
             changed, changed_server_id, request = self.ensure_public_ip_present(
-                server_id=server_id, protocol=protocol, ports=ports, source_restrictions=restrictions)
+                server_id=server_id,
+                private_ip=private_ip,
+                ports=ports,
+                source_restrictions=restrictions
+            )
         elif state == 'absent':
             changed, changed_server_id, request = self.ensure_public_ip_absent(
                 server_id=server_id)
@@ -211,25 +224,31 @@ class ClcPublicIp(object):
         """
         argument_spec = dict(
             server_id=dict(required=True),
-            protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
-            ports=dict(type='list'),
+            private_ip=dict(default=None),
+            ports=dict(
+                type='list',
+                default=[],
+                protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
+                port=dict()
+            ),
             source_restrictions=dict(type='list'),
             wait=dict(type='bool', default=True),
             state=dict(default='present', choices=['present', 'absent']),
         )
         return argument_spec
 
-    def ensure_public_ip_present(self, server_id, protocol, ports, source_restrictions=None):
+    def ensure_public_ip_present(self, server_id, ports=[], private_ip=None, source_restrictions=None):
         """
         Ensures the given server ids having the public ip available
         :param server_id: the server id
+        :param private_ip: optional private ip to which private ip should be NAT'ed
         :param protocol: the ip protocol
         :param ports: the list of ports to expose
         :param source_restrictions: The list of IP range allowed to access the public IP, specified using CIDR notation.
-        :return: (changed, changed_server_id, results)
+        :return: (changed, changed_server_id, result)
                   changed: A flag indicating if there is any change
                   changed_server_id : the server id that is changed
-                  results: The result list from clc public ip call
+                  result: The result from clc public ip call
         """
         changed = False
         result  = ""
@@ -238,22 +257,24 @@ class ClcPublicIp(object):
         server = self._get_server_from_clc(
             server_id,
             'Failed to obtain server from the CLC API')
-        ports_to_expose = [{'protocol': protocol, 'port': port}
-                           for port in ports]
 
         if source_restrictions:
             restrictions_list = [{'cidr': cidr} for cidr in source_restrictions]
 
         if not self.module.check_mode:
-            result = self._add_publicip_to_server(server, ports_to_expose, source_restrictions=restrictions_list)
+            result = self._add_publicip_to_server(server, ports, private_ip=private_ip, source_restrictions=restrictions_list)
         changed_server_id = server.id
         changed = True
         return changed, changed_server_id, result
 
-    def _add_publicip_to_server(self, server, ports_to_expose, source_restrictions=None):
+    def _add_publicip_to_server(self, server, ports_to_expose, private_ip=None, source_restrictions=None):
         result = None
         try:
-            result = server.PublicIPs().Add(ports=ports_to_expose, source_restrictions=source_restrictions)
+            result = server.PublicIPs().Add(
+                ports=ports_to_expose
+                , source_restrictions=source_restrictions
+                , private_ip=private_ip
+            )
         except CLCException, ex:
             self.module.fail_json(msg='Failed to add public ip to the server : {0}. {1}'.format(
                 server.id, ex.response_text
@@ -264,10 +285,10 @@ class ClcPublicIp(object):
         """
         Ensures the given server ids having the public ip removed if there is any
         :param server_id: the server id
-        :return: (changed, changed_server_id, results)
+        :return: (changed, changed_server_id, result)
                   changed: A flag indicating if there is any change
                   changed_server_id : the changed server id
-                  results: The result list from clc public ip call
+                  result: The result from clc public ip call
         """
         changed = False
         result  = ""

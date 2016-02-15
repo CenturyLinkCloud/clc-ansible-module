@@ -149,7 +149,6 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_with(msg='requests library is required for this module')
         reload(clc_publicip)
 
-
     def test_set_clc_credentials_w_token(self):
         with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'Token12345',
                                        'CLC_ACCT_ALIAS': 'TEST' }):
@@ -242,8 +241,10 @@ class TestClcPublicIpFunctions(unittest.TestCase):
     def test_process_request_state_present(self, mock_set_clc_creds, mock_public_ip):
         test_params = {
             'server_id': 'TESTSVR1'
-            ,'protocol': 'TCP'
-            ,'ports': [80, 90]
+            ,'ports': [
+                {'port': 80},
+                {'port': 90, 'protocol': 'TCP'}
+            ]
             ,'wait': True
             ,'state': 'present'
         }
@@ -257,13 +258,47 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         self.module.exit_json.assert_called_once_with(changed=True, server_id='TESTSVR1')
         self.assertFalse(self.module.fail_json.called)
 
+    @patch.object(ClcPublicIp, 'ensure_public_ip_present')
+    @patch.object(ClcPublicIp, '_set_clc_credentials_from_env')
+    def test_process_request_calls_ensure_public_ip_present_with_expected_args(self, mock_set_clc_creds, mock_public_ip):
+        test_params = {
+            'server_id': 'TESTSVR1'
+            ,'private_ip': '10.11.12.13'
+            ,'source_restrictions': ['no']
+            ,'ports': [
+                {'port': 80},
+                {'port': 90, 'protocol': 'TCP'}
+            ]
+            ,'wait': True
+            ,'state': 'present'
+        }
+        mock_public_ip.return_value = True, 'TESTSVR1', mock.MagicMock()
+        self.module.params = test_params
+        self.module.check_mode = False
+
+        under_test = ClcPublicIp(self.module)
+        under_test.process_request()
+
+        mock_public_ip.assert_called_once_with(
+            server_id='TESTSVR1'
+            , private_ip="10.11.12.13"
+            , ports=[
+                {'port': 80},
+                {'port': 90, 'protocol': 'TCP'}
+            ]
+            , source_restrictions=['no']
+        )
+        self.assertFalse(self.module.fail_json.called)
+
     @patch.object(ClcPublicIp, 'ensure_public_ip_absent')
     @patch.object(ClcPublicIp, '_set_clc_credentials_from_env')
     def test_process_request_state_absent(self, mock_set_clc_creds, mock_public_ip):
         test_params = {
             'server_id': 'TESTSVR1'
-            ,'protocol': 'TCP'
-            ,'ports': [80, 90]
+            ,'ports': [
+                {'port': 80},
+                {'port': 90, 'protocol': 'TCP'}
+            ]
             ,'wait': True
             ,'state': 'absent'
         }
@@ -282,8 +317,10 @@ class TestClcPublicIpFunctions(unittest.TestCase):
     def test_process_request_state_invalid(self, mock_set_clc_creds, mock_public_ip):
         test_params = {
             'server_id': 'TESTSVR1'
-            ,'protocol': 'TCP'
-            ,'ports': [80, 90]
+            ,'ports': [
+                {'port': 80},
+                {'port': 90, 'protocol': 'TCP'}
+            ]
             ,'wait': True
             ,'state': 'INVALID'
         }
@@ -299,11 +336,13 @@ class TestClcPublicIpFunctions(unittest.TestCase):
     def test_ensure_server_publicip_present_w_mock_server(self,mock_get_server):
         server_id = 'TESTSVR1'
         mock_get_server.return_value=mock.MagicMock()
-        protocol = 'TCP'
-        ports = [80]
+        ports = [
+            {'port': 80},
+            {'port': 90, 'protocol': 'TCP'}
+        ]
         self.module.check_mode = False
         under_test = ClcPublicIp(self.module)
-        under_test.ensure_public_ip_present(server_id, protocol, ports)
+        under_test.ensure_public_ip_present(server_id, ports)
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcPublicIp, '_get_server_from_clc')
@@ -313,11 +352,15 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         mock_server.id = server_id
         mock_server.PublicIPs().Add.return_value = 'Awesome Result'
         mock_get_server.return_value=mock_server
+        ports = [
+            {'port': 80},
+            {'port': 1290, 'protocol': 'UDP'}
+        ]
 
         self.module.check_mode = False
         under_test = ClcPublicIp(self.module)
 
-        changed, changed_server_id, result = under_test.ensure_public_ip_present(server_id, 'TCP', [80])
+        changed, changed_server_id, result = under_test.ensure_public_ip_present(server_id, ports)
 
         self.assertEqual(True, changed)
         self.assertEqual(server_id, changed_server_id)
@@ -327,16 +370,58 @@ class TestClcPublicIpFunctions(unittest.TestCase):
     def test_ensure_server_publicip_present_w_mock_server_restrictions(self,mock_get_server):
         server_id = 'TESTSVR1'
         mock_get_server.return_value=mock.MagicMock()
-        protocol = 'TCP'
-        ports = [80]
+        ports = [
+            {'port': 80},
+            {'port': 1290, 'protocol': 'UDP'}
+        ]
         restrictions = ['1.1.1.1/24', '2.2.2.0/36']
         self.module.check_mode = False
         under_test = ClcPublicIp(self.module)
         under_test.ensure_public_ip_present(server_id=server_id,
-                                            protocol=protocol,
                                             ports=ports,
                                             source_restrictions=restrictions)
         self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcPublicIp, '_add_publicip_to_server')
+    @patch.object(ClcPublicIp, '_get_server_from_clc')
+    def test_ensure_server_publicip_present_calls_private_helper_with_expected_args(self,mock_get_server,mock_add_ip):
+        server_id = 'TESTSVR1'
+        mock_server = mock.MagicMock()
+        mock_get_server.return_value=mock_server
+        private_ip = '2.4.6.01'
+        ports = [
+            {'port': 80},
+            {'port': 1290, 'protocol': 'UDP'}
+        ]
+        restrictions = ['not now']
+        self.module.check_mode = False
+        under_test = ClcPublicIp(self.module)
+        under_test.ensure_public_ip_present(server_id=server_id,
+                                            private_ip=private_ip,
+                                            ports=ports,
+                                            source_restrictions=restrictions)
+        mock_add_ip.assert_called_once_with(
+            mock_server
+            , ports
+            , private_ip=private_ip
+            , source_restrictions=[{'cidr': restrictions[0]}]
+        )
+
+    def test_ensure_add_public_ip_to_server_calls_sdk_add_with_expected_args(self):
+        mock_server = mock.MagicMock()
+        private_ip = '2.4.6.0.1'
+        ports = [{'protocol': 'UDP', 'port': 8675309}]
+        restrictions = [{'cidr': 'cider'}]
+        under_test = ClcPublicIp(self.module)
+        under_test._add_publicip_to_server( server=mock_server,
+                                            private_ip=private_ip,
+                                            ports_to_expose=ports,
+                                            source_restrictions=restrictions)
+        mock_server.PublicIPs().Add.assert_called_once_with(
+            ports=ports
+            , private_ip=private_ip
+            , source_restrictions=restrictions
+        )
 
     @patch.object(ClcPublicIp, '_get_server_from_clc')
     def test_ensure_server_absent_absent_w_mock_server(self,mock_get_server):
