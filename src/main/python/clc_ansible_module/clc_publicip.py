@@ -40,15 +40,9 @@ options:
     default: None
     choices: Any private ip belonging to the server
     required: False
-  protocol:
-    description:
-      - The protocol that the public IP will listen for.
-    default: TCP
-    choices: ['TCP', 'UDP', 'ICMP']
-    required: False
   ports:
     description:
-      - A list of ports to expose. This is required when state is 'present'
+      - A list of structures specifying port and protocol ('TCP','UDP')
     required: False
     default: None
   server_id:
@@ -101,9 +95,9 @@ EXAMPLES = '''
   tasks:
     - name: Create Public IP For Servers
       clc_publicip:
-        protocol: 'TCP'
         ports:
-            - 80
+            - {'port': 80}
+            - {'port': 24601, 'protocol': 'UDP'}
         server_id: UC1TEST-SVR01
         state: present
       register: clc
@@ -196,7 +190,7 @@ class ClcPublicIp(object):
 
         server_id = params.get('server_id')
         private_ip = params.get('private_ip')
-        ports = params.get('ports')
+        ports = self._validate_ports(params.get('ports'))
         restrictions = params.get('source_restrictions')
         state = params.get('state')
 
@@ -216,6 +210,31 @@ class ClcPublicIp(object):
         return self.module.exit_json(changed=changed,
                                      server_id=changed_server_id)
 
+    def _validate_ports(self, ports):
+        """
+        Validates the provided list of port structures
+        :param ports: list of dictionaries specifying port and protocol
+        :return: list of validated ports
+        """
+        validated_ports = []
+
+        for entry in ports:
+            if 'port' not in entry and 'protocol' not in entry:
+                continue
+            elif 'protocol' not in entry:
+                entry['protocol'] = 'TCP'
+            elif entry['protocol'] not in ['TCP', 'UDP']:
+                self.module.fail_json(
+                    msg="Valid protocols for this module are: [TCP, UDP]: You specified '{0}'".format(entry['protocol'])
+                )
+            elif 'port' not in entry:
+                self.module.fail_json(msg="You must provide a port")
+
+            validated_ports.append(entry)
+
+        return validated_ports
+
+
     @staticmethod
     def _define_module_argument_spec():
         """
@@ -228,8 +247,8 @@ class ClcPublicIp(object):
             ports=dict(
                 type='list',
                 default=[],
-                protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
-                port=dict()
+                protocol=dict(default='TCP', choices=['TCP', 'UDP']),
+                port=dict(required=True)
             ),
             source_restrictions=dict(type='list'),
             wait=dict(type='bool', default=True),
@@ -242,8 +261,7 @@ class ClcPublicIp(object):
         Ensures the given server ids having the public ip available
         :param server_id: the server id
         :param private_ip: optional private ip to which private ip should be NAT'ed
-        :param protocol: the ip protocol
-        :param ports: the list of ports to expose
+        :param ports: list of dictionaries specifying ports and protocols to expose
         :param source_restrictions: The list of IP range allowed to access the public IP, specified using CIDR notation.
         :return: (changed, changed_server_id, result)
                   changed: A flag indicating if there is any change

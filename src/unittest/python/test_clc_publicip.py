@@ -283,7 +283,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
             server_id='TESTSVR1'
             , private_ip="10.11.12.13"
             , ports=[
-                {'port': 80},
+                {'port': 80, 'protocol': 'TCP'},
                 {'port': 90, 'protocol': 'TCP'}
             ]
             , source_restrictions=['no']
@@ -310,6 +310,69 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         under_test.process_request()
 
         self.module.exit_json.assert_called_once_with(changed=True, server_id='TESTSVR1')
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(ClcPublicIp, '_validate_ports')
+    @patch.object(ClcPublicIp, 'ensure_public_ip_present')
+    @patch.object(ClcPublicIp, '_set_clc_credentials_from_env')
+    def test_process_request_validates_valid_ports_argument(self, mock_set_clc_creds, mock_public_ip, mock_validate_ports):
+        test_params = {
+            'server_id': 'TESTSVR1'
+            ,'ports': [
+                {'port': 80},
+                {'port': 34590, 'protocol': 'UDP'}
+            ]
+            ,'wait': True
+            ,'state': 'present'
+        }
+        mock_public_ip.return_value = True, 'TESTSVR1', mock.MagicMock()
+        self.module.params = test_params
+        self.module.check_mode = False
+
+        under_test = ClcPublicIp(self.module)
+        under_test.process_request()
+
+        mock_validate_ports.assert_called_once_with(test_params['ports'])
+        self.module.exit_json.assert_called_once_with(changed=True, server_id='TESTSVR1')
+        self.assertFalse(self.module.fail_json.called)
+
+    def test_valid_ports_returns_expected_output(self):
+        expected = [
+            {'port': 80, 'protocol': 'TCP'},
+            {'port': 34590, 'protocol': 'UDP'}
+        ]
+
+        input_data = [
+            {'port': 80},
+            {'port': 34590, 'protocol': 'UDP'}
+        ]
+
+        under_test = ClcPublicIp(self.module)
+        actual = under_test._validate_ports(input_data)
+
+        self.assertEqual(expected, actual)
+        self.assertFalse(self.module.fail_json.called)
+
+    def test_valid_ports_returns_expected_error_for_missing_port(self):
+        under_test = ClcPublicIp(self.module)
+        under_test._validate_ports([{'protocol': 'UDP'}])
+
+        self.module.fail_json.assert_called_once_with(msg="You must provide a port")
+
+    def test_valid_ports_returns_expected_error_for_invalid_protocol(self):
+        under_test = ClcPublicIp(self.module)
+        under_test._validate_ports([{'protocol': 'ICP', 'port': 'Faygo'}])
+
+        self.module.fail_json.assert_called_once_with(
+            msg="Valid protocols for this module are: [TCP, UDP]: You specified 'ICP'"
+        )
+
+    def test_valid_ports_skips_and_removes_blank_entry(self):
+        expected = [{'protocol': 'TCP', 'port': 456}]
+        under_test = ClcPublicIp(self.module)
+        actual = under_test._validate_ports([{'protocol': 'TCP', 'port': 456}, {}])
+
+        self.assertEqual(expected, actual)
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcPublicIp, 'ensure_public_ip_absent')
