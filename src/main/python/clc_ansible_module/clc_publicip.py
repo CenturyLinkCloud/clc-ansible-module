@@ -42,7 +42,9 @@ options:
     required: False
   ports:
     description:
-      - A list of structures specifying port and protocol ('TCP','UDP')
+      - A list of structures specifying port (required), protocol ['TCP','UDP'] (required), and
+        port_to (optional)
+      - Example: {protocol: 'TCP', port: 10000, port_to: 10050}
     required: False
     default: None
   server_id:
@@ -96,8 +98,9 @@ EXAMPLES = '''
     - name: Create Public IP For Servers
       clc_publicip:
         ports:
-            - {'port': 80}
-            - {'port': 24601, 'protocol': 'UDP'}
+            - {port: 80, protocol: 'TCP'}
+            - {port: 10000, port_to: 10050}
+            - {port: 24601, protocol: 'UDP'}
         server_id: UC1TEST-SVR01
         state: present
       register: clc
@@ -213,7 +216,9 @@ class ClcPublicIp(object):
     def _validate_ports(self, ports):
         """
         Validates the provided list of port structures
-        :param ports: list of dictionaries specifying port and protocol
+        Note that this is required because Ansible does not seem to validate argument specs
+        beyond the first level of the dictionary
+        :param ports: list of dictionaries specifying port, protocol, and an optional port_to
         :return: list of validated ports
         """
         validated_ports = []
@@ -248,7 +253,8 @@ class ClcPublicIp(object):
                 type='list',
                 default=[],
                 protocol=dict(default='TCP', choices=['TCP', 'UDP']),
-                port=dict(required=True)
+                port=dict(required=True),
+                port_to=dict()
             ),
             source_restrictions=dict(type='list'),
             wait=dict(type='bool', default=True),

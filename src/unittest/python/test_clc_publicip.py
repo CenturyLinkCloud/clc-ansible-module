@@ -339,12 +339,14 @@ class TestClcPublicIpFunctions(unittest.TestCase):
     def test_valid_ports_returns_expected_output(self):
         expected = [
             {'port': 80, 'protocol': 'TCP'},
-            {'port': 34590, 'protocol': 'UDP'}
+            {'port': 34590, 'protocol': 'UDP'},
+            {'port': 1234, 'port_to': 4567, 'protocol': 'TCP'}
         ]
 
         input_data = [
             {'port': 80},
-            {'port': 34590, 'protocol': 'UDP'}
+            {'port': 34590, 'protocol': 'UDP'},
+            {'port': 1234, 'port_to': 4567}
         ]
 
         under_test = ClcPublicIp(self.module)
