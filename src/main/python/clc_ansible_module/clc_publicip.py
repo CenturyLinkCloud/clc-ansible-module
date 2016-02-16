@@ -43,7 +43,7 @@ options:
   ports:
     description:
       - A list of structures specifying port (required), protocol ['TCP','UDP'] (required), and
-        port_to (optional)
+        port_to (optional; used when specifying a range of ports)
       - Example: {protocol: 'TCP', port: 10000, port_to: 10050}
     required: False
     default: None
@@ -266,7 +266,7 @@ class ClcPublicIp(object):
         """
         Ensures the given server ids having the public ip available
         :param server_id: the server id
-        :param private_ip: optional private ip to which private ip should be NAT'ed
+        :param private_ip: optional private ip to which public ip should be NAT'ed
         :param ports: list of dictionaries specifying ports and protocols to expose
         :param source_restrictions: The list of IP range allowed to access the public IP, specified using CIDR notation.
         :return: (changed, changed_server_id, result)
