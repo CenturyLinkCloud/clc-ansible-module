@@ -628,14 +628,19 @@ class ClcModifyServer:
         acct_alias = clc.v2.Account.GetAlias()
         datacenter = ClcModifyServer._find_datacenter(clc, module)
         additional_network = ClcModifyServer._find_network_id(module, datacenter)
+        wait = module.params.get('wait')
         try:
-            job_obj = clc.v2.Server(alias=acct_alias, id=server_id). \
-                AddNIC(network_id=additional_network). \
-                WaitUntilComplete()
-            result = job_obj
+            if wait:
+                job_obj = clc.v2.Server(alias=acct_alias, id=server_id). \
+                    AddNIC(network_id=additional_network). \
+                    WaitUntilComplete()
+            else:
+                job_obj = clc.v2.Server(alias=acct_alias, id=server_id). \
+                    AddNIC(network_id=additional_network)
+            result = True
         except APIFailedResponse as ex:
             if "already has an adapter" in str(ex.response_text):
-                result = str(ex.response_text)
+                result = False
             else:
                 module.fail_json(
                     msg='Unable to update the server configuration for server : "{0}". {1}'.format(
@@ -709,8 +714,7 @@ class ClcModifyServer:
                 self.clc,
                 self.module,
                 server.id)
-            if add_nic == 0:
-                changed = True
+            changed = add_nic
         return changed
 
     @staticmethod
