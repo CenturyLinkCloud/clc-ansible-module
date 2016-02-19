@@ -71,6 +71,11 @@ options:
         This is mutually exclusive with 'alert_policy_id'
     required: False
     default: None
+  additional_network:
+    description:
+      - The additional network id/name that needs to be added to the server
+    required: False
+    default: None
   state:
     description:
       - The state to insure that the provided resources are in.
@@ -665,7 +670,7 @@ class ClcModifyServer:
         except CLCException as ex:
             module.fail_json(
                 msg=str(
-                    "Unable to find location: {0}".format(location)))
+                    "Unable to find location: {0}. {1}".format(location, ex.message)))
 
     @staticmethod
     def _find_network_id(module, datacenter):
@@ -675,12 +680,20 @@ class ClcModifyServer:
         :param datacenter: the datacenter to search for a network id
         :return: a valid network id
         """
-        network_id = module.params.get('additional_network')
+        additional_network = module.params.get('additional_network')
+        network_id = None
 
         # Validates provided network id
         # Allows lookup of network by id, name, or cidr notation
-        if network_id:
-          network_id = datacenter.Networks(forced_load=True).Get(network_id).id
+        if additional_network:
+            network = datacenter.Networks(forced_load=True).Get(additional_network)
+            if network:
+                network_id = network.id
+            else:
+                return module.fail_json(
+                    msg='Unable to find a network with name/id "{}" at location: {}'.format(
+                            additional_network,
+                            datacenter.id))
 
         if not network_id:
             try:
