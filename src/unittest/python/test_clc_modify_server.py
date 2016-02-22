@@ -989,5 +989,18 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         under_test._modify_add_nic(self.clc, self.module, 'server_id')
         self.assertEqual(self.module.fail_json.called, False)
 
+
+    @patch.object(ClcModifyServer, '_find_network_id')
+    def test_modify_add_nic_looks_up_datacenter_by_location(self, mock_network):
+        self.module.clc = self.clc
+        self.module.params = {
+            'location': 'cybertron'
+        }
+        under_test = ClcModifyServer(self.module)
+        under_test._modify_add_nic(self.clc, self.module, 'server_id')
+
+        self.clc.v2.Datacenter.assert_called_once_with('cybertron')
+
+
 if __name__ == '__main__':
     unittest.main()

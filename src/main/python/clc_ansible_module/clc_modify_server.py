@@ -434,6 +434,7 @@ class ClcModifyServer:
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
             state=dict(default='present', choices=['present', 'absent']),
+            location=dict(),
             cpu=dict(),
             memory=dict(),
             anti_affinity_policy_id=dict(),
