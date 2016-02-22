@@ -30,6 +30,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
     def setUp(self):
         self.clc = mock.MagicMock()
         self.module = mock.MagicMock()
+        self.module.check_mode = False
         self.datacenter = mock.MagicMock()
 
     def test_clc_module_not_found(self):
@@ -959,7 +960,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
     @patch.object(ClcModifyServer, '_modify_add_nic')
     def test_ensure_nic_present_change(self, add_nic):
-        add_nic.return_value = 0
+        add_nic.return_value = True
         mock_server = mock.MagicMock()
         mock_server_params = {
             'additional_network': 'test'
@@ -970,7 +971,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
     @patch.object(ClcModifyServer, '_modify_add_nic')
     def test_ensure_nic_present_no_change(self, add_nic):
-        add_nic.return_value = 1
+        add_nic.return_value = False
         mock_server = mock.MagicMock()
         mock_server_params = {
             'additional_network': 'test'
