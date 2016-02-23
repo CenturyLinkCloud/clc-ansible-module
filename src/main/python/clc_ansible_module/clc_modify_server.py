@@ -131,6 +131,14 @@ EXAMPLES = '''
     additional_network: 613a25aff2124d10a71b16cd6fb28975
     state: present
 
+- name: remove a secondary nic
+  clc_modify_server:
+    server_ids:
+        - UC1TESTSVR01
+        - UC1TESTSVR02
+    additional_network: '10.11.12.0/24'
+    state: absent
+
 - name: set the anti affinity policy on a server
   clc_modify_server:
     server_ids:
