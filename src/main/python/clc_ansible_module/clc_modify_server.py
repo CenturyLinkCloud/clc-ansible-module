@@ -547,6 +547,9 @@ class ClcModifyServer:
                 ap_changed = self._ensure_alert_policy_absent(
                     server,
                     server_params)
+                nic_changed = self._ensure_nic_absent(
+                    server,
+                    server_params)
             if server_changed or aa_changed or ap_changed or nic_changed:
                 changed_servers.append(server)
                 changed = True
@@ -634,7 +637,7 @@ class ClcModifyServer:
         acct_alias = clc.v2.Account.GetAlias()
         datacenter = ClcModifyServer._find_datacenter(clc, module)
         additional_network = ClcModifyServer._find_network_id(module, datacenter)
-        wait = module.params.get('wait')
+        wait = module.params.get('wait', False)
         if not module.check_mode:
             try:
                 if wait:
@@ -653,6 +656,32 @@ class ClcModifyServer:
                         msg='Unable to update the server configuration for server : "{0}". {1}'.format(
                             server_id, str(ex.response_text)))
         return result
+
+    @staticmethod
+    def _modify_remove_nic(clc, module, server_id):
+      result = None
+
+      acct_alias = clc.v2.Account.GetAlias()
+      dc = ClcModifyServer._find_datacenter(clc, module)
+      network = ClcModifyServer._find_network_id(module, dc)
+      wait = module.params.get('wait', False)
+
+      if not module.check_mode:
+        try:
+          if wait:
+            clc.v2.Server(alias=acct_alias, id=server_id).RemoveNIC(network_id=network).WaitUntilComplete()
+            result = True
+          else:
+            clc.v2.Server(alias=acct_alias, id=server_id).RemoveNIC(network_id=network)
+            result = True
+        except CLCException as ex:
+          result = False
+          module.fail_json(
+            msg='Unable to remove NIC from server : "{0}". {1}'.format(
+                    server_id, str(ex.message))
+          )
+
+      return result
 
     @staticmethod
     def _find_datacenter(clc, module):
@@ -732,6 +761,25 @@ class ClcModifyServer:
                     server.id)
                 changed = add_nic
         return changed
+
+    def _ensure_nic_absent(self, server, server_params):
+      """
+
+      :param server: server from which to remove nic
+      :param server_params: map of server params
+      :return: True or False
+      """
+      changed = False
+
+      additional_network = server_params.get('additional_network', False)
+      if additional_network:
+        if not self.module.check_mode:
+          changed = self._modify_remove_nic(
+            self.clc
+            , self.module
+            , server.id)
+
+      return changed
 
     @staticmethod
     def _wait_for_requests(module, request_list):

@@ -31,6 +31,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         self.clc = mock.MagicMock()
         self.module = mock.MagicMock()
         self.module.check_mode = False
+        self.module.params = {}
         self.datacenter = mock.MagicMock()
 
     def test_clc_module_not_found(self):
@@ -887,6 +888,7 @@ class TestClcModifyServerFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_once_with(msg='Unable to fetch alert policies for account : "alias". Mock failure message')
 
     def test_wait_for_requests_fail(self):
+        self.module.params = {'wait': True}
         under_test = ClcModifyServer(self.module)
         mock_request = mock.MagicMock()
         mock_request.WaitUntilComplete.return_value = 1
@@ -1001,6 +1003,135 @@ class TestClcModifyServerFunctions(unittest.TestCase):
 
         self.clc.v2.Datacenter.assert_called_once_with('cybertron')
 
+    @patch.object(ClcModifyServer, '_get_servers_from_clc')
+    @patch.object(ClcModifyServer, '_ensure_alert_policy_absent')
+    @patch.object(ClcModifyServer, '_ensure_aa_policy_absent')
+    @patch.object(ClcModifyServer, '_ensure_nic_absent')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_modify_servers_calls_ensure_nic_absent(
+        self
+        , mock_clc_sdk
+        , mock_ensure_nic_absent
+        , mock_ensure_aa_pol
+        , mock_ensure_alert_pol
+        , mock_get_servers
+    ):
+        module = self.module
+        module.params = {
+            'state': 'absent',
+            'wait': True
+        }
+        mock_ensure_aa_pol.return_value = False
+        mock_ensure_alert_pol.return_value= False
+        mock_ensure_nic_absent.return_value = True
+        server1 = mock.MagicMock()
+        server_ids = ['server1']
+        server1.id = 'server1'
+        mock_get_servers.return_value = [server1]
+        under_test = ClcModifyServer(module)
+        changed, server, result = under_test._modify_servers(server_ids)
+        self.assertEqual(changed, True)
+
+    @patch.object(ClcModifyServer, '_modify_remove_nic')
+    def test_ensure_nic_absent_calls_modify_remove_nic(self, mock_remove_nic):
+        self.module.clc = self.clc
+        mock_server = mock.MagicMock
+        mock_server.id = 'test_id'
+
+        under_test = ClcModifyServer(self.module)
+        under_test._ensure_nic_absent(mock_server, {'additional_network': 'beer'})
+
+        mock_remove_nic.assert_called_once_with(under_test.clc, under_test.module, 'test_id')
+
+    @patch.object(ClcModifyServer, '_modify_remove_nic')
+    def test_ensure_nic_absent_returns_false_if_network_not_provided(self, mock_remove_nic):
+        mock_remove_nic.return_value = 'Purple'
+        self.module.clc = self.clc
+
+        under_test = ClcModifyServer(self.module)
+        result = under_test._ensure_nic_absent(None, {})
+
+        self.assertEqual(False, result)
+
+    @patch.object(ClcModifyServer, '_modify_remove_nic')
+    def test_ensure_nic_absent_returns_false_if_check_mode_set(self, mock_remove_nic):
+        self.module.check_mode = True
+        mock_remove_nic.return_value = 'Purple'
+        self.module.clc = self.clc
+        mock_server = mock.MagicMock
+        mock_server.id = 'test_id'
+        mock_params = {
+            'additional_network': 'goyethereforeandtest'
+        }
+
+        under_test = ClcModifyServer(self.module)
+        result = under_test._ensure_nic_absent(mock_server, mock_params)
+
+        self.assertEqual(False, result)
+
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_modify_remove_nic_returns_none_if_check_mode(self, mock_sdk):
+        self.module.check_mode = True
+        under_test = ClcModifyServer(self.module)
+        result = under_test._modify_remove_nic(mock_sdk, self.module, '')
+
+        self.assertEqual(None, result)
+
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_modify_remove_nic_looks_up_server(self, mock_sdk):
+        mock_sdk.v2.Account.GetAlias.return_value = 'alias'
+
+        under_test = ClcModifyServer(self.module)
+        result = under_test._modify_remove_nic(mock_sdk, self.module, 'test_id')
+
+        self.assertEqual(1, mock_sdk.v2.Account.GetAlias.call_count)
+        mock_sdk.v2.Server.assert_called_once_with(alias='alias', id='test_id')
+
+    @patch('clc_ansible_module.clc_modify_server.ClcModifyServer._find_datacenter')
+    @patch('clc_ansible_module.clc_modify_server.ClcModifyServer._find_network_id')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_modify_remove_nic_calls_remove_nic_on_server_without_wait(self, mock_sdk, mock_net, mock_dc):
+        mock_sdk.v2.Account.GetAlias.return_value = 'alias'
+        mock_dc.return_value = 'test-dc'
+        mock_net.return_value = 'testnet'
+
+        under_test = ClcModifyServer(self.module)
+        result = under_test._modify_remove_nic(mock_sdk, self.module, 'test_id')
+
+        mock_sdk.v2.Server.return_value.RemoveNIC.assert_called_once_with(network_id='testnet')
+        self.assertEqual(0, mock_sdk.v2.Server.return_value.RemoveNIC.return_value.WaitUntilComplete.call_count)
+        mock_net.assert_called_once_with(self.module, 'test-dc')
+        self.assertTrue(result)
+
+    @patch('clc_ansible_module.clc_modify_server.ClcModifyServer._find_datacenter')
+    @patch('clc_ansible_module.clc_modify_server.ClcModifyServer._find_network_id')
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_modify_remove_nic_calls_remove_nic_on_server_with_wait(self, mock_sdk, mock_net, mock_dc):
+        mock_sdk.v2.Account.GetAlias.return_value = 'alias'
+        mock_net.return_value = 'testnet'
+        mock_dc.return_value = 'test-dc'
+        self.module.params = {'wait': True}
+
+        under_test = ClcModifyServer(self.module)
+        result = under_test._modify_remove_nic(mock_sdk, self.module, 'test_id')
+
+        self.assertEqual(1, mock_sdk.v2.Server.return_value.RemoveNIC.return_value.WaitUntilComplete.call_count)
+        mock_sdk.v2.Server.return_value.RemoveNIC.assert_called_once_with(network_id='testnet')
+        mock_net.assert_called_once_with(self.module, 'test-dc')
+        self.assertTrue(result)
+
+    @patch.object(clc_modify_server, 'clc_sdk')
+    def test_modify_remove_nic_handles_exception(self, mock_sdk):
+        mock_sdk.v2.Account.GetAlias.return_value = 'alias'
+        exception = CLCException()
+        exception.message = "get wrekd"
+        mock_sdk.v2.Server.side_effect = exception
+
+        under_test = ClcModifyServer(self.module)
+        result = under_test._modify_remove_nic(mock_sdk, self.module, 'test_id')
+
+        self.assertFalse(result)
+        self.module.fail_json.assert_called_with(msg='Unable to remove NIC from server : "test_id". get wrekd')
 
 if __name__ == '__main__':
     unittest.main()
