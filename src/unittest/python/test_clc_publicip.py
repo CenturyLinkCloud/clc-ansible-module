@@ -216,7 +216,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         mock_server.data = {'details': {'ipAddresses': [{'internal': '1.2.3.4'}]}}
         mock_server.PublicIPs().Add.side_effect = error
         under_test = ClcPublicIp(self.module)
-        under_test._add_publicip_to_server(mock_server, 'ports')
+        under_test._add_publicip_to_server(mock_server, ['ports'])
         self.module.fail_json.assert_called_once_with(
             msg='Failed to add public ip to the server : TESTSVR1. Mock failure message')
 
@@ -476,6 +476,8 @@ class TestClcPublicIpFunctions(unittest.TestCase):
         mock_server = mock.MagicMock()
         private_ip = '2.4.6.0.1'
         ports = [{'protocol': 'UDP', 'port': 8675309}]
+        ports_with_icmp = [{'protocol': 'UDP', 'port': 8675309}]
+        ports_with_icmp.insert(0, {'protocol': 'ICMP', 'port': 0})
         restrictions = [{'cidr': 'cider'}]
         under_test = ClcPublicIp(self.module)
         under_test._add_publicip_to_server( server=mock_server,
@@ -483,7 +485,7 @@ class TestClcPublicIpFunctions(unittest.TestCase):
                                             ports_to_expose=ports,
                                             source_restrictions=restrictions)
         mock_server.PublicIPs().Add.assert_called_once_with(
-            ports=ports
+            ports=ports_with_icmp
             , private_ip=private_ip
             , source_restrictions=restrictions
         )

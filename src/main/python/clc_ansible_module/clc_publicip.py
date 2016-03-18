@@ -293,6 +293,11 @@ class ClcPublicIp(object):
 
     def _add_publicip_to_server(self, server, ports_to_expose, private_ip=None, source_restrictions=None):
         result = None
+
+        # We are mimicing Control here and auto-enabling ping
+        # Port is set to 0 because all 'ports' must have a port
+        ports_to_expose.insert(0, {'protocol': 'ICMP', 'port': 0})
+
         try:
             result = server.PublicIPs().Add(
                 ports=ports_to_expose
