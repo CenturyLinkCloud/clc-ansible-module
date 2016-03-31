@@ -907,12 +907,17 @@ class ClcServer:
         :return: validated ttl
         """
         ttl = module.params.get('ttl')
+        if not ttl:
+            return None
 
-        if ttl:
-            if ttl <= 3600:
-                return module.fail_json(msg=str("Ttl cannot be <= 3600"))
-            else:
-                ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time()) + ttl)
+        try:
+            ttl = int(ttl)
+        except ValueError as ve:
+            module.fail_json(msg=str("Invalid value for ttl. Ttl should be an integer >= 3600"))
+        if ttl <= 3600:
+            return module.fail_json(msg=str("Ttl cannot be <= 3600"))
+        else:
+            ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time()) + ttl)
         return ttl
 
     @staticmethod
