@@ -209,21 +209,19 @@ class ClcNetwork:
         Process the request - Main Code Path
         :return: Returns with either an exit_json or fail_json
         """
+        changed = False
         p = self.module.params
 
         self._set_clc_credentials_from_env()
 
-        self._populate_networks(p.get('location'))
+        self.networks = self._populate_networks(p.get('location'))
 
-        self._ensure_network_present(
-          location=p.get('location'),
-          wait=p.get('wait', True)
-        )
+        changed = self._ensure_network_present(p)
 
-        self.module.exit_json()
+        self.module.exit_json(changed=changed)
 
     def _populate_networks(self, location):
-      self.networks = self.clc.v2.Networks(location=location)
+      return self.clc.v2.Networks(location=location)
 
     @staticmethod
     def _set_user_agent(clc):
@@ -234,11 +232,16 @@ class ClcNetwork:
             ses.headers['User-Agent'] += " " + agent_string
             clc.SetRequestsSession(ses)
 
-    def _ensure_network_present(self, location, wait=True):
-      request = self.clc.v2.Network.Create(location=location)
+    def _ensure_network_present(self, params):
+      changed = False
+      if self.networks.Get(params.get('name')) is None:
+        changed = True
+        request = self.clc.v2.Network.Create(location=params.get('location'))
 
-      if wait:
-        request.WaitUntilComplete()
+        if params.get('wait') if 'wait' in params else True:
+          request.WaitUntilComplete()
+
+      return changed
 
 def main():
     """
