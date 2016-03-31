@@ -213,7 +213,17 @@ class ClcNetwork:
 
         self._set_clc_credentials_from_env()
 
+        self._populate_networks(p.get('location'))
+
+        self._ensure_network_present(
+          location=p.get('location'),
+          wait=p.get('wait', True)
+        )
+
         self.module.exit_json()
+
+    def _populate_networks(self, location):
+      self.networks = self.clc.v2.Networks(location=location)
 
     @staticmethod
     def _set_user_agent(clc):
@@ -224,6 +234,11 @@ class ClcNetwork:
             ses.headers['User-Agent'] += " " + agent_string
             clc.SetRequestsSession(ses)
 
+    def _ensure_network_present(self, location, wait=True):
+      request = self.clc.v2.Network.Create(location=location)
+
+      if wait:
+        request.WaitUntilComplete()
 
 def main():
     """

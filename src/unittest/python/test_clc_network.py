@@ -31,7 +31,6 @@ def FakeAnsibleModule():
 class TestClcNetwork(unittest.TestCase):
 
     def setUp(self):
-        self.clc = mock.MagicMock()
         self.module = FakeAnsibleModule()
         self.network = ClcNetwork(self.module)
         self.network.module.exit_json = mock.MagicMock()
@@ -153,7 +152,7 @@ class TestClcNetwork(unittest.TestCase):
     # End copy/pasta tests
 
 
-    def testArgumentSpecContract(self):
+    def test_argument_spec_contract(self):
         args = ClcNetwork._define_module_argument_spec()
         self.assertEqual(args, dict(
             name=dict(required=True),
@@ -162,6 +161,62 @@ class TestClcNetwork(unittest.TestCase):
             state=dict(default='present', choices=['present', 'absent']),
             wait=dict(default=True)
         ))
+
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_populates_network_list(self, mock_set_creds):
+        mock_nets = mock.MagicMock()
+        self.network.clc.v2.Networks = mock.MagicMock(return_value=mock_nets)
+        self.module.params = {
+            'location': 'mock_loc'
+        }
+
+        self.network.process_request()
+
+        self.network.clc.v2.Networks.assert_called_once_with(location="mock_loc")
+        self.assertEqual(mock_nets, self.network.networks)
+
+    @patch.object(ClcNetwork, '_populate_networks')
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_for_create_calls_sdk_network_create(self, mock_set_creds, mock_nets):
+        self.network.clc.v2.Network.Create = mock.MagicMock()
+        self.module.params = {
+            'location': 'mock_loc'
+        }
+
+        self.network.process_request()
+
+        self.network.clc.v2.Network.Create.assert_called_once_with(location="mock_loc")
+        self.assertEqual(self.module.fail_json.called, False)
+
+    @patch.object(ClcNetwork, '_populate_networks')
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_for_create_waits_on_request(self, mock_set_creds, mock_nets):
+        mock_request = mock.MagicMock()
+        mock_request.WaitUntilComplete = mock.MagicMock(return_value=0)
+        self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_request)
+        self.module.params = {
+            'location': 'mock_loc'
+        }
+
+        self.network.process_request()
+
+        self.assertEqual(1, mock_request.WaitUntilComplete.call_count)
+
+    @patch.object(ClcNetwork, '_populate_networks')
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_for_create_skips_wait_when_wait_false(self, mock_set_creds, mock_nets):
+        mock_request = mock.MagicMock()
+        mock_request.WaitUntilComplete = mock.MagicMock(return_value=0)
+        self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_request)
+        self.module.params = {
+            'location': 'mock_loc',
+            'wait': False
+        }
+
+        self.network.process_request()
+
+        self.assertEqual(0, mock_request.WaitUntilComplete.call_count)
+
 
 if __name__ == '__main__':
     unittest.main()
