@@ -248,7 +248,8 @@ class ClcNetwork:
         network = request
 
         if params.get('wait') if 'wait' in params else True:
-          request.WaitUntilComplete()
+          if request.WaitUntilComplete() > 0:
+            self.module.fail_json(msg="Unable to create network")
           network = self.clc.v2.Networks(location=location).Get(key=name)
 
       return changed, network
