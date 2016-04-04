@@ -210,19 +210,22 @@ class ClcNetwork:
         :return: Returns with either an exit_json or fail_json
         """
         changed = False
-        return_val = None
+        network = None
         p = self.module.params
 
         self._set_clc_credentials_from_env()
 
         self.networks = self._populate_networks(p.get('location'))
 
-        changed, network = self._ensure_network_present(p)
+        if p.get('state') == 'absent':
+          changed = self._ensure_network_absent(p)
+        else:
+          changed, network = self._ensure_network_present(p)
 
         if network:
-          return_val = network.data
+          network = network.data
 
-        self.module.exit_json(changed=changed, network=return_val)
+        self.module.exit_json(changed=changed, network=network)
 
     def _populate_networks(self, location):
       return self.clc.v2.Networks(location=location)

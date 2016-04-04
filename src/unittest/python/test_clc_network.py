@@ -36,6 +36,7 @@ class TestClcNetwork(unittest.TestCase):
         v2_networks = mock.MagicMock()
         v2_networks.Get = mock.MagicMock(side_effect=lambda key: existing_net if key=="existing" else None)
         self.mock_nets = v2_networks
+        self.existing_net = existing_net
 
         self.module = FakeAnsibleModule()
         self.network = ClcNetwork(self.module)
@@ -285,6 +286,38 @@ class TestClcNetwork(unittest.TestCase):
             self.network.process_request()
 
             self.module.exit_json.assert_called_once_with(changed=True,network=mock_new.data)
+
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_for_delete_calls_sdk_delete_and_reports_change(self, mock_set_creds):
+        with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets) as mock_nets:
+            self.existing_net.Delete = mock.MagicMock()
+            self.module.params = {
+                'state': 'absent',
+                'id': 'existing',
+                'location': 'mock_loc'
+            }
+
+            self.network.process_request()
+
+            self.existing_net.Delete.assert_called_once_with(location="mock_loc")
+            self.module.exit_json.assert_called_once_with(changed=True, network=None)
+
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_for_delete_returns_no_change_when_network_not_found(self, mock_set_creds):
+        with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets) as mock_nets:
+            self.existing_net.Delete = mock.MagicMock()
+            self.module.params = {
+                'state': 'absent',
+                'id': 'non-existing',
+                'location': 'mock_loc'
+            }
+
+            self.network.process_request()
+
+            self.assertEqual(0, self.existing_net.Delete.call_count)
+            self.module.exit_json.assert_called_once_with(changed=False, network=None)
+
+
 
 
 if __name__ == '__main__':
