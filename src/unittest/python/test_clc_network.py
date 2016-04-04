@@ -163,7 +163,8 @@ class TestClcNetwork(unittest.TestCase):
     def test_argument_spec_contract(self):
         args = ClcNetwork._define_module_argument_spec()
         self.assertEqual(args, dict(
-            name=dict(required=True),
+            id=dict(required=False),
+            name=dict(required=False),
             location=dict(required=True),
             description=dict(required=False),
             state=dict(default='present', choices=['present', 'absent']),
@@ -175,7 +176,7 @@ class TestClcNetwork(unittest.TestCase):
         mock_nets = mock.MagicMock()
         self.network.clc.v2.Networks = mock.MagicMock(return_value=mock_nets)
         self.module.params = {
-            'name': 'nope',
+            'id': 'nope',
             'location': 'mock_loc'
         }
 
@@ -185,11 +186,10 @@ class TestClcNetwork(unittest.TestCase):
         self.assertEqual(mock_nets, self.network.networks)
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
-    def test_process_request_for_create_calls_sdk_network_create(self, mock_set_creds):
+    def test_process_request_present_calls_sdk_network_create(self, mock_set_creds):
         with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets) as mock_nets:
             self.network.clc.v2.Network.Create = mock.MagicMock()
             self.module.params = {
-                'name': 'nope',
                 'location': 'mock_loc'
             }
 
@@ -198,13 +198,12 @@ class TestClcNetwork(unittest.TestCase):
             self.network.clc.v2.Network.Create.assert_called_once_with(location="mock_loc")
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
-    def test_process_request_for_create_waits_on_request(self, mock_set_creds):
+    def test_process_request_present_waits_on_request(self, mock_set_creds):
         with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets) as mock_nets:
             mock_request = mock.MagicMock()
             mock_request.WaitUntilComplete = mock.MagicMock(return_value=0)
             self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_request)
             self.module.params = {
-                'name': 'nope',
                 'location': 'mock_loc'
             }
 
@@ -214,13 +213,12 @@ class TestClcNetwork(unittest.TestCase):
             self.assertEqual(self.module.fail_json.called, False)
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
-    def test_process_request_for_create_waits_on_request(self, mock_set_creds):
+    def test_process_request_present_reports_failure_when_create_fails(self, mock_set_creds):
         with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets) as mock_nets:
             mock_request = mock.MagicMock()
             mock_request.WaitUntilComplete = mock.MagicMock(return_value=1)
             self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_request)
             self.module.params = {
-                'name': 'nope',
                 'location': 'mock_loc'
             }
 
@@ -230,13 +228,12 @@ class TestClcNetwork(unittest.TestCase):
             self.module.fail_json.assert_called_once_with(msg="Unable to create network")
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
-    def test_process_request_for_create_skips_wait_when_wait_false(self, mock_set_creds):
+    def test_process_request_present_skips_wait_when_wait_false(self, mock_set_creds):
         with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets) as mock_nets:
             mock_request = mock.MagicMock()
             mock_request.WaitUntilComplete = mock.MagicMock(return_value=0)
             self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_request)
             self.module.params = {
-                'name': 'nope',
                 'location': 'mock_loc',
                 'wait': False
             }
@@ -246,13 +243,13 @@ class TestClcNetwork(unittest.TestCase):
             self.assertEqual(0, mock_request.WaitUntilComplete.call_count)
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
-    def test_process_request_for_create_skips_create_when_network_exists(self, mock_set_creds):
+    def test_process_request_present_skips_create_when_network_exists(self, mock_set_creds):
         with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets):
             mock_request = mock.MagicMock()
             mock_request.WaitUntilComplete = mock.MagicMock(return_value=0)
             self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_request)
             self.module.params = {
-                'name': 'existing',
+                'id': 'existing',
                 'location': 'mock_loc',
             }
 
@@ -262,14 +259,14 @@ class TestClcNetwork(unittest.TestCase):
             self.module.exit_json.assert_called_once_with(changed=False,network=None)
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
-    def test_process_request_for_create_exits_with_expected_network(self, mock_set_creds):
+    def test_process_request_present_exits_with_expected_network(self, mock_set_creds):
         with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets):
             mock_nets = mock.MagicMock()
             mock_new = mock.MagicMock()
             mock_new.id = '12345'
             mock_new.alias = 'my_alias'
             mock_new.data = {
-                'name': 'working',
+                'id': 'working',
                 'field': 'value'
             }
             mock_nets.Get = mock.MagicMock(return_value = mock_new)
@@ -279,7 +276,7 @@ class TestClcNetwork(unittest.TestCase):
             mock_request.WaitUntilComplete = mock.MagicMock(return_value=0)
             self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_request)
             self.module.params = {
-                'name': 'working',
+                'id': 'working',
                 'location': 'mock_loc'
             }
 

@@ -167,7 +167,8 @@ class ClcNetwork:
         :return: argument spec dictionary
         """
         argument_spec = dict(
-            name=dict(required=True),
+            id=dict(required=False),
+            name=dict(required=False),
             location=dict(required=True),
             description=dict(required=False),
             wait=dict(default=True),
@@ -239,21 +240,33 @@ class ClcNetwork:
             ses.headers['User-Agent'] += " " + agent_string
             clc.SetRequestsSession(ses)
 
+    def _ensure_network_absent(self, params):
+      changed = False
+      location = params.get('location')
+
+      network = self.networks.Get(params.get('id'))
+
+      if network is not None:
+        network.Delete(location=location)
+        changed = True
+
+      return changed
+
     def _ensure_network_present(self, params):
       changed = False
       network = None
       location = params.get('location')
-      name = params.get('name')
+      search_key = params.get('id') if 'id' in params else params.get('name', None)
 
-      if self.networks.Get(name) is None:
-        changed = True
+      if self.networks.Get(search_key) is None:
         request = self.clc.v2.Network.Create(location=location)
         network = request
+        changed = True
 
         if params.get('wait') if 'wait' in params else True:
           if request.WaitUntilComplete() > 0:
             self.module.fail_json(msg="Unable to create network")
-          network = self.clc.v2.Networks(location=location).Get(key=name)
+          network = self.clc.v2.Networks(location=location).Get(key=search_key)
 
       return changed, network
 
