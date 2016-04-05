@@ -243,20 +243,42 @@ class TestClcNetwork(unittest.TestCase):
             self.assertEqual(0, mock_request.WaitUntilComplete.call_count)
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
-    def test_process_request_present_skips_create_when_network_exists(self, mock_set_creds):
+    def test_process_request_present_calls_update_when_network_exists_and_is_not_current(self, mock_set_creds):
         with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets):
-            mock_request = mock.MagicMock()
-            mock_request.WaitUntilComplete = mock.MagicMock(return_value=0)
-            self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_request)
+            name = 'ShinyNewName'
+            desc = 'ShinyNewDescription'
+            self.network.clc.v2.Network.Create = mock.MagicMock()
+            # Needs return value
+            self.existing_net.Update = mock.MagicMock()
             self.module.params = {
                 'id': 'existing',
+                'name': name,
+                'desc': desc,
                 'location': 'mock_loc',
             }
 
             self.network.process_request()
 
             self.assertEqual(0, self.network.clc.v2.Network.Create.call_count)
-            self.module.exit_json.assert_called_once_with(changed=False,network=None)
+            self.existing_net.Update.assert_called_once_with(name,description=desc,location='mock_loc' )
+
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_present_calls_update_when_network_exists_and_only_name_is_not_current(self, mock_set_creds):
+        with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets):
+            name = 'ShinyNewName'
+            desc = 'ShinyNewDescription'
+            self.network.clc.v2.Network.Create = mock.MagicMock()
+            self.existing_net.Update = mock.MagicMock()
+            self.module.params = {
+                'id': 'existing',
+                'name': name,
+                'location': 'mock_loc',
+            }
+
+            self.network.process_request()
+
+            self.assertEqual(0, self.network.clc.v2.Network.Create.call_count)
+            self.existing_net.Update.assert_called_once_with(name, location='mock_loc')
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
     def test_process_request_present_exits_with_expected_network(self, mock_set_creds):

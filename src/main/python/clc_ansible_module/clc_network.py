@@ -254,21 +254,42 @@ class ClcNetwork:
 
     def _ensure_network_present(self, params):
       changed = False
-      network = None
       location = params.get('location')
       search_key = params.get('id') if 'id' in params else params.get('name', None)
+      network = self.networks.Get(search_key)
 
-      if self.networks.Get(search_key) is None:
-        request = self.clc.v2.Network.Create(location=location)
-        network = request
+      if network is None:
         changed = True
-
-        if params.get('wait') if 'wait' in params else True:
-          if request.WaitUntilComplete() > 0:
-            self.module.fail_json(msg="Unable to create network")
-          network = self.clc.v2.Networks(location=location).Get(key=search_key)
+        network = self._create_network(location, params.get('wait',True), search_key)
+      else:
+        changed, network = self._update_network(network, location, params)
 
       return changed, network
+
+    def _create_network(self, location, wait, search_key):
+      request = self.clc.v2.Network.Create(location=location)
+
+      if wait:
+        if request.WaitUntilComplete() > 0:
+          self.module.fail_json(msg="Unable to create network")
+        return self.clc.v2.Networks(location=location).Get(key=search_key)
+
+      return request
+
+    def _update_network(self, network, location, params):
+      changed = False
+      name = params.get('name', None)
+      desc = params.get('desc', None)
+
+      if (name is not None and network.name != name) or (desc is not None and network.description != name):
+        update_name = name if name is not None else network.name
+        if desc is not None:
+          network.Update(update_name, description=desc, location=location)
+        else:
+          network.Update(update_name, location=location)
+
+      return changed, network
+
 
 def main():
     """
