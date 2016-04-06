@@ -42,7 +42,9 @@ class TestClcNetwork(unittest.TestCase):
         self.network = ClcNetwork(self.module)
         self.network.module.exit_json = mock.MagicMock()
         self.network_dict = {}
+        self.network.clc.v2.Network  = mock.MagicMock()
         self.network.clc.v2.Networks = mock.MagicMock()
+        self.network.clc.v2.API.Call = mock.MagicMock()
 
     # Begin copy/pasta tests
 
@@ -212,6 +214,115 @@ class TestClcNetwork(unittest.TestCase):
             self.assertEqual(1, mock_request.WaitUntilComplete.call_count)
             self.assertEqual(self.module.fail_json.called, False)
 
+    def ugly_setup(self, mock_update, network_id):
+        """
+        Long comment time!  This level of setup is most certainly unnecessary, as this
+        logic should be handled in the Python SDK.  Unfortunately, since the network API
+        remains in the 'experimental' space, it stands to reason that it will be further
+        refined/changed, so effort is not being expended enhacing the Requests portion of
+        the SDK to handle waiting on and returning network objects post-wait.  As a stop-gap,
+        enjoy the mocking shenanigans that follow.
+        """
+
+        # Step the first: Mock the status request
+        initial_name = 'vlan_bob_192.168.222'
+        initial_desc = 'vlan_bob_192.168.222 description'
+        status_uri = '/v2-experimental/operations/xxx/status/id'
+        network_uri = '/v2-experimental/networks/xxx/dcx/54321'
+
+        mock_request = mock.MagicMock()
+        mock_request.uri = status_uri
+        status_output = {
+            'requestType': 'blueprintOperation',
+            'status': 'succeeded',
+            'summary': {
+                'blueprintId': 12345,
+                'locationId': 'DCx',
+                'links': [{
+                    'href': network_uri,
+                    'id': network_id,
+                    'rel': 'network'
+                }]
+            }
+        }
+
+        # Step the Second: Mock out the two API calls
+        new_network = {
+            'name': initial_name,
+            'links': [],
+            'vlan': 'bob',
+            'id': network_id,
+            'netmask': '255.255.255.0',
+            'cidr': '192.168.222.0/24',
+            'type': 'private',
+            'gateway': '192.168.222.1',
+            'description': initial_desc
+        }
+
+        response_map = {
+            status_uri: status_output,
+            network_uri: new_network
+        }
+
+        self.network.clc.v2.API.Call = mock.MagicMock(side_effect=lambda uri: response_map[uri] if uri in response_map else 'doing it wrong')
+
+        # Step the Third: Mock the instantiation of a v2 Network object
+        mock_network = mock.MagicMock()
+        mock_network.id = network_id
+        mock_network.name = initial_name
+        mock_network.data = new_network
+        self.network.clc.v2.Network = mock.MagicMock(return_value=mock_network)
+
+        # Step the Fourth: Mock the wait/create calls
+        mock_requests = mock.MagicMock()
+        mock_requests.requests = [mock_request]
+        mock_requests.WaitUntilComplete = mock.MagicMock(return_value=0)
+        self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_request)
+        mock_update.return_value = True, mock_network
+
+        return status_uri, network_uri, mock_network
+
+    @patch.object(ClcNetwork, '_update_network')
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_present_updates_network_after_create_wait_if_provided_name_or_desc(self, mock_set_creds, mock_update):
+        with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets) as mock_nets:
+            network_id = 24601
+            uri1, uri2, mock_network = self.ugly_setup(mock_update, network_id)
+            new_name = "mocketymockmock"
+            new_desc = "mockerymockmockdesc"
+            self.module.params = {
+                'name': new_name,
+                'desc': new_desc,
+                'location': 'mock_loc'
+            }
+            self.network.process_request()
+
+            self.assertEqual(2, self.network.clc.v2.API.Call.call_count)
+            self.network.clc.v2.API.Call.assert_any_call(uri1)
+            self.network.clc.v2.API.Call.assert_called_with(uri2)
+            self.network.clc.v2.Network.assert_called_once_with(network_id,network_obj=mock_network.data)
+            mock_update.assert_called_once_with(mock_network,self.module.params)
+
+    @patch.object(ClcNetwork, '_update_network')
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_present_skips_update_after_create_if_no_name_or_desc_are_provided(self, mock_set_creds, mock_update):
+        with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets) as mock_nets:
+            network_id = 24601
+            uri1, uri2, mock_network = self.ugly_setup(mock_update, network_id)
+            new_name = "mocketymockmock"
+            new_desc = "mockerymockmockdesc"
+            self.module.params = {
+                'location': 'mock_loc'
+            }
+            self.network.process_request()
+
+            self.assertEqual(2, self.network.clc.v2.API.Call.call_count)
+            self.network.clc.v2.API.Call.assert_any_call(uri1)
+            self.network.clc.v2.API.Call.assert_called_with(uri2)
+            self.network.clc.v2.Network.assert_called_once_with(network_id,network_obj=mock_network.data)
+            mock_update.assert_not_called()
+
+
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
     def test_process_request_present_reports_failure_when_create_fails(self, mock_set_creds):
         with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets) as mock_nets:
@@ -280,10 +391,11 @@ class TestClcNetwork(unittest.TestCase):
             self.assertEqual(0, self.network.clc.v2.Network.Create.call_count)
             self.existing_net.Update.assert_called_once_with(name, location='mock_loc')
 
+
+
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
     def test_process_request_present_exits_with_expected_network(self, mock_set_creds):
         with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets):
-            mock_nets = mock.MagicMock()
             mock_new = mock.MagicMock()
             mock_new.id = '12345'
             mock_new.alias = 'my_alias'
@@ -291,8 +403,7 @@ class TestClcNetwork(unittest.TestCase):
                 'id': 'working',
                 'field': 'value'
             }
-            mock_nets.Get = mock.MagicMock(return_value = mock_new)
-            self.network.clc.v2.Networks = mock.MagicMock(return_value=mock_nets)
+            self.network.clc.v2.Network = mock.MagicMock(return_value=mock_new)
 
             mock_request = mock.MagicMock()
             mock_request.WaitUntilComplete = mock.MagicMock(return_value=0)

@@ -254,30 +254,37 @@ class ClcNetwork:
 
     def _ensure_network_present(self, params):
       changed = False
-      location = params.get('location')
       search_key = params.get('id') if 'id' in params else params.get('name', None)
       network = self.networks.Get(search_key)
 
       if network is None:
         changed = True
-        network = self._create_network(location, params.get('wait',True), search_key)
+        network = self._create_network(params)
       else:
-        changed, network = self._update_network(network, location, params)
+        changed, network = self._update_network(network, params)
 
       return changed, network
 
-    def _create_network(self, location, wait, search_key):
-      request = self.clc.v2.Network.Create(location=location)
+    def _create_network(self, params):
+      name = params.get('name', None)
+      desc = params.get('desc', None)
+      request = self.clc.v2.Network.Create(location=params.get('location'))
 
-      if wait:
+      if params.get('wait',True):
         if request.WaitUntilComplete() > 0:
           self.module.fail_json(msg="Unable to create network")
-        return self.clc.v2.Networks(location=location).Get(key=search_key)
+        network_payload = self.clc.v2.API.Call(
+          self.clc.v2.API.Call(request.uri)['summary']['links'][0]['href'])
+        request = self.clc.v2.Network(network_payload['id'], network_obj=network_payload)
+
+        if name is not None or desc is not None:
+          ignored,request = self._update_network(request, params)
 
       return request
 
-    def _update_network(self, network, location, params):
+    def _update_network(self, network, params):
       changed = False
+      location = params.get('location')
       name = params.get('name', None)
       desc = params.get('desc', None)
 
