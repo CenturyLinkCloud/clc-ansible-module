@@ -417,6 +417,33 @@ class TestClcNetwork(unittest.TestCase):
 
             self.module.exit_json.assert_called_once_with(changed=True,network=mock_new.data)
 
+
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_present_exits_with_expected_request_when_wait_false(self, mock_set_creds):
+        with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets):
+            op_id = "operationId"
+            op_uri = "/v2-experimental/operations/xxx/status/operationId"
+            mock_request = mock.MagicMock()
+            mock_request.id = op_id
+            mock_request.uri = op_uri
+            mock_requests = create_autospec(clc_sdk.v2.Requests)
+            mock_requests.requests = [mock_request]
+            self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_requests)
+            self.module.params = {
+                'location': 'mock_loc',
+                'wait': False
+            }
+
+            self.network.process_request()
+
+            expected = {
+                "id": op_id,
+                "uri": op_uri
+            }
+
+            self.module.exit_json.assert_called_once_with(changed=True,network=expected)
+
+
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
     def test_process_request_for_delete_calls_sdk_delete_and_reports_change(self, mock_set_creds):
         with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets) as mock_nets:

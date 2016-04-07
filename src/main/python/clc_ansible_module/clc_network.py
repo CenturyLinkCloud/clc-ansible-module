@@ -223,8 +223,13 @@ class ClcNetwork:
         else:
           changed, network = self._ensure_network_present(p)
 
-        if network:
+        if hasattr(network, 'data'):
           network = network.data
+        elif hasattr(network, 'requests'):
+          network = {
+            "id": network.requests[0].id,
+            "uri": network.requests[0].uri
+          }
 
         self.module.exit_json(changed=changed, network=network)
 
