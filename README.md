@@ -64,7 +64,6 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
         name: test
         template: ubuntu-14-64
         exact_count: 3
-        group: 'Default Group'
         count_group: 'Default Group'
       register: clc
     - name: debug
