@@ -276,10 +276,11 @@ class ClcNetwork:
       request = self.clc.v2.Network.Create(location=params.get('location'))
 
       if params.get('wait',True):
+        uri = request.requests[0].uri
         if request.WaitUntilComplete() > 0:
           self.module.fail_json(msg="Unable to create network")
-        network_payload = self.clc.v2.API.Call(
-          self.clc.v2.API.Call(request.uri)['summary']['links'][0]['href'])
+        network_payload = self.clc.v2.API.Call('GET',
+          self.clc.v2.API.Call('GET', uri)['summary']['links'][0]['href'])
         request = self.clc.v2.Network(network_payload['id'], network_obj=network_payload)
 
         if name is not None or desc is not None:

@@ -264,7 +264,7 @@ class TestClcNetwork(unittest.TestCase):
             network_uri: new_network
         }
 
-        self.network.clc.v2.API.Call = mock.MagicMock(side_effect=lambda uri: response_map[uri] if uri in response_map else 'doing it wrong')
+        self.network.clc.v2.API.Call = mock.MagicMock(side_effect=lambda x, uri: response_map[uri] if uri in response_map else 'doing it wrong')
 
         # Step the Third: Mock the instantiation of a v2 Network object
         mock_network = mock.MagicMock()
@@ -277,7 +277,7 @@ class TestClcNetwork(unittest.TestCase):
         mock_requests = mock.MagicMock()
         mock_requests.requests = [mock_request]
         mock_requests.WaitUntilComplete = mock.MagicMock(return_value=0)
-        self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_request)
+        self.network.clc.v2.Network.Create = mock.MagicMock(return_value=mock_requests)
         mock_update.return_value = True, mock_network
 
         return status_uri, network_uri, mock_network
@@ -298,8 +298,8 @@ class TestClcNetwork(unittest.TestCase):
             self.network.process_request()
 
             self.assertEqual(2, self.network.clc.v2.API.Call.call_count)
-            self.network.clc.v2.API.Call.assert_any_call(uri1)
-            self.network.clc.v2.API.Call.assert_called_with(uri2)
+            self.network.clc.v2.API.Call.assert_any_call('GET', uri1)
+            self.network.clc.v2.API.Call.assert_called_with('GET', uri2)
             self.network.clc.v2.Network.assert_called_once_with(network_id,network_obj=mock_network.data)
             mock_update.assert_called_once_with(mock_network,self.module.params)
 
@@ -317,8 +317,8 @@ class TestClcNetwork(unittest.TestCase):
             self.network.process_request()
 
             self.assertEqual(2, self.network.clc.v2.API.Call.call_count)
-            self.network.clc.v2.API.Call.assert_any_call(uri1)
-            self.network.clc.v2.API.Call.assert_called_with(uri2)
+            self.network.clc.v2.API.Call.assert_any_call('GET', uri1)
+            self.network.clc.v2.API.Call.assert_called_with('GET', uri2)
             self.network.clc.v2.Network.assert_called_once_with(network_id,network_obj=mock_network.data)
             mock_update.assert_not_called()
 
