@@ -39,7 +39,7 @@ options:
     required: True
   credentials:
     description:
-      - Whether to return server credentials in the facts.
+      - Indicates if server credentials should be returned in the facts.
     required: False
     default: False
     choices: [False, True]
