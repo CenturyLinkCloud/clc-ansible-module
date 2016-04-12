@@ -257,9 +257,15 @@ class ClcNetwork:
 
       return changed
 
+    def _get_search_key(self, params):
+      if params.get('id', None) is not None:
+        return params.get('id', None)
+
+      return params.get('name', None)
+
     def _ensure_network_present(self, params):
       changed = False
-      search_key = params.get('id') if 'id' in params else params.get('name', None)
+      search_key = self._get_search_key(params)
       network = self.networks.Get(search_key)
 
       if network is None:
