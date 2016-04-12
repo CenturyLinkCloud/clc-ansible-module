@@ -170,7 +170,7 @@ class TestClcNetwork(unittest.TestCase):
             location=dict(required=True),
             description=dict(required=False),
             state=dict(default='present', choices=['present', 'absent']),
-            wait=dict(default=True)
+            wait=dict(default=True, type='bool')
         ))
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')

@@ -171,7 +171,7 @@ class ClcNetwork:
             name=dict(required=False),
             location=dict(required=True),
             description=dict(required=False),
-            wait=dict(default=True),
+            wait=dict(default=True, type='bool'),
             state=dict(default='present', choices=['present', 'absent']),
         )
         return argument_spec
