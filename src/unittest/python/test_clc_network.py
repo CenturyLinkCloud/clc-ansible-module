@@ -364,7 +364,7 @@ class TestClcNetwork(unittest.TestCase):
             self.module.params = {
                 'id': 'existing',
                 'name': name,
-                'desc': desc,
+                'description': desc,
                 'location': 'mock_loc',
             }
 
