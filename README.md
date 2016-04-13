@@ -106,6 +106,29 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
     - name: debug
       debug: var=clc
 ```
+```yaml
+---
+- name: Sample playbook which executes a blueprint package post build.
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create Server
+      clc_server:
+        name: test
+        description: 'Test Server'
+        template: WIN2012R2DTC-64
+        group: 'Default Group'
+        count: 1
+        cpu: 2
+        memory: 4
+        additional_disks:
+          - {path: e, sizeGB: 100, type: partitioned}
+        packages:
+          - { packageId: '98d7cb38-41ae-41de-b3e4-9967be006f6c', parameters: {} }
+      register: clc_svr
+    - debug: var=clc_svr
+```
 
 ###Available Parameters
 
@@ -131,11 +154,11 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 | `memory:` | N | 1 | Any valid int value | Memory in GB.
 | `name:` | Y | | | A 1 - 6 character identifier to use for the server.
 | `network_id:` | N | The first vlan in the datacenter under that account | | The text vlan identifier on which to create the servers.  Defaults if not provided.
-| `packages:` | N | | | Blueprints to run on the created server.|
+| `packages:` | N | | | Blueprints to run on the created server.  Make reference to the Blueprint ID and not the name.|
 | `password:` | N | Generated if not provided | | Password for the administrator user.  This password must be at least 3 of the 4 standard items.  Upper case, Lower Case, Numbers, and Special Characters (Some special characters may have issues.  This needs to be tested.)
 | `primary_dns:` | N | Provided by the platform if not included. | | Primary DNS used by the server. |
 | `secondary_dns:` | N | Provided by the platform if not included. | | Secondary DNS used by the server. |
-| `server_ids:` | Y (for some states)|  |  | Required for `started`, `stopped`, and `absent` states.   A list of server Ids to insure are started, stopped, or absent. 
+| `server_ids:` | Y (for some states)|  |  | Required for `started`, `stopped`, and `absent` states.   A list of server Ids to insure are started, stopped, or absent.
 | `source_server_password:` | N | | | The password for the source server if a clone is specified |
 | `state:` | Y | | `present`, `started`, `stopped`, `absent` | The state to insure that the provided resources are in.
 | `storage_type:` | N | `standard` |`standard`, `ssd` | The type of storage to attach to the server.
@@ -731,7 +754,7 @@ Access the CLC hostvars from a play defined in yaml:
 
 ```JSON
 ---
-- name: Read Hostvars for Servers 
+- name: Read Hostvars for Servers
   hosts: all
   gather_facts: False
   tasks:
