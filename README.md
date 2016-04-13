@@ -281,6 +281,28 @@ This module can be used to modify server configuration in CLC.
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
 
+## clc_server_fact Module
+Retrieve facts about servers in Centurylink Cloud.
+
+###Example Playbook
+```yaml
+- name: Retrieve Server Facts
+  clc_server_fact:
+    server_id: UC1ACCTSRVR10
+```
+```yaml
+- name: Retrieve Server Facts With Credentials
+  clc_server_fact:
+    server_id: UC1ACCTSRVR10
+    credentials: true
+```
+###Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `server_id` | Y | | | The server id to retrieve facts for.
+| `credentials` | N | False | False, True | Indicates if the server credentials should be returned in the facts.
+
 ## clc_group Module
 
 Create or deletes Server Groups at CenturyLink Cloud.
@@ -330,6 +352,21 @@ Create or deletes Server Groups at CenturyLink Cloud.
 | `parent:` | N |top level	 | | The parent group of the server group
 | `location:` | N |the default datcenter associated with the account | | Datacenter to create the group in
 | `state:` | N | present|present, absent | Whether to create or delete the group
+
+## clc_group_fact Module
+Retrieve facts about groups in Centurylink Cloud.
+
+###Example Playbook
+```yaml
+- name: Retrieve Group Facts
+  clc_group_fact:
+    group_id: 31d13f501459411ba59304f3d47486eb
+```
+
+###Available Parameters
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `group_id` | Y | | | The group id to retrieve facts for.
 
 ## clc_aa_policy Module
 
