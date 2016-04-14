@@ -300,7 +300,7 @@ class ClcNetwork:
       name = params.get('name', None)
       desc = params.get('description', None)
 
-      if (name is not None and network.name != name) or (desc is not None and network.description != name):
+      if (name is not None and network.name != name) or (desc is not None and network.description != desc):
         changed = True
         update_name = name if name is not None else network.name
         if desc is not None:
