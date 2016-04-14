@@ -394,7 +394,7 @@ class TestClcNetwork(unittest.TestCase):
 
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
-    def test_process_request_present_exits_with_expected_network(self, mock_set_creds):
+    def test_process_request_present_creates_and_exits_with_expected_network(self, mock_set_creds):
         with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets):
             mock_new = mock.MagicMock()
             mock_new.id = '12345'
@@ -417,6 +417,33 @@ class TestClcNetwork(unittest.TestCase):
 
             self.module.exit_json.assert_called_once_with(changed=True,network=mock_new.data)
 
+    def update_data(self, payload):
+        self.existing_net.data = payload
+
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_present_updates_and_exits_with_expected_network(self, mock_set_creds):
+        with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets):
+            new_name = 'new_name'
+            mock_update = self.existing_net
+            mock_update.alias = 'my_alias'
+            mock_update.data = {
+                'id': 'existing',
+                'field': 'value'
+            }
+
+            expected = mock_update.data
+            expected['name'] = new_name
+
+            self.existing_net.Update = mock.MagicMock(side_effect=self.update_data(expected))
+            self.module.params = {
+                'id': 'existing',
+                'name': new_name,
+                'location': 'mock_loc'
+            }
+
+            self.network.process_request()
+
+            self.module.exit_json.assert_called_once_with(changed=True,network=expected)
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
     def test_process_request_present_exits_with_expected_request_when_wait_false(self, mock_set_creds):
