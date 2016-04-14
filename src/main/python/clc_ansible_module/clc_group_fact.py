@@ -40,6 +40,7 @@ options:
 requirements:
     - python = 2.7
     - requests >= 2.5.0
+author: "CLC Runner (@clc-runner)"
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
       Centurylink Cloud
