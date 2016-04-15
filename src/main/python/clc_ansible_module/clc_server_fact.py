@@ -65,12 +65,12 @@ EXAMPLES = '''
 - name: Retrieve Server Facts
   clc_server_fact:
     server_id: UC1WFADWRDPRS10
-    
+
 - name: Retrieve Server Facts With Credentials
   clc_server_fact:
     server_id: UC1WFADWRDPRS10
     credentials: true
-    
+
 '''
 
 RETURN = '''
@@ -237,14 +237,13 @@ server:
 
 __version__ = '${version}'
 
-from distutils.version import LooseVersion
-
 try:
     import requests
 except ImportError:
     REQUESTS_FOUND = False
 else:
     REQUESTS_FOUND = True
+
 
 class ClcServerFact:
 
@@ -265,13 +264,15 @@ class ClcServerFact:
         """
         self._set_clc_credentials_from_env()
         server_id = self.module.params.get('server_id')
-        
+
         r = requests.get(self._get_endpoint(server_id), headers={
-            'Authorization' : 'Bearer ' + self.v2_api_token
+            'Authorization': 'Bearer ' + self.v2_api_token
         })
 
         if r.status_code not in [200]:
-            self.module.fail_json(msg='Failed to retrieve server facts: %s' % server_id)
+            self.module.fail_json(
+                msg='Failed to retrieve server facts: %s' %
+                server_id)
 
         r = r.json()
 
@@ -291,16 +292,18 @@ class ClcServerFact:
             credentials=dict(default=False))
 
         return {"argument_spec": argument_spec}
-    
+
     def _get_server_credentials(self, server_id):
-        
+
         r = requests.get(self._get_endpoint(server_id) + '/credentials', headers={
-            'Authorization' : 'Bearer ' + self.v2_api_token
+            'Authorization': 'Bearer ' + self.v2_api_token
         })
-    
+
         if r.status_code not in [200]:
-            self.module.fail_json(msg='Failed to retrieve server credentials: %s' % server_id)
-            
+            self.module.fail_json(
+                msg='Failed to retrieve server credentials: %s' %
+                server_id)
+
         return r.json()
 
     def _get_endpoint(self, server_id):
@@ -317,30 +320,32 @@ class ClcServerFact:
         v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
         clc_alias = env.get('CLC_ACCT_ALIAS', False)
         self.api_url = env.get('CLC_V2_API_URL', 'https://api.ctl.io')
-        
+
         if v2_api_token and clc_alias:
-            
+
             self.v2_api_token = v2_api_token
             self.clc_alias = clc_alias
-            
+
         elif v2_api_username and v2_api_passwd:
-            
+
             r = requests.post(self.api_url + '/v2/authentication/login', json={
-                'username' : v2_api_username,
-                'password' : v2_api_passwd
+                'username': v2_api_username,
+                'password': v2_api_passwd
             })
-            
+
             if r.status_code not in [200]:
-                self.module.fail_json(msg='Failed to authenticate with clc V2 api.')
-            
-            r = r.json()            
+                self.module.fail_json(
+                    msg='Failed to authenticate with clc V2 api.')
+
+            r = r.json()
             self.v2_api_token = r['bearerToken']
             self.clc_alias = r['accountAlias']
-            
+
         else:
             return self.module.fail_json(
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
+
 
 def main():
     """
