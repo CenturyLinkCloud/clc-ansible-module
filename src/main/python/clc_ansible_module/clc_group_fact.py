@@ -230,10 +230,10 @@ class ClcGroupFact:
                 group_id)
 
         r = r.json()
-        servers = r['server'] = []
+        servers = r['servers'] = []
 
         for l in r['links']:
-            if 'servers' == l['rel']:
+            if 'server' == l['rel']:
                 servers.append(l['id'])
 
         self.module.exit_json(changed=False, group=r)
