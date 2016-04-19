@@ -31,21 +31,25 @@ description:
   - An Ansible module to Create or Delete networks at CenturyLink Cloud.
 version_added: "2.0"
 options:
-  name:
-    description:
-      - The name of the network.
-    required: True
-  location:
-    description:
-      - Datacenter in which the network lives/should live.
-    required: True
   description:
     description:
       - A free text field for describing the network's purpose
     required: False
+  id:
+    description:
+      - The id for the network being updated or deleted; required when state = 'absent'.
+    required: False
+  location:
+    description:
+      - Datacenter in which the network lives/should live.
+    required: True
+  name:
+    description:
+      - The name of the network.  Used to find an existing network when state='present'.
+    required: False
   state:
     description:
-      - Whether to create or delete the network.
+      - Whether to claim or release the network.
     required: False
     default: present
     choices: ['present','absent']
@@ -80,15 +84,15 @@ EXAMPLES = '''
   gather_facts: False
   connection: local
   tasks:
-    - name: Create a network
+    - name: Create and update a new network
       clc_network:
-        name: 'Storage Network'
-        location: 'UK3'
+        location: 'ut1'
         state: present
-      register: network
+        name: 'ProdNet5000'
+        description: 'Production Minecraft'
+      register: net
 
-    - name: debug
-      debug: var=network
+    - debug: var=nettwork
 
 ---
 - name: Delete Network
@@ -96,15 +100,14 @@ EXAMPLES = '''
   gather_facts: False
   connection: local
   tasks:
-    - name: Delete an network
+    - name: Delete-ification
       clc_network:
-        name: 'Storage Network'
-        location: 'UK3'
+        location: 'ut1'
         state: absent
-      register: network
+        id: 'vlan_1306_10.81.206'
+      register: net
 
-    - name: debug
-      debug: var=network
+    - debug: var=net
 '''
 
 RETURN = '''
