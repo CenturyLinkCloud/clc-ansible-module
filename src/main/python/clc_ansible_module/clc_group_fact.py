@@ -40,6 +40,7 @@ options:
 requirements:
     - python = 2.7
     - requests >= 2.5.0
+author: "CLC Runner (@clc-runner)"
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
       Centurylink Cloud
@@ -58,7 +59,7 @@ EXAMPLES = '''
 - name: Retrieve Group Facts
   clc_group_fact:
     group_id: 31d13f501459411ba59304f3d47486eb
-    
+
 '''
 
 RETURN = '''
@@ -191,14 +192,13 @@ server:
 
 __version__ = '${version}'
 
-from distutils.version import LooseVersion
-
 try:
     import requests
 except ImportError:
     REQUESTS_FOUND = False
 else:
     REQUESTS_FOUND = True
+
 
 class ClcGroupFact:
 
@@ -219,19 +219,21 @@ class ClcGroupFact:
         """
         self._set_clc_credentials_from_env()
         group_id = self.module.params.get('group_id')
-        
+
         r = requests.get(self._get_endpoint(group_id), headers={
-            'Authorization' : 'Bearer ' + self.v2_api_token
+            'Authorization': 'Bearer ' + self.v2_api_token
         })
 
         if r.status_code not in [200]:
-            self.module.fail_json(msg='Failed to retrieve group facts: %s' % group_id)
+            self.module.fail_json(
+                msg='Failed to retrieve group facts: %s' %
+                group_id)
 
         r = r.json()
-        servers = r['server'] = []
-        
+        servers = r['servers'] = []
+
         for l in r['links']:
-            if 'servers' == l['rel']:
+            if 'server' == l['rel']:
                 servers.append(l['id'])
 
         self.module.exit_json(changed=False, group=r)
@@ -258,30 +260,32 @@ class ClcGroupFact:
         v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
         clc_alias = env.get('CLC_ACCT_ALIAS', False)
         self.api_url = env.get('CLC_V2_API_URL', 'https://api.ctl.io')
-        
+
         if v2_api_token and clc_alias:
-            
+
             self.v2_api_token = v2_api_token
             self.clc_alias = clc_alias
-            
+
         elif v2_api_username and v2_api_passwd:
-            
+
             r = requests.post(self.api_url + '/v2/authentication/login', json={
-                'username' : v2_api_username,
-                'password' : v2_api_passwd
+                'username': v2_api_username,
+                'password': v2_api_passwd
             })
-            
+
             if r.status_code not in [200]:
-                self.module.fail_json(msg='Failed to authenticate with clc V2 api.')
-            
-            r = r.json()            
+                self.module.fail_json(
+                    msg='Failed to authenticate with clc V2 api.')
+
+            r = r.json()
             self.v2_api_token = r['bearerToken']
             self.clc_alias = r['accountAlias']
-            
+
         else:
             return self.module.fail_json(
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
+
 
 def main():
     """
