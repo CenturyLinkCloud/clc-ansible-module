@@ -1,0 +1,14 @@
+- name: Create Network
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create and update a new network
+      clc_network:
+        location: 'ut1'
+        state: present
+        name: 'ProdNet5000'
+        description: 'Production Minecraft'
+      register: net
+
+    - debug: var=net
