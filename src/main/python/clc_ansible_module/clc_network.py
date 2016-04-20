@@ -322,7 +322,7 @@ def main():
     """
     module = AnsibleModule(
         argument_spec=ClcNetwork._define_module_argument_spec(),
-        supports_check_mode=True)
+        supports_check_mode=False)
     clc_network = ClcNetwork(module)
     clc_network.process_request()
 
