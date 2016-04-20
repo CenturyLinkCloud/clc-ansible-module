@@ -38,6 +38,7 @@ options:
   id:
     description:
       - The id for the network being updated or deleted; required when state = 'absent'.
+        This can be the network's id, name, or vlan -- as these can all be used to uniquely id the network.
     required: False
   location:
     description:

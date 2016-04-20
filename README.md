@@ -741,7 +741,7 @@ Create or delete Network at CenturyLink Cloud.
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
 | `description` | N | | | Description for the network |
-| `id` | N | | | Identifier for network to be updated/deleted.  This is required when state is 'absent'.  This is used to find an existing network when state is 'present' and takes precedence over `name`. |
+| `id` | N | | | Identifier for network to be updated/deleted.  This is required when state is 'absent'.  This is used to find an existing network when state is 'present' and takes precedence over `name`.  The `id` field can be the network id, network name, or network vlan. |
 | `location` | Y | | | Datacenter in which the network lives |
 | `name` | N | | | The Name of the network.  This is used to find an existing network when state is 'present'; if not found, the claimed network is given this name. |
 | `state` | N | present | present, absent | Whether to claim or release the network |
