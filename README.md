@@ -148,7 +148,7 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 | `description:` | N | Set to `name:` if not provided | | The description to set for the server |
 | `exact_count:` | N | | | Run in *idempotent* mode.  Will insure that this exact number of servers are running in the provided group, creating and deleting them to reach that count.  Requires `count_group:` to be set.
 | `group:` | N | 'Default Group' | | The Server Group to create servers under.  |
-| `ip_address:` | N | Provided by the platform it not set | | The IP Address for the server. One is assigned if not provided.  This is a parameter on the CLC api, but I'm not sure what happens if it's set.
+| `ip_address:` | N | Provided by the platform it not set | | The IP Address for the server. One is assigned if not provided. 
 | `location:` | N | Defaults to the default datacenter for the account | | The Datacenter to create servers in.
 | `managed_os:` | N | N | | Whether to create the server as 'Managed' or not.
 | `memory:` | N | 1 | Any valid int value | Memory in GB.
