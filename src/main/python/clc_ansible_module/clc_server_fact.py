@@ -275,6 +275,8 @@ class ClcServerFact:
                 server_id)
 
         r = r.json()
+        if r['details']['memoryMB']:
+            r['details']['memory'] = int(r['details']['memoryMB'] / 1024)
 
         if self.module.params.get('credentials'):
             r['credentials'] = self._get_server_credentials(server_id)
