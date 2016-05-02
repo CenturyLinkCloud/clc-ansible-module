@@ -74,17 +74,164 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
----
 changed:
-  description: "A flag indicating if any change was made or not"
-  returned: success
-  sample: true
-  type: boolean
+    description: A flag indicating if any change was made or not
+    returned: success
+    type: boolean
+    sample: True
 server:
-  description: "The retrieved server facts"
-  returned: success
-  sample: "{\"changeInfo\": {\"createdBy\": \"chris.kent.wfad\", \"createdDate\": \"2016-03-15T19:44:40Z\", \"modifiedDate\": \"2016-03-15T19:47:46Z\"}, \"description\": \"WRDPRS\", \"details\": {\"alertPolicies\": [], \"cpu\": 1, \"customFields\": [], \"diskCount\": 3, \"disks\": [{\"id\": \"0:0\", \"partitionPaths\": [], \"sizeGB\": 1 }, {\"id\": \"0:1\", \"partitionPaths\": [], \"sizeGB\": 2 }, {\"id\": \"0:2\", \"partitionPaths\": [], \"sizeGB\": 14 } ], \"hostName\": \"uc1wfadwrdprs10\", \"inMaintenanceMode\": false, \"ipAddresses\": [{\"internal\": \"10.141.19.15\"} ], \"memoryMB\": 2048, \"partitions\": [{\"path\": \"(swap)\", \"sizeGB\": 0.0 }, {\"path\": \"/\", \"sizeGB\": 13.655 }, {\"path\": \"/boot\", \"sizeGB\": 0.474 } ], \"powerState\": \"started\", \"secondaryIPAddresses\": [], \"snapshots\": [], \"storageGB\": 17 }, \"displayName\": \"UC1WFADWRDPRS10\", \"groupId\": \"0e330aec1d2f46cfbf77b5b06d50e733\", \"id\": \"uc1wfadwrdprs10\", \"isTemplate\": false, \"links\": [{\"href\": \"/v2/servers/wfad/uc1wfadwrdprs10\", \"id\": \"uc1wfadwrdprs10\", \"rel\": \"self\", \"verbs\": [\"GET\", \"PATCH\", \"DELETE\"] }, {\"href\": \"/v2/groups/wfad/0e330aec1d2f46cfbf77b5b06d50e733\", \"id\": \"0e330aec1d2f46cfbf77b5b06d50e733\", \"rel\": \"group\"}, {\"href\": \"/v2/accounts/wfad\", \"id\": \"wfad\", \"rel\": \"account\"}, {\"href\": \"/v2/billing/wfad/serverPricing/uc1wfadwrdprs10\", \"rel\": \"billing\"}, {\"href\": \"/v2/servers/wfad/uc1wfadwrdprs10/publicIPAddresses\", \"rel\": \"publicIPAddresses\", \"verbs\": [\"POST\"] }, {\"href\": \"/v2/servers/wfad/uc1wfadwrdprs10/credentials\", \"rel\": \"credentials\"}, {\"href\": \"/v2/servers/wfad/uc1wfadwrdprs10/statistics\", \"rel\": \"statistics\"}, {\"href\": \"/v2/servers/wfad/e3561ed15320456e9890561df7be6e19/upcomingScheduledActivities\", \"rel\": \"upcomingScheduledActivities\"}, {\"href\": \"/v2/servers/wfad/e3561ed15320456e9890561df7be6e19/scheduledActivities\", \"rel\": \"scheduledActivities\", \"verbs\": [\"GET\", \"POST\"] }, {\"href\": \"/v2/servers/wfad/uc1wfadwrdprs10/capabilities\", \"rel\": \"capabilities\"}, {\"href\": \"/v2/servers/wfad/uc1wfadwrdprs10/alertPolicies\", \"rel\": \"alertPolicyMappings\", \"verbs\": [\"POST\"] }, {\"href\": \"/v2/servers/wfad/uc1wfadwrdprs10/antiAffinityPolicy\", \"rel\": \"antiAffinityPolicyMapping\", \"verbs\": [\"PUT\", \"DELETE\"] }, {\"href\": \"/v2/servers/wfad/uc1wfadwrdprs10/cpuAutoscalePolicy\", \"rel\": \"cpuAutoscalePolicyMapping\", \"verbs\": [\"PUT\", \"DELETE\"] } ], \"locationId\": \"UC1\", \"name\": \"UC1WFADWRDPRS10\", \"os\": \"ubuntu14_64Bit\", \"osType\": \"Ubuntu 14 64-bit\", \"status\": \"active\", \"storageType\": \"standard\", \"type\": \"standard\"} }"
-  type: dict
+    description: The retrieved server facts.
+    returned: success
+    type: dict
+    sample:
+        "server": {
+                "changeInfo": {
+                    "createdBy": "chris.kent.wfad",
+                    "createdDate": "2016-03-15T19:44:40Z",
+                    "modifiedDate": "2016-03-15T19:47:46Z"
+                },
+                "description": "WRDPRS",
+                "details": {
+                    "alertPolicies": [],
+                    "cpu": 1,
+                    "customFields": [],
+                    "diskCount": 3,
+                    "disks": [
+                        {
+                            "id": "0:0",
+                            "partitionPaths": [],
+                            "sizeGB": 1
+                        },
+                        {
+                            "id": "0:1",
+                            "partitionPaths": [],
+                            "sizeGB": 2
+                        },
+                        {
+                            "id": "0:2",
+                            "partitionPaths": [],
+                            "sizeGB": 14
+                        }
+                    ],
+                    "hostName": "uc1wfadwrdprs10",
+                    "inMaintenanceMode": false,
+                    "ipAddresses": [
+                        {
+                            "internal": "10.141.19.15"
+                        }
+                    ],
+                    "memoryMB": 2048,
+                    "partitions": [
+                        {
+                            "path": "(swap)",
+                            "sizeGB": 0.0
+                        },
+                        {
+                            "path": "/",
+                            "sizeGB": 13.655
+                        },
+                        {
+                            "path": "/boot",
+                            "sizeGB": 0.474
+                        }
+                    ],
+                    "powerState": "started",
+                    "secondaryIPAddresses": [],
+                    "snapshots": [],
+                    "storageGB": 17
+                },
+                "displayName": "UC1WFADWRDPRS10",
+                "groupId": "0e330aec1d2f46cfbf77b5b06d50e733",
+                "id": "uc1wfadwrdprs10",
+                "isTemplate": false,
+                "links": [
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadwrdprs10",
+                        "id": "uc1wfadwrdprs10",
+                        "rel": "self",
+                        "verbs": [
+                            "GET",
+                            "PATCH",
+                            "DELETE"
+                        ]
+                    },
+                    {
+                        "href": "/v2/groups/wfad/0e330aec1d2f46cfbf77b5b06d50e733",
+                        "id": "0e330aec1d2f46cfbf77b5b06d50e733",
+                        "rel": "group"
+                    },
+                    {
+                        "href": "/v2/accounts/wfad",
+                        "id": "wfad",
+                        "rel": "account"
+                    },
+                    {
+                        "href": "/v2/billing/wfad/serverPricing/uc1wfadwrdprs10",
+                        "rel": "billing"
+                    },
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadwrdprs10/publicIPAddresses",
+                        "rel": "publicIPAddresses",
+                        "verbs": [
+                            "POST"
+                        ]
+                    },
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadwrdprs10/credentials",
+                        "rel": "credentials"
+                    },
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadwrdprs10/statistics",
+                        "rel": "statistics"
+                    },
+                    {
+                        "href": "/v2/servers/wfad/e3561ed15320456e9890561df7be6e19/upcomingScheduledActivities",
+                        "rel": "upcomingScheduledActivities"
+                    },
+                    {
+                        "href": "/v2/servers/wfad/e3561ed15320456e9890561df7be6e19/scheduledActivities",
+                        "rel": "scheduledActivities",
+                        "verbs": [
+                            "GET",
+                            "POST"
+                        ]
+                    },
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadwrdprs10/capabilities",
+                        "rel": "capabilities"
+                    },
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadwrdprs10/alertPolicies",
+                        "rel": "alertPolicyMappings",
+                        "verbs": [
+                            "POST"
+                        ]
+                    },
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadwrdprs10/antiAffinityPolicy",
+                        "rel": "antiAffinityPolicyMapping",
+                        "verbs": [
+                            "PUT",
+                            "DELETE"
+                        ]
+                    },
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadwrdprs10/cpuAutoscalePolicy",
+                        "rel": "cpuAutoscalePolicyMapping",
+                        "verbs": [
+                            "PUT",
+                            "DELETE"
+                        ]
+                    }
+                ],
+                "locationId": "UC1",
+                "name": "UC1WFADWRDPRS10",
+                "os": "ubuntu14_64Bit",
+                "osType": "Ubuntu 14 64-bit",
+                "status": "active",
+                "storageType": "standard",
+                "type": "standard"
+            }
 '''
 
 __version__ = '${version}'

@@ -63,17 +63,130 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
----
 changed:
-  description: "A flag indicating if any change was made or not"
-  returned: success
-  sample: true
-  type: boolean
+    description: A flag indicating if any change was made or not
+    returned: success
+    type: boolean
+    sample: True
 server:
-  description: "The retrieved group facts"
-  returned: success
-  sample: "{\"changeInfo\": {\"createdBy\": \"mark.ramach.wfas\", \"createdDate\": \"2016-04-07T23:37:15Z\", \"modifiedBy\": \"mark.ramach.wfas\", \"modifiedDate\": \"2016-04-07T23:37:15Z\"}, \"customFields\": [], \"description\": \"K8S\", \"groups\": [], \"id\": \"479857c65d6a42d8b2523fab58c4c3cb\", \"links\": [{\"href\": \"/v2/groups/wfad\", \"rel\": \"createGroup\", \"verbs\": [\"POST\"] }, {\"href\": \"/v2/servers/wfad\", \"rel\": \"createServer\", \"verbs\": [\"POST\"] }, {\"href\": \"/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb\", \"rel\": \"self\", \"verbs\": [\"GET\", \"PATCH\", \"DELETE\"] }, {\"href\": \"/v2/groups/wfad/a319873a32e84c17aa76306a477b9a22\", \"id\": \"a319873a32e84c17aa76306a477b9a22\", \"rel\": \"parentGroup\"}, {\"href\": \"/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/defaults\", \"rel\": \"defaults\", \"verbs\": [\"GET\", \"POST\"] }, {\"href\": \"/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/billing\", \"rel\": \"billing\"}, {\"href\": \"/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/archive\", \"rel\": \"archiveGroupAction\"}, {\"href\": \"/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/statistics\", \"rel\": \"statistics\"}, {\"href\": \"/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/upcomingScheduledActivities\", \"rel\": \"upcomingScheduledActivities\"}, {\"href\": \"/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/horizontalAutoscalePolicy\", \"rel\": \"horizontalAutoscalePolicyMapping\", \"verbs\": [\"GET\", \"PUT\", \"DELETE\"] }, {\"href\": \"/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/scheduledActivities\", \"rel\": \"scheduledActivities\", \"verbs\": [\"GET\", \"POST\"] }, {\"href\": \"/v2/servers/wfad/uc1wfadk8sm16\", \"id\": \"UC1WFADK8SM16\", \"rel\": \"server\"}, {\"href\": \"/v2/servers/wfad/uc1wfadk8sn46\", \"id\": \"UC1WFADK8SN46\", \"rel\": \"server\"}, {\"href\": \"/v2/servers/wfad/uc1wfadk8sm17\", \"id\": \"UC1WFADK8SM17\", \"rel\": \"server\"}, {\"href\": \"/v2/servers/wfad/uc1wfadk8sn45\", \"id\": \"UC1WFADK8SN45\", \"rel\": \"server\"} ], \"locationId\": \"UC1\", \"name\": \"K8S\", \"servers\": [\"UC1WFADK8SM16\", \"UC1WFADK8SN46\", \"UC1WFADK8SM17\", \"UC1WFADK8SN45\"], \"serversCount\": 4, \"status\": \"active\", \"type\": \"default\"} }"
-  type: dict
+    description: The retrieved group facts.
+    returned: success
+    type: dict
+    sample:
+        "group": {
+                "changeInfo": {
+                    "createdBy": "mark.ramach.wfas",
+                    "createdDate": "2016-04-07T23:37:15Z",
+                    "modifiedBy": "mark.ramach.wfas",
+                    "modifiedDate": "2016-04-07T23:37:15Z"
+                },
+                "customFields": [],
+                "description": "K8S",
+                "groups": [],
+                "id": "479857c65d6a42d8b2523fab58c4c3cb",
+                "links": [
+                    {
+                        "href": "/v2/groups/wfad",
+                        "rel": "createGroup",
+                        "verbs": [
+                            "POST"
+                        ]
+                    },
+                    {
+                        "href": "/v2/servers/wfad",
+                        "rel": "createServer",
+                        "verbs": [
+                            "POST"
+                        ]
+                    },
+                    {
+                        "href": "/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb",
+                        "rel": "self",
+                        "verbs": [
+                            "GET",
+                            "PATCH",
+                            "DELETE"
+                        ]
+                    },
+                    {
+                        "href": "/v2/groups/wfad/a319873a32e84c17aa76306a477b9a22",
+                        "id": "a319873a32e84c17aa76306a477b9a22",
+                        "rel": "parentGroup"
+                    },
+                    {
+                        "href": "/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/defaults",
+                        "rel": "defaults",
+                        "verbs": [
+                            "GET",
+                            "POST"
+                        ]
+                    },
+                    {
+                        "href": "/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/billing",
+                        "rel": "billing"
+                    },
+                    {
+                        "href": "/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/archive",
+                        "rel": "archiveGroupAction"
+                    },
+                    {
+                        "href": "/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/statistics",
+                        "rel": "statistics"
+                    },
+                    {
+                        "href": "/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/upcomingScheduledActivities",
+                        "rel": "upcomingScheduledActivities"
+                    },
+                    {
+                        "href": "/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/horizontalAutoscalePolicy",
+                        "rel": "horizontalAutoscalePolicyMapping",
+                        "verbs": [
+                            "GET",
+                            "PUT",
+                            "DELETE"
+                        ]
+                    },
+                    {
+                        "href": "/v2/groups/wfad/479857c65d6a42d8b2523fab58c4c3cb/scheduledActivities",
+                        "rel": "scheduledActivities",
+                        "verbs": [
+                            "GET",
+                            "POST"
+                        ]
+                    },
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadk8sm16",
+                        "id": "UC1WFADK8SM16",
+                        "rel": "server"
+                    },
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadk8sn46",
+                        "id": "UC1WFADK8SN46",
+                        "rel": "server"
+                    },
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadk8sm17",
+                        "id": "UC1WFADK8SM17",
+                        "rel": "server"
+                    },
+                    {
+                        "href": "/v2/servers/wfad/uc1wfadk8sn45",
+                        "id": "UC1WFADK8SN45",
+                        "rel": "server"
+                    }
+                ],
+                "locationId": "UC1",
+                "name": "K8S",
+                "servers": [
+                    "UC1WFADK8SM16",
+                    "UC1WFADK8SN46",
+                    "UC1WFADK8SM17",
+                    "UC1WFADK8SN45"
+                ],
+                "serversCount": 4,
+                "status": "active",
+                "type": "default"
+            }
 '''
 
 __version__ = '${version}'
