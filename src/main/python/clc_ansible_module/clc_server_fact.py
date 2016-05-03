@@ -117,8 +117,10 @@ server:
                     "inMaintenanceMode": false,
                     "ipAddresses": [
                         {
-                            "internal": "10.141.19.15"
+                            "internal": "10.100.121.210",
+                            "public": "206.152.34.248"
                         }
+
                     ],
                     "memoryMB": 2048,
                     "partitions": [
@@ -143,6 +145,7 @@ server:
                 "displayName": "UC1WFADWRDPRS10",
                 "groupId": "0e330aec1d2f46cfbf77b5b06d50e733",
                 "id": "uc1wfadwrdprs10",
+                "ipaddress": "10.100.121.210",
                 "isTemplate": false,
                 "links": [
                     {
@@ -228,6 +231,7 @@ server:
                 "name": "UC1WFADWRDPRS10",
                 "os": "ubuntu14_64Bit",
                 "osType": "Ubuntu 14 64-bit",
+                "publicip": "206.152.34.248",
                 "status": "active",
                 "storageType": "standard",
                 "type": "standard"
@@ -279,6 +283,13 @@ class ClcServerFact:
                 server_id)
 
         r = r.json()
+        if r['details']['memoryMB']:
+            r['details']['memory'] = int(r['details']['memoryMB'] / 1024)
+        if len(r['details']['ipAddresses']) > 0:
+            r['ipaddress'] = r['details']['ipAddresses'][0]['internal']
+            publicips = [ a for a in r['details']['ipAddresses'] if 'public' in a ]
+            if len(publicips) > 0:
+                r['publicip'] = publicips[0]
 
         if self.module.params.get('credentials'):
             r['credentials'] = self._get_server_credentials(server_id)

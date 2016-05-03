@@ -392,7 +392,7 @@ servers:
               },
               "groupId":"086ac1dfe0b6411989e8d1b77c4065f0",
               "id":"test-server",
-              "ipaddress":"10.120.45.23",
+              "ipaddress":"10.1.1.1",
               "isTemplate":false,
               "links":[
                  {
