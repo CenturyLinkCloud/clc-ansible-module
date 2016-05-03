@@ -1651,6 +1651,13 @@ class ClcServer:
                         msg='Unable to reach the CLC API after 5 attempts')
                 sleep(back_out)
                 back_out *= 2
+            except requests.exceptions.ConnectionError as ce:
+                # retry on connection error
+                if retries == 0:
+                    return module.fail_json(
+                        msg='Unable to connect to the CLC API after 5 attempts. {0}'.format(ce.message))
+                sleep(back_out)
+                back_out *= 2
 
     @staticmethod
     def _set_user_agent(clc):
