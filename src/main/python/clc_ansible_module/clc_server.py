@@ -1626,9 +1626,10 @@ class ClcServer:
         if not alias:
             alias = clc.v2.Account.GetAlias()
 
-        # Wait and retry if the api returns a 404
+        # Wait and retry if the api returns a 404 or a connection error from requests module
+        retry_count = retries
         while True:
-            retries -= 1
+            retry_count -= 1
             try:
                 server_obj = clc.v2.API.Call(
                     method='GET', url='servers/%s/%s?uuid=true' %
@@ -1646,16 +1647,16 @@ class ClcServer:
                         msg='A failure response was received from CLC API when '
                         'attempting to get details for a server:  UUID=%s, Code=%i, Message=%s' %
                         (svr_uuid, e.response_status_code, e.message))
-                if retries == 0:
+                if retry_count == 0:
                     return module.fail_json(
-                        msg='Unable to reach the CLC API after 5 attempts')
+                        msg='Unable to reach the CLC API after {0} attempts'.format(retries))
                 sleep(back_out)
                 back_out *= 2
             except requests.exceptions.ConnectionError as ce:
                 # retry on connection error
-                if retries == 0:
+                if retry_count == 0:
                     return module.fail_json(
-                        msg='Unable to connect to the CLC API after 5 attempts. {0}'.format(ce.message))
+                        msg='Unable to connect to the CLC API after {0} attempts. {1}'.format(retries, ce.message))
                 sleep(back_out)
                 back_out *= 2
 
