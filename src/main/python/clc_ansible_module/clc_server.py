@@ -1613,7 +1613,7 @@ class ClcServer:
 
     @staticmethod
     def _find_server_by_uuid_w_retry(
-            clc, module, svr_uuid, alias=None, retries=5, back_out=2):
+            clc, module, svr_uuid, alias=None, retries=25, back_out=2):
         """
         Find the clc server by the UUID returned from the provisioning request.  Retry the request if a 404 is returned.
         :param clc: the clc-sdk instance to use
