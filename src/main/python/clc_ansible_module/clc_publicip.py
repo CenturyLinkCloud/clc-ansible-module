@@ -34,7 +34,7 @@ version_added: "2.0"
 options:
   protocol:
     description:
-      - The protocol that the public IP will listen for.
+      - The protocol that the public IP will listen for. This is required when state is 'present'
     default: TCP
     choices: ['TCP', 'UDP', 'ICMP']
     required: False
@@ -219,7 +219,7 @@ class ClcPublicIp(object):
         """
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
-            protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
+            protocol=dict(choices=['TCP', 'UDP', 'ICMP']),
             ports=dict(type='list'),
             source_restrictions=dict(type='list'),
             wait=dict(type='bool', default=True),
@@ -239,6 +239,11 @@ class ClcPublicIp(object):
                   changed_server_ids : the list of server ids that are changed
                   results: The result list from clc public ip call
         """
+
+        if protocol is None or ports is None:
+            return self.module.fail_json(
+                msg="you must specify a protocol and ports whenever state is set to present")
+
         changed = False
         results = []
         changed_server_ids = []
@@ -251,6 +256,8 @@ class ClcPublicIp(object):
                 server.PublicIPs().public_ips) == 0]
         ports_to_expose = [{'protocol': protocol, 'port': port}
                            for port in ports]
+
+        ports_to_expose.append({'protocol': 'ICMP', 'port':0})
         if source_restrictions:
             restrictions_list = [{'cidr': cidr} for cidr in source_restrictions]
         for server in servers_to_change:
