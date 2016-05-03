@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import unittest
-
+import requests
 from uuid import UUID
 import clc as clc_sdk
 from clc import CLCException
@@ -594,10 +594,48 @@ class TestClcServerFunctions(unittest.TestCase):
                                                          module=self.module,
                                                          svr_uuid='12345',
                                                          alias='TST',
-                                                         retries=1)
+                                                         retries=2)
 
         # Assert
-        self.module.fail_json.assert_called_with(msg='Unable to reach the CLC API after 5 attempts')
+        self.module.fail_json.assert_called_with(msg='Unable to reach the CLC API after 2 attempts')
+
+    @patch.object(clc_server, 'clc_sdk')
+    def test_find_server_by_uuid_connection_error(self,
+                                                  mock_clc_sdk):
+        # Define Mock Objects
+        mock_server = mock.MagicMock()
+
+        # Set Mock Server Return Values
+        mock_server.id = 'TEST_SERVER'
+        mock_server.data = {'name': 'TEST_SERVER'}
+        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
+
+        num_api_errors_to_generate = [2]
+
+        # Setup Mock API Responses
+        def _api_call_return_values(*args, **kwargs):
+            if num_api_errors_to_generate[0] > 0:
+                num_api_errors_to_generate[0] -= 1
+                error = requests.exceptions.ConnectionError()
+                error.response_status_code = 404
+                error.message = "Connection Error"
+                raise error
+            else:
+                return {'id': '12345'}
+
+        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
+        mock_clc_sdk.v2.Server.return_value  = mock_server
+
+        # Test
+        under_test = ClcServer(self.module)
+        result = under_test._find_server_by_uuid_w_retry(clc=mock_clc_sdk,
+                                                         module=self.module,
+                                                         svr_uuid='12345',
+                                                         alias='TST',
+                                                         retries=2)
+
+        # Assert
+        self.module.fail_json.assert_called_with(msg='Unable to connect to the CLC API after 2 attempts. Connection Error')
 
     @patch.object(clc_server, 'clc_sdk')
     def test_find_server_by_uuid_other_api_error_response(self,

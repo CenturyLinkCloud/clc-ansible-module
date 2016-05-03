@@ -798,3 +798,54 @@ Access the CLC hostvars from a play defined in yaml:
     - name: Print PowerState returned by Dynamic Inventory / CLC API
       debug: msg="PowerState={{ hostvars[inventory_hostname]['clc_data']['details']['powerState'] }}"
 ```
+
+---
+## Working with the source code
+Our recommended approach to working with the clc-ansible-module code base is to create a virtual environment and working with the code from within that environment.  The steps below outline the actiions necessary to get a functional development environment up and running.
+
+### Create a virtual environment
+- move to your normal development space on your system.  We will be creating our virtual environment in this location.
+- Execute:`
+  virtualenv clc-ansible-module
+  `
+- Make the virutual environment active:`
+  . ./clc-ansible-module/bin/activate
+  `
+
+### Install necessary dependencies
+- `pip install nose`
+- `pip install coverage`
+- `pip install pybuilder==0.10.63`
+- `pip install mock`
+- `pip install xmlrunner`
+- `pip install ansible`
+- `pip install clc_sdk=2.44`
+
+### Last minute updates to your environment
+Update your active PATH with reference some binaries we just installed.
+
+  `export PATH='pwd'/clc-ansible-module/bin:$PATH`
+
+### Get the project
+- `cd clc-ansible-module`
+- `mkdir workspace`
+- `cd workspace`
+- `git clone https://github.com/CenturyLinkCloud/clc-ansible-module.git`
+- `cd clc-ansible-module`
+
+### Build the project
+- `mvn clean install`
+	- This step isn't required to build the module set.  It's primarily used to help the Runner team manage changes and releases.
+- `pyb -v`
+
+### Submitting Changes
+#####PR's are welcome!
+
+Please create an Issue in Github against the project prior to doing any custom work or submitting a PR.
+
+All changes must be submitted as PR's against the Develop branch (Github Pull Requests). - `git checkout develop`
+
+Please create one PR for each change.  Please keep the change small and specific.  
+
+
+ 	
