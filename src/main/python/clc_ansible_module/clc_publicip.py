@@ -34,7 +34,7 @@ version_added: "2.0"
 options:
   protocol:
     description:
-      - The protocol that the public IP will listen for.
+      - The protocol that the public IP will listen for. This is required when state is 'present'
     default: TCP
     choices: ['TCP', 'UDP', 'ICMP']
     required: False
@@ -239,6 +239,11 @@ class ClcPublicIp(object):
                   changed_server_ids : the list of server ids that are changed
                   results: The result list from clc public ip call
         """
+
+        if protocol is None or ports is None:
+            return self.module.fail_json(
+                msg="you must specify a protocol and some ports")
+
         changed = False
         results = []
         changed_server_ids = []
