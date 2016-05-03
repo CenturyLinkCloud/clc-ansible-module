@@ -6,3 +6,9 @@ coverage.xml
 nosetests.xml
 target
 .vagrant/
+*.iml
+*.imr
+*.ipr
+*.iws
+*~
+*.orig
