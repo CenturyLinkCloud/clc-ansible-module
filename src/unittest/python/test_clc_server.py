@@ -594,10 +594,10 @@ class TestClcServerFunctions(unittest.TestCase):
                                                          module=self.module,
                                                          svr_uuid='12345',
                                                          alias='TST',
-                                                         retries=1)
+                                                         retries=2)
 
         # Assert
-        self.module.fail_json.assert_called_with(msg='Unable to reach the CLC API after 5 attempts')
+        self.module.fail_json.assert_called_with(msg='Unable to reach the CLC API after 2 attempts')
 
     @patch.object(clc_server, 'clc_sdk')
     def test_find_server_by_uuid_connection_error(self,
@@ -632,10 +632,10 @@ class TestClcServerFunctions(unittest.TestCase):
                                                          module=self.module,
                                                          svr_uuid='12345',
                                                          alias='TST',
-                                                         retries=1)
+                                                         retries=2)
 
         # Assert
-        self.module.fail_json.assert_called_with(msg='Unable to connect to the CLC API after 5 attempts. Connection Error')
+        self.module.fail_json.assert_called_with(msg='Unable to connect to the CLC API after 2 attempts. Connection Error')
 
     @patch.object(clc_server, 'clc_sdk')
     def test_find_server_by_uuid_other_api_error_response(self,
