@@ -413,8 +413,8 @@ class ClcModifyServer:
         self._set_clc_credentials_from_env()
 
         p = self.module.params
-        cpu = p.get('cpu')
-        memory = p.get('memory')
+        cpu = int(p.get('cpu')) if p.get('cpu') else None
+        memory = int(p.get('memory')) if p.get('memory') else None
         state = p.get('state')
         if state == 'absent' and (cpu or memory):
             return self.module.fail_json(
@@ -444,8 +444,8 @@ class ClcModifyServer:
             server_ids=dict(type='list', required=True),
             state=dict(default='present', choices=['present', 'absent']),
             location=dict(),
-            cpu=dict(),
-            memory=dict(),
+            cpu=dict(type='int'),
+            memory=dict(type='int'),
             anti_affinity_policy_id=dict(),
             anti_affinity_policy_name=dict(),
             alert_policy_id=dict(),
