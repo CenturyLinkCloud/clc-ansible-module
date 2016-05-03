@@ -219,7 +219,7 @@ class ClcPublicIp(object):
         """
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
-            protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
+            protocol=dict(choices=['TCP', 'UDP', 'ICMP']),
             ports=dict(type='list'),
             source_restrictions=dict(type='list'),
             wait=dict(type='bool', default=True),
@@ -251,6 +251,8 @@ class ClcPublicIp(object):
                 server.PublicIPs().public_ips) == 0]
         ports_to_expose = [{'protocol': protocol, 'port': port}
                            for port in ports]
+
+        ports_to_expose.append({'protocol': 'ICMP', 'port':0})
         if source_restrictions:
             restrictions_list = [{'cidr': cidr} for cidr in source_restrictions]
         for server in servers_to_change:
