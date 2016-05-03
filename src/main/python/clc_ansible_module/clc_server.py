@@ -492,6 +492,7 @@ from distutils.version import LooseVersion
 
 try:
     import requests
+    from requests.exceptions import ConnectionError
 except ImportError:
     REQUESTS_FOUND = False
 else:
@@ -1625,6 +1626,8 @@ class ClcServer:
         """
         if not alias:
             alias = clc.v2.Account.GetAlias()
+            
+        retry_count = retries
 
         # Wait and retry if the api returns a 404
         while True:
@@ -1639,7 +1642,13 @@ class ClcServer:
                     alias=alias,
                     server_obj=server_obj)
                 return server
-
+            
+            except ConnectionError as ce:
+                if retries == 0:
+                    return module.fail_json(
+                        msg=('Unable to reach the CLC API after %s attempts' % (retry_count)))
+                sleep(back_out)
+                back_out *= 2
             except APIFailedResponse as e:
                 if e.response_status_code != 404:
                     return module.fail_json(
@@ -1648,7 +1657,7 @@ class ClcServer:
                         (svr_uuid, e.response_status_code, e.message))
                 if retries == 0:
                     return module.fail_json(
-                        msg='Unable to reach the CLC API after 5 attempts')
+                        msg=('Unable to reach the CLC API after %s attempts' % (retry_count)))
                 sleep(back_out)
                 back_out *= 2
 
