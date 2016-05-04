@@ -116,12 +116,27 @@ class TestClcServerFunctions(unittest.TestCase):
 
         mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
 
+        # Set Mock Group Return values
+        mock_existing_server = mock.MagicMock()
+        mock_existing_server.id = "EXISTING_SERVER"
+        mock_result_group = mock.MagicMock()
+        mock_result_group.data = { "id":"1111111", "links": [ "link" ] }
+        mock_result_group.Servers().Servers.return_value = [ mock_existing_server ]
+
+        # Set Mock Group Values
+        mock_group = mock.MagicMock()
+        mock_group.Defaults.return_value = 1
+        mock_group.id = '12345'
+
+        mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = [ mock_group, mock_result_group ]
+
         # Test
         under_test = ClcServer(self.module)
         under_test.process_request()
 
         # Assert
         self.module.exit_json.assert_called_once_with(changed=True,
+                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER" ]},
                                                       servers=[],
                                                       server_ids=['TEST_SERVER'],
                                                       partially_created_server_ids=[])
@@ -201,6 +216,7 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert
         mock_server.PublicIPs().Add.assert_called_with([{'protocol': 'TCP', 'port': 80}])
         self.module.exit_json.assert_called_once_with(changed=True,
+                                                      group=None,
                                                       servers=[{'publicip': '5.6.7.8',
                                                                 'ipaddress': '1.2.3.4',
                                                                 'name': 'TEST_SERVER'}],
@@ -334,6 +350,13 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_group.Defaults.return_value = 1
         mock_group.id = '12345'
 
+        # Set Mock Group Return values
+        mock_existing_server = mock.MagicMock()
+        mock_existing_server.id = "EXISTING_SERVER"
+        mock_result_group = mock.MagicMock()
+        mock_result_group.data = { "id":"1111111", "links": [ "link" ] }
+        mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
+
         # Setup Mock API Responses
         def _api_call_return_values(*args, **kwargs):
             if kwargs.get('method') == 'GET':
@@ -341,7 +364,7 @@ class TestClcServerFunctions(unittest.TestCase):
             if kwargs.get('method') == 'POST':
                 return {'links': [{'rel': 'self', 'id': '12345'}]}
 
-        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+        mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = [ mock_group, mock_result_group ]
         mock_clc_sdk.v2.Group.return_value = mock_group
         mock_clc_sdk.v2.Server.return_value = mock_server
         mock_clc_sdk.v2.Account.GetAlias.return_value = 'TST'
@@ -361,6 +384,7 @@ class TestClcServerFunctions(unittest.TestCase):
         #self.assertFalse(self.module.fail_json.called)
         self.assertTrue(self.module.exit_json.called)
         self.module.exit_json.assert_called_once_with(changed=True,
+                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER", "TEST_SERVER" ]},
                                                       servers=[{'ipaddress': '1.2.3.4',
                                                                 'name': 'TEST_SERVER'}],
                                                       server_ids=['TEST_SERVER'],
@@ -410,6 +434,13 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_group.Defaults.return_value = 1
         mock_group.id = '12345'
 
+        # Set Mock Group Return values
+        mock_existing_server = mock.MagicMock()
+        mock_existing_server.id = "EXISTING_SERVER"
+        mock_result_group = mock.MagicMock()
+        mock_result_group.data = { "id":"1111111", "links": [ "link" ] }
+        mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
+
         # Setup Mock API Responses
         def _api_call_return_values(*args, **kwargs):
             if kwargs.get('method') == 'GET':
@@ -417,7 +448,7 @@ class TestClcServerFunctions(unittest.TestCase):
             if kwargs.get('method') == 'POST':
                 return {'links': [{'rel': 'self', 'id': '12345'}]}
 
-        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
+        mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = [ mock_group, mock_result_group ]
         mock_clc_sdk.v2.Group.return_value = mock_group
         mock_clc_sdk.v2.Server.return_value = mock_server
         mock_clc_sdk.v2.Account.GetAlias.return_value = 'TST'
@@ -436,6 +467,7 @@ class TestClcServerFunctions(unittest.TestCase):
         #self.assertFalse(self.module.fail_json.called)
         self.assertTrue(self.module.exit_json.called)
         self.module.exit_json.assert_called_once_with(changed=True,
+                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER", "TEST_SERVER" ]},
                                                       servers=[{'ipaddress': '1.2.3.4',
                                                                 'name': 'TEST_SERVER'}],
                                                       server_ids=['TEST_SERVER'],
@@ -469,6 +501,14 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_server.status = 'active'
         mock_server.powerState = 'started'
 
+        # Set Mock Group Return values
+        mock_existing_server = mock.MagicMock()
+        mock_existing_server.id = "EXISTING_SERVER"
+        mock_result_group = mock.MagicMock()
+        mock_result_group.data = { "id":"1111111", "links": [ "link" ] }
+        mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
+
+        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_result_group
         mock_enforce_count.return_value = ([], [mock_server.id], [], True)
 
         # Test
@@ -477,6 +517,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Assert
         self.module.exit_json.assert_called_once_with(changed=True,
+                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER", "TEST_SERVER" ]},
                                                       servers=[],
                                                       server_ids=['TEST_SERVER'],
                                                       partially_created_server_ids=[])
@@ -506,8 +547,21 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_server.PublicIPs().public_ips.__getitem__.return_value = "5.6.7.8"
         mock_server.details['ipAddresses'][0].__getitem__.return_value = "1.2.3.4"
 
+        # Set Mock Group Values
+        mock_group = mock.MagicMock()
+        mock_group.Defaults.return_value = 1
+        mock_group.id = '12345'
+
+        # Set Mock Group Return values
+        mock_existing_server = mock.MagicMock()
+        mock_existing_server.id = "EXISTING_SERVER"
+        mock_result_group = mock.MagicMock()
+        mock_result_group.data = { "id":"1111111", "links": [ "link" ] }
+        mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
+
         mock_request.WaitUntilComplete.return_value = 0
 
+        mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = [ mock_group, mock_result_group ]
         mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
 
         # Test
@@ -516,6 +570,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Assert
         self.module.exit_json.assert_called_once_with(server_ids=['TEST_SERVER'],
+                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER", "TEST_SERVER" ]},
                                                       changed=True,
                                                       servers=[{'name': 'TEST_SERVER',
                                                                 'publicip': '5.6.7.8',
