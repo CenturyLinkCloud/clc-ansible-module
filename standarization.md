@@ -1,11 +1,11 @@
 
 
-### Insure that all modules honor CHECK mode:
+### Ensure that all modules honor CHECK mode:
 See http://docs.ansible.com/developing_modules.html#check-mode and https://docs.ansible.com/playbooks_checkmode.html
 
 1.  Pass ```supports_check_mode=True``` when instantiating the AnsibleModule object.
 2.  Place ```if not module.check_mode:``` before any call to the CLC API that would change state.
-3.  Insure that module.exit_json only returns items actually changed from ```changed=```
+3.  Ensure that module.exit_json only returns items actually changed from ```changed=```
 
 ### Standardize wait parameter
 All modules should take ```wait``` as a parameter.  It should default to ```True```.  If wait is set to false, then the 
@@ -60,7 +60,7 @@ See the clc_server module for an example.
 
 ### All Classes and Functions should have docstrings
 
-Insure that all classes and functions should have docstrings that follow the conventions in [PEP257](https://www.python.org/dev/peps/pep-0257/).
+Ensure that all classes and functions should have docstrings that follow the conventions in [PEP257](https://www.python.org/dev/peps/pep-0257/).
 
 ### Add copywrite comment to the beginning of each module
 This should be included in each file at the very beginning, before the DOCUMENTATION string.
@@ -68,31 +68,46 @@ This should be included in each file at the very beginning, before the DOCUMENTA
 ```python
 # CenturyLink Cloud Ansible Modules.
 #
-# These Ansible modules enable the CenturyLink Cloud v2 API to be called# from an within Ansible Playbook.
+# These Ansible modules enable the CenturyLink Cloud v2 API to be called
+# from an within Ansible Playbook.
 #
 # This file is part of CenturyLink Cloud, and is maintained
 # by the Workflow as a Service Team
 #
-# Copyright 2015 CenturyLink Cloud## Licensed under the Apache License, Version 2.0 (the "License");# you may not use this file except in compliance with the License.# You may obtain a copy of the License at##    http://www.apache.org/licenses/LICENSE-2.0## Unless required by applicable law or agreed to in writing, software# distributed under the License is distributed on an "AS IS" BASIS,# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.# See the License for the specific language governing permissions and# limitations under the License.
+# Copyright 2015 CenturyLink Cloud
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
 # CenturyLink Cloud: http://www.CenturyLinkCloud.com
 # API Documentation: https://www.centurylinkcloud.com/api-docs/v2/
 #
 ```
 
-### Insure the ansible.module_utils.basic import is at the bottom of the file:
+### Ensure the ansible.module_utils.basic import is at the bottom of the file:
 The import should be right before main, not at the top of the file.
 
 Main should be invoked like this:
 ```python
-from ansible.module_utils.basic import *  # pylint: disable=W0614if __name__ == '__main__':    main()
+from ansible.module_utils.basic import *  # pylint: disable=W0614
+if __name__ == '__main__':
+    main()
 ```
 
-### Insure that main() is defined at the bottom of the file
+### Ensure that main() is defined at the bottom of the file
 
 For readability, main should be defined just before it's called.  It should be the last function def in the file.
 
-### Insure that main calls a .process_request() method on a class named for the module
+### Ensure that main calls a .process_request() method on a class named for the module
 
 Example: 
 
