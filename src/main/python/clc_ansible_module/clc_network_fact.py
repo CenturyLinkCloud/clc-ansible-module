@@ -41,7 +41,7 @@ requirements:
 author: "CLC Runner (@clc-runner)"
 notes:
   - To use this module, it is required to set the below environmental variables which enable access to CLC
-      - CLC_V2_API_USERNAMNE: the account login id for CLC
+      - CLC_V2_API_USERNAME: the account login id for CLC
       - CLC_V2_API_PASSWORD: the password for the CLC account
   - Alternatively, the module accepts the API token and account alias. The API token can be generated using the CLC
     account login and password via the HTTP api call @ https://api.ctl.io/v2/authentication/login
@@ -138,6 +138,7 @@ except ImportError:
 else:
     CLC_FOUND = True
 
+
 class ClcNetworkFact:
 
     def __init__(self, module):
@@ -147,6 +148,7 @@ class ClcNetworkFact:
         self.module = module
         self.clc = clc_sdk
         self.net_dict = {}
+        self.networks = None
 
         if not CLC_FOUND:
             self.module.fail_json(
@@ -175,34 +177,36 @@ class ClcNetworkFact:
         Process the request - Main code path
         :return: Returns with either an exit_json or fail_json
         """
+        result = None
         params = self.module.params
 
         self._set_clc_credentials_from_env()
 
-        self.networks = self._populate_networks(params.get('location'))
+        self.networks = self._get_clc_networks(params.get('location'))
 
         try:
             result = self._get_network_details(params)
-        except APIFailedResponse as e:
-            self.module.fail_json(e.response_text)
+        except APIFailedResponse as ex:
+            self.module.fail_json(msg='Unable to gather the facts about network. {0}'.format(ex.response_text))
 
-        self.module.exit_json(changed=False, network=result.data)
+        self.module.exit_json(network=result.data)
 
     def _get_network_details(self, params):
-        search_key = self._get_search_key(params)
+        search_key = params.get('id', None)
         network = self.networks.Get(search_key)
         if network is None:
-            return self.module.fail_json(
-            msg="Network does not exist"
-        )
+            return self.module.fail_json(msg='Network: {0} does not exist'.format(search_key))
         return network
 
-    def _get_search_key(self, params):
-      if params.get('id', None) is not None:
-        return params.get('id', None)
-
-    def _populate_networks(self, location):
-      return self.clc.v2.Networks(location=location)
+    def _get_clc_networks(self, location):
+        result = None
+        try:
+            result = self.clc.v2.Networks(location=location)
+        except self.clc.CLCException as ex:
+                self.module.fail_json(msg='Unable to fetch networks for location {0}. {1}'.format(
+                    location, ex.message
+                ))
+        return result
 
     @staticmethod
     def _define_module_argument_spec():
@@ -243,6 +247,7 @@ class ClcNetworkFact:
             return self.module.fail_json(
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
+
 
 def main():
     """
