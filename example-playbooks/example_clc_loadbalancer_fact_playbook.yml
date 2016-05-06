@@ -1,0 +1,16 @@
+---
+- name: Load balancer fact example
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Get facts for loadbalancer
+      clc_loadbalancer_fact:
+        name: testlb
+        location: WA1
+        alias: WFTC
+      register: loadbalancer
+
+    - name: output
+      debug:
+        var: loadbalancer

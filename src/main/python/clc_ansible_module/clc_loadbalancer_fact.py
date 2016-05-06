@@ -44,10 +44,10 @@ options:
 requirements:
   - python = 2.7
   - requests >= 2.5.0
-auther: "CLC Runner (@clc-runner)"
+author: "CLC Runner (@clc-runner)"
 notes:
   - To use this module, it is required to set the below environmental variables which enable access to CLC
-      - CLC_V2_API_USERNAMNE: the account login id for CLC
+      - CLC_V2_API_USERNAME: the account login id for CLC
       - CLC_V2_API_PASSWORD: the password for the CLC account
   - Alternatively, the module accepts the API token and account alias. The API token can be generated using the CLC
     account login and password via the HTTP api call @ https://api.ctl.io/v2/authentication/login
@@ -57,7 +57,7 @@ notes:
 '''
 
 EXAMPLES = '''
-# NOTE - You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD Environmental variables before running these examples
+# NOTE - You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD Environmental variables before running examples
 
 - name: Retrieve loadbalancer facts
   clc_loadbalancer_fact:
@@ -169,6 +169,7 @@ except ImportError:
 else:
     CLC_FOUND = True
 
+
 class ClcLoadbalancerFact:
 
     def __init__(self, module):
@@ -199,17 +200,18 @@ class ClcLoadbalancerFact:
         name = self.module.params.get('name')
         location = self.module.params.get('location')
         alias = self.module.params.get('alias')
+        result = None
 
         self.lb_dict = self._get_loadbalancer_list(
             alias=alias,
             location=location)
 
         try:
-            r = self._get_endpoint(alias, location, name)
+            result = self._get_endpoint(alias, location, name)
         except APIFailedResponse as e:
-            self.module.fail_json(e.response_text)
+            self.module.fail_json(msg=e.response_text)
 
-        self.module.exit_json(changed=False, loadbalancer=r)
+        self.module.exit_json(changed=False, loadbalancer=result)
 
     @staticmethod
     def _define_module_argument_spec():
@@ -217,7 +219,9 @@ class ClcLoadbalancerFact:
         Define the argument spec for the ansible module
         :return: argument spec dictionaries
         """
-        return {"argument_spec": dict(name=dict(required=True), location=dict(required=True), alias=dict(required=True))}
+        return {"argument_spec": dict(name=dict(required=True),
+                                      location=dict(required=True),
+                                      alias=dict(required=True))}
 
     def _set_clc_credentials_from_env(self):
         """
@@ -260,8 +264,8 @@ class ClcLoadbalancerFact:
                 'GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
         except APIFailedResponse as e:
             self.module.fail_json(
-                msg='Unable to fetch load balancers for account: {0}. {1}'.format(
-                    alias, str(e.response_text)))
+                msg='Unable to fetch load balancers for account: {0} at location: {1}. {2}'.format(
+                    alias, location, str(e.message)))
         return result
 
     def _get_loadbalancer_id(self, name):
@@ -270,21 +274,29 @@ class ClcLoadbalancerFact:
         :param name: Name of loadbalancer
         :return: Unique ID of the loadbalancer
         """
-        id = None
+        lb_id = None
         for lb in self.lb_dict:
             if lb.get('name') == name:
-                id = lb.get('id')
-        return id
+                lb_id = lb.get('id')
+        return lb_id
 
     def _get_endpoint(self, alias, location, name):
-        id = self._get_loadbalancer_id(name=name)
-        if id == None:
+        lb_id = self._get_loadbalancer_id(name=name)
+        if not lb_id:
             self.module.fail_json(
-                msg=name + " does not exist"
+                msg='load balancer {0} does not exist for account: {1} at location: {2}'.format(
+                    name, alias, location
+                )
             )
-        else:
+        try:
             return self.clc.v2.API.Call(
-                'GET', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, id))
+                'GET', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, lb_id))
+        except APIFailedResponse as e:
+            self.module.fail_json(
+                msg='Unable to get information for load balancer {0} with account: {1} at location: {2}. {3}'.format(
+                    name, alias, location, str(e.message)))
+
+
 
 def main():
     """
@@ -296,6 +308,6 @@ def main():
     clc_loadbalancer_fact = ClcLoadbalancerFact(module)
     clc_loadbalancer_fact.process_request()
 
-from ansible.module_utils.basic import * # pylint: disable=W0614
+from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
     main()
