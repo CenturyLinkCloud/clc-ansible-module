@@ -38,7 +38,7 @@ options:
 requirements:
   - python = 2.7
   - requests >= 2.5.0
-auther: "CLC Runner (@clc-runner)"
+author: "CLC Runner (@clc-runner)"
 notes:
   - To use this module, it is required to set the below environmental variables which enable access to CLC
       - CLC_V2_API_USERNAMNE: the account login id for CLC
@@ -51,7 +51,7 @@ notes:
 '''
 
 EXAMPLES = '''
-# NOTE - You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD Environmental variables before running these examples
+# NOTE - You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD Environment variables before running examples
 
 - name: Retrieve network facts
   clc_network_fact:
@@ -175,20 +175,18 @@ class ClcNetworkFact:
         Process the request - Main code path
         :return: Returns with either an exit_json or fail_json
         """
-        changed = False
-        network = None
-        p = self.module.params
+        params = self.module.params
 
         self._set_clc_credentials_from_env()
 
-        self.networks = self._populate_networks(p.get('location'))
+        self.networks = self._populate_networks(params.get('location'))
 
         try:
-            r = self._get_network_details(p)
+            result = self._get_network_details(params)
         except APIFailedResponse as e:
             self.module.fail_json(e.response_text)
 
-        self.module.exit_json(changed=False, network=r.data)
+        self.module.exit_json(changed=False, network=result.data)
 
     def _get_network_details(self, params):
         search_key = self._get_search_key(params)
