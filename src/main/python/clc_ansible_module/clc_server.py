@@ -635,7 +635,6 @@ class ClcServer:
             servers = group.Servers().Servers()
             group = group.data
             group['servers'] = map(lambda s: s.id, servers)
-            del group['links']
 
         self.module.exit_json(
             changed=changed,

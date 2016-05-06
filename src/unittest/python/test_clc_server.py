@@ -120,7 +120,7 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_existing_server = mock.MagicMock()
         mock_existing_server.id = "EXISTING_SERVER"
         mock_result_group = mock.MagicMock()
-        mock_result_group.data = { "id":"1111111", "links": [ "link" ] }
+        mock_result_group.data = { "id":"1111111" }
         mock_result_group.Servers().Servers.return_value = [ mock_existing_server ]
 
         # Set Mock Group Values
@@ -354,7 +354,7 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_existing_server = mock.MagicMock()
         mock_existing_server.id = "EXISTING_SERVER"
         mock_result_group = mock.MagicMock()
-        mock_result_group.data = { "id":"1111111", "links": [ "link" ] }
+        mock_result_group.data = { "id":"1111111" }
         mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
 
         # Setup Mock API Responses
@@ -362,7 +362,7 @@ class TestClcServerFunctions(unittest.TestCase):
             if kwargs.get('method') == 'GET':
                 return {'id': '12345','name': 'test alert policy'}
             if kwargs.get('method') == 'POST':
-                return {'links': [{'rel': 'self', 'id': '12345'}]}
+                return {'links': [{'rel': 'self', 'id': '12345'}] }
 
         mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = [ mock_group, mock_result_group ]
         mock_clc_sdk.v2.Group.return_value = mock_group
@@ -438,7 +438,7 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_existing_server = mock.MagicMock()
         mock_existing_server.id = "EXISTING_SERVER"
         mock_result_group = mock.MagicMock()
-        mock_result_group.data = { "id":"1111111", "links": [ "link" ] }
+        mock_result_group.data = { "id":"1111111" }
         mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
 
         # Setup Mock API Responses
@@ -505,7 +505,7 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_existing_server = mock.MagicMock()
         mock_existing_server.id = "EXISTING_SERVER"
         mock_result_group = mock.MagicMock()
-        mock_result_group.data = { "id":"1111111", "links": [ "link" ] }
+        mock_result_group.data = { "id":"1111111" }
         mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
 
         mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_result_group
@@ -556,7 +556,7 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_existing_server = mock.MagicMock()
         mock_existing_server.id = "EXISTING_SERVER"
         mock_result_group = mock.MagicMock()
-        mock_result_group.data = { "id":"1111111", "links": [ "link" ] }
+        mock_result_group.data = { "id":"1111111" }
         mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
 
         mock_request.WaitUntilComplete.return_value = 0
