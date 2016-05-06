@@ -55,7 +55,16 @@ EXAMPLES = '''
 
 - name: Retrieve network facts
   clc_network_fact:
+    id: Blah
+    location: CA3
 
+  clc_network_fact:
+    id: f759b60eb31d4a33a3d63ffe713de019
+    location: CA3
+
+  clc_network_fact:
+    id: 10.101.236.0/24
+    location: CA3
 '''
 
 RETURN = '''
@@ -69,7 +78,44 @@ network:
   returned: success
   type: dict
   sample:
-    "tbd"
+    "network": {
+        "changed": false,
+        "network": {
+            "cidr": "10.101.236.0/24",
+            "description": "vlan_736_10.101.236",
+            "gateway": "10.101.236.1",
+            "id": "f759b60eb31d4a33a3d63ffe713de019",
+            "links": [
+                {
+                    "href": "/v2-experimental/networks/wfti/ca3/f759b60eb31d4a33a3d63ffe713de019",
+                    "rel": "self",
+                    "verbs": [
+                        "GET",
+                        "PUT"
+                    ]
+                },
+                {
+                    "href": "/v2-experimental/networks/wfti/ca3/f759b60eb31d4a33a3d63ffe713de019/ipAddresses",
+                    "rel": "ipAddresses",
+                    "verbs": [
+                        "GET"
+                    ]
+                },
+                {
+                    "href": "/v2-experimental/networks/wfti/ca3/f759b60eb31d4a33a3d63ffe713de019/release",
+                    "rel": "release",
+                    "verbs": [
+                        "POST"
+                    ]
+                }
+            ],
+            "name": "Ansible Network",
+            "netmask": "255.255.255.0",
+            "type": "private",
+            "vlan": 736
+        }
+    }
+}
 '''
 
 __version__ = '{version}'
@@ -142,12 +188,15 @@ class ClcNetworkFact:
         except APIFailedResponse as e:
             self.module.fail_json(e.response_text)
 
-        self.module.exit_json(changed=False, network=r)
-
+        self.module.exit_json(changed=False, network=r.data)
 
     def _get_network_details(self, params):
         search_key = self._get_search_key(params)
         network = self.networks.Get(search_key)
+        if network is None:
+            return self.module.fail_json(
+            msg="Network does not exist"
+        )
         return network
 
     def _get_search_key(self, params):
