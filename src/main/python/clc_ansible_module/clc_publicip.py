@@ -219,7 +219,7 @@ class ClcPublicIp(object):
         """
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
-            protocol=dict(choices=['TCP', 'UDP', 'ICMP']),
+            protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
             ports=dict(type='list'),
             source_restrictions=dict(type='list'),
             wait=dict(type='bool', default=True),
