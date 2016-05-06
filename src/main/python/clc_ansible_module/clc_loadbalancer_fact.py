@@ -35,7 +35,7 @@ version_added: "2.0"
 options:
   name:
     - The name of the loadbalancer to gather data
-  datacenter:
+  location:
     description:
       - The datacenter the loadbalancer is based
     required: True
@@ -62,7 +62,7 @@ EXAMPLES = '''
 - name: Retrieve loadbalancer facts
   clc_loadbalancer_fact:
     name: TEST
-    datacenter: UC1
+    location: UC1
     alias: WFTC
   register: loadbalancer
 '''
@@ -197,15 +197,15 @@ class ClcLoadbalancerFact:
         """
         self._set_clc_credentials_from_env()
         name = self.module.params.get('name')
-        datacenter = self.module.params.get('datacenter')
+        location = self.module.params.get('location')
         alias = self.module.params.get('alias')
 
         self.lb_dict = self._get_loadbalancer_list(
             alias=alias,
-            datacenter=datacenter)
+            location=location)
 
         try:
-            r = self._get_endpoint(alias, datacenter, name)
+            r = self._get_endpoint(alias, location, name)
         except APIFailedResponse as e:
             self.module.fail_json(e.response_text)
 
@@ -217,7 +217,7 @@ class ClcLoadbalancerFact:
         Define the argument spec for the ansible module
         :return: argument spec dictionaries
         """
-        return {"argument_spec": dict(name=dict(required=True), datacenter=dict(required=True), alias=dict(required=True))}
+        return {"argument_spec": dict(name=dict(required=True), location=dict(required=True), alias=dict(required=True))}
 
     def _set_clc_credentials_from_env(self):
         """
@@ -247,17 +247,17 @@ class ClcLoadbalancerFact:
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
 
-    def _get_loadbalancer_list(self, alias, datacenter):
+    def _get_loadbalancer_list(self, alias, location):
         """
         Retrieve a list of loadbalancers
         :param alias: Alias for account
-        :param datacenter: Datacenter
-        :return: JSON data for all loadbalancers at datacenter
+        :param location: Datacenter
+        :return: JSON data for all loadbalancers at location
         """
         result = None
         try:
             result = self.clc.v2.API.Call(
-                'GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, datacenter))
+                'GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
         except APIFailedResponse as e:
             self.module.fail_json(
                 msg='Unable to fetch load balancers for account: {0}. {1}'.format(
@@ -276,7 +276,7 @@ class ClcLoadbalancerFact:
                 id = lb.get('id')
         return id
 
-    def _get_endpoint(self, alias, datacenter, name):
+    def _get_endpoint(self, alias, location, name):
         id = self._get_loadbalancer_id(name=name)
         if id == None:
             self.module.fail_json(
@@ -284,7 +284,7 @@ class ClcLoadbalancerFact:
             )
         else:
             return self.clc.v2.API.Call(
-                'GET', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, datacenter, id))
+                'GET', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, id))
 
 def main():
     """
