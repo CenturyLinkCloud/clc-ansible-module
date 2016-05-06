@@ -276,10 +276,6 @@ class ClcPublicIp(object):
                   result: The result from clc public ip call
         """
 
-        if protocol is None or ports is None:
-            return self.module.fail_json(
-                msg="you must specify a protocol and ports whenever state is set to present")
-
         changed = False
         result  = ""
         changed_server_id = ""
