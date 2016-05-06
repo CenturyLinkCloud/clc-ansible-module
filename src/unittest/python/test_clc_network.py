@@ -33,6 +33,7 @@ class TestClcNetwork(unittest.TestCase):
     def setUp(self):
 
         existing_net = mock.MagicMock()
+        existing_net.name = 'existing'
         v2_networks = mock.MagicMock()
         v2_networks.Get = mock.MagicMock(side_effect=lambda key: existing_net if key=="existing" else None)
         self.mock_nets = v2_networks
@@ -359,7 +360,6 @@ class TestClcNetwork(unittest.TestCase):
             name = 'ShinyNewName'
             desc = 'ShinyNewDescription'
             self.network.clc.v2.Network.Create = mock.MagicMock()
-            # Needs return value
             self.existing_net.Update = mock.MagicMock()
             self.module.params = {
                 'id': 'existing',
@@ -372,6 +372,24 @@ class TestClcNetwork(unittest.TestCase):
 
             self.assertEqual(0, self.network.clc.v2.Network.Create.call_count)
             self.existing_net.Update.assert_called_once_with(name,description=desc,location='mock_loc' )
+
+    @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
+    def test_process_request_present_calls_update_with_description_when_name_not_provided(self, mock_set_creds):
+        with patch.object(ClcNetwork, '_populate_networks', return_value=self.mock_nets):
+            desc = 'ShinyNewDescription'
+            self.network.clc.v2.Network.Create = mock.MagicMock()
+            self.existing_net.Update = mock.MagicMock()
+            self.module.params = {
+                'id': 'existing',
+                'description': desc,
+                'location': 'mock_loc',
+            }
+
+            self.network.process_request()
+
+            self.assertEqual(0, self.network.clc.v2.Network.Create.call_count)
+            self.existing_net.Update.assert_called_once_with('existing',description=desc,location='mock_loc' )
+
 
     @patch.object(ClcNetwork, '_set_clc_credentials_from_env')
     def test_process_request_present_calls_update_when_network_exists_and_only_name_is_not_current(self, mock_set_creds):
