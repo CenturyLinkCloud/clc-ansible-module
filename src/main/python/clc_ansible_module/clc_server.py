@@ -308,6 +308,32 @@ changed:
     returned: success
     type: boolean
     sample: True
+group:
+    description: The state of the group after all operations have completed. If wait is False then this value is not set.
+    returned: success
+    type: dict
+    sample:
+        {
+            "changeInfo": {
+                "createdBy": "service.wfad",
+                "createdDate": "2016-05-03T17:04:01Z",
+                "modifiedBy": "service.wfad",
+                "modifiedDate": "2016-05-03T17:04:01Z"
+            },
+            "customFields": [],
+            "description": "A group for my servers",
+            "groups": [],
+            "id": "162274ff03164eeea2e0f6173cfdd59e",
+            "locationId": "CA3",
+            "name": "My Server Group",
+            "servers": [
+                "CA3T3DATEST06",
+                "CA3T3DATEST07"
+            ],
+            "serversCount": 2,
+            "status": "active",
+            "type": "default"
+        }
 server_ids:
     description: The list of server ids that are created
     returned: success
@@ -335,9 +361,9 @@ servers:
            {
               "changeInfo":{
                  "createdBy":"service.wfad",
-                 "createdDate":1438196820,
+                 "createdDate":2016-05-03T17:04:01Z,
                  "modifiedBy":"service.wfad",
-                 "modifiedDate":1438196820
+                 "modifiedDate":2016-05-03T17:04:01Z
               },
               "description":"test-server",
               "details":{
@@ -601,9 +627,19 @@ class ClcServer:
                  changed) = self._enforce_count(self.module,
                                                 self.clc)
 
+        group = None
+        wait = self.module.params.get('wait')
+        if wait:
+            datacenter = self._find_datacenter(self.clc, self.module)
+            group = ClcServer._find_group(module=self.module, datacenter=datacenter, lookup_group=p.get('group'))
+            servers = group.Servers().Servers()
+            group = group.data
+            group['servers'] = map(lambda s: s.id, servers)
+
         self.module.exit_json(
             changed=changed,
             server_ids=new_server_ids,
+            group=group,
             partially_created_server_ids=partial_servers_ids,
             servers=server_dict_array)
 
@@ -619,8 +655,8 @@ class ClcServer:
             group=dict(default='Default Group'),
             network_id=dict(),
             location=dict(default=None),
-            cpu=dict(default=1),
-            memory=dict(default=1),
+            cpu=dict(default=1, type='int'),
+            memory=dict(default=1, type='int'),
             alias=dict(default=None),
             password=dict(default=None, no_log=True),
             ip_address=dict(default=None),
@@ -1448,11 +1484,7 @@ class ClcServer:
             lookup_group=count_group)
 
         servers = group.Servers().Servers()
-        running_servers = []
-
-        for server in servers:
-            if server.status == 'active' and server.powerState == 'started':
-                running_servers.append(server)
+        running_servers = [s for s in servers if (s.status == 'active' and s.powerState == 'started')]
 
         return servers, running_servers
 
