@@ -1367,7 +1367,9 @@ class TestClcServerFunctions(unittest.TestCase):
 
     @patch.object(ClcServer, '_find_running_servers_by_group')
     def test_enforce_count_no_change(self, mock_running_servers):
-        mock_server_list = [mock.MagicMock()]
+        mock_server = mock.MagicMock()
+        mock_server.id = 'mock_server'
+        mock_server_list = [mock_server]
         mock_running_servers.return_value = (mock_server_list, mock_server_list)
         params = {
             'state': 'present',
@@ -1380,8 +1382,8 @@ class TestClcServerFunctions(unittest.TestCase):
             under_test._enforce_count(self.module, self.clc)
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, False)
-        self.assertEqual(server_dict_array, [])
-        self.assertEqual(changed_server_ids, [])
+        self.assertEqual(len(server_dict_array), 1)
+        self.assertEqual(changed_server_ids, ['mock_server'])
         self.assertEqual(partial_servers_ids, [])
 
     def test_add_public_ip_to_servers_w_failed_servers(self):
@@ -1403,8 +1405,13 @@ class TestClcServerFunctions(unittest.TestCase):
     @patch.object(ClcServer, '_create_servers')
     @patch.object(ClcServer, '_find_running_servers_by_group')
     def test_enforce_count_min_count(self, mock_running_servers, mock_create_servers):
-        mock_server_list = [mock.MagicMock()]
-        mock_create_servers.return_value = ('test_server', mock_server_list, mock_server_list, True)
+        mock_server = mock.MagicMock()
+        mock_server.id = 'server1'
+        mock_server_list = [mock_server]
+        new_mock_server = mock.MagicMock()
+        new_mock_server.id = 'new_server'
+        new_mock_server_list = [new_mock_server]
+        mock_create_servers.return_value = (new_mock_server_list, ['new_server'], [], True)
         mock_running_servers.return_value = (mock_server_list, mock_server_list)
         params = {
             'min_count': 2,
@@ -1416,7 +1423,7 @@ class TestClcServerFunctions(unittest.TestCase):
             under_test._enforce_count(self.module, self.clc)
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, True)
-        self.assertEqual(server_dict_array, 'test_server')
+        self.assertEqual(changed_server_ids, ['new_server', 'server1'])
 
     @patch.object(ClcServer, '_delete_servers')
     @patch.object(ClcServer, '_find_running_servers_by_group')

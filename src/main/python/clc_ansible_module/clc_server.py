@@ -1162,9 +1162,9 @@ class ClcServer:
         exact_count = p.get('exact_count')
         min_count = p.get('min_count')
         max_count = p.get('max_count')
-        server_dict_array = []
+        result_server_dict_array = []
         partial_servers_ids = []
-        changed_server_ids = []
+        result_server_ids = []
 
         # fail here if the exact count was specified without filtering
         # on a group, as this may lead to a undesired removal of instances
@@ -1189,13 +1189,14 @@ class ClcServer:
                 server_dict_array, changed_server_ids, partial_servers_ids, changed \
                     = self._create_servers(module, clc, override_count=to_create)
 
-                for server in server_dict_array:
-                    running_servers.append(server)
+                result_server_dict_array.extend(server_dict_array)
+                result_server_ids.extend(changed_server_ids)
 
             elif len(running_servers) > exact_count:
                 to_remove = len(running_servers) - exact_count
                 all_server_ids = sorted([x.id for x in running_servers])
                 remove_ids = all_server_ids[0:to_remove]
+                running_servers = [server for server in running_servers if server.id not in remove_ids]
 
                 (changed, server_dict_array, changed_server_ids) \
                     = ClcServer._delete_servers(module, clc, remove_ids)
@@ -1206,20 +1207,24 @@ class ClcServer:
                 server_dict_array, changed_server_ids, partial_servers_ids, changed \
                     = self._create_servers(module, clc, override_count=to_create)
 
-                for server in server_dict_array:
-                    running_servers.append(server)
+                result_server_dict_array.extend(server_dict_array)
+                result_server_ids.extend(changed_server_ids)
 
         if max_count:
             if len(running_servers) > max_count:
                 to_remove = len(running_servers) - max_count
                 all_server_ids = sorted([x.id for x in running_servers])
                 remove_ids = all_server_ids[0:to_remove]
+                running_servers = [server for server in running_servers if server.id not in remove_ids]
 
                 changed, server_dict_array, changed_server_ids \
                     = self._delete_servers(module, clc, remove_ids)
 
+        for server in running_servers:
+            result_server_dict_array.append(server.data)
+            result_server_ids.append(server.id)
 
-        return server_dict_array, changed_server_ids, partial_servers_ids, changed
+        return result_server_dict_array, result_server_ids, partial_servers_ids, changed
 
     @staticmethod
     def _wait_for_requests(module, request_list):
