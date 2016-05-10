@@ -299,7 +299,8 @@ class ClcNetwork:
       network = self.networks.Get(params.get('id'))
 
       if network is not None:
-        network.Delete(location=location)
+        if not self.module.check_mode:
+          network.Delete(location=location)
         changed = True
 
       return changed
@@ -317,7 +318,8 @@ class ClcNetwork:
 
       if network is None:
         changed = True
-        network = self._create_network(params)
+        if not self.module.check_mode:
+          network = self._create_network(params)
       else:
         changed, network = self._update_network(network, params)
 
@@ -349,11 +351,12 @@ class ClcNetwork:
 
       if (name is not None and network.name != name) or (desc is not None and network.description != desc):
         changed = True
-        update_name = name if name is not None else network.name
-        if desc is not None:
-          network.Update(update_name, description=desc, location=location)
-        else:
-          network.Update(update_name, location=location)
+        if not self.module.check_mode:
+          update_name = name if name is not None else network.name
+          if desc is not None:
+            network.Update(update_name, description=desc, location=location)
+          else:
+            network.Update(update_name, location=location)
 
       return changed, network
 
@@ -365,7 +368,7 @@ def main():
     """
     module = AnsibleModule(
         argument_spec=ClcNetwork._define_module_argument_spec(),
-        supports_check_mode=False)
+        supports_check_mode=True)
     clc_network = ClcNetwork(module)
     clc_network.process_request()
 
