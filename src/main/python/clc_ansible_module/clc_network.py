@@ -112,7 +112,50 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-TBD
+changed:
+    description: A flag indicating if any change was made or not
+    returned: success
+    type: boolean
+    sample: True
+network:
+    description: The network information
+    returned: success
+    type: dict
+    sample:
+        {
+            "cidr": "10.101.216.0/24",
+            "description": "The testing place",
+            "gateway": "10.101.216.1",
+            "id": "7c5fc52fd9dd48d5a6ab879bf6ab3db9",
+            "links": [
+                {
+                    "href": "/v2-experimental/networks/wftc/ca3/7c5fc52fd9dd48d5a6ab879bf6ab3db9",
+                    "rel": "self",
+                    "verbs": [
+                        "GET",
+                        "PUT"
+                    ]
+                },
+                {
+                    "href": "/v2-experimental/networks/wftc/ca3/7c5fc52fd9dd48d5a6ab879bf6ab3db9/ipAddresses",
+                    "rel": "ipAddresses",
+                    "verbs": [
+                        "GET"
+                    ]
+                },
+                {
+                    "href": "/v2-experimental/networks/wftc/ca3/7c5fc52fd9dd48d5a6ab879bf6ab3db9/release",
+                    "rel": "release",
+                    "verbs": [
+                        "POST"
+                    ]
+                }
+            ],
+            "name": "test9001",
+            "netmask": "255.255.255.0",
+            "type": "private",
+            "vlan": 716
+        }
 '''
 
 __version__ = '${version}'
