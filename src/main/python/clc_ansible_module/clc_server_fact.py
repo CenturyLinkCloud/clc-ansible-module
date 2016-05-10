@@ -31,7 +31,7 @@ module: clc_server_fact
 short_description: Get facts about servers in CenturyLink Cloud.
 description:
   - An Ansible module to retrieve facts about servers in CenturyLink Cloud.
-version_added: "2.1"
+version_added: "2.3"
 options:
   server_id:
     description:
@@ -45,7 +45,6 @@ options:
     choices: [False, True]
 requirements:
     - python = 2.7
-    - requests >= 2.5.0
 author: "CLC Runner (@clc-runner)"
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
@@ -240,13 +239,6 @@ server:
 
 __version__ = '${version}'
 
-try:
-    import requests
-except ImportError:
-    REQUESTS_FOUND = False
-else:
-    REQUESTS_FOUND = True
-
 
 class ClcServerFact:
 
@@ -255,10 +247,6 @@ class ClcServerFact:
         Construct module
         """
         self.module = module
-
-        if not REQUESTS_FOUND:
-            self.module.fail_json(
-                msg='requests library is required for this module')
 
     def process_request(self):
         """
@@ -269,20 +257,20 @@ class ClcServerFact:
         server_id = self.module.params.get('server_id')
 
         try:
-            r = requests.get(self._get_endpoint(server_id), headers={
-                'Authorization': 'Bearer ' + self.v2_api_token
-            })
-        except requests.exceptions.RequestException as re:
+            request = open_url(url=self._get_endpoint(server_id),
+                               headers={'Authorization': 'Bearer ' + self.v2_api_token},
+                               method='GET')
+        except Exception as e:
             self.module.fail_json(
-                msg='Unable to fetch the server facts for server : {0}. {1}'.format(server_id, re.message)
+                msg='Unable to fetch the server facts for server id : {0}. {1}'.format(server_id, e.message)
             )
 
-        if r.status_code not in [200]:
+        if request.code not in [200]:
             self.module.fail_json(
-                msg='Failed to retrieve server facts: %s' %
-                server_id)
+                msg='Failed to retrieve server facts: {0}'.format(server_id))
 
-        r = r.json()
+        r = json.loads(request.read())
+
         if r['details']['memoryMB']:
             r['details']['memory'] = int(r['details']['memoryMB'] / 1024)
         if len(r['details']['ipAddresses']) > 0:
@@ -311,20 +299,20 @@ class ClcServerFact:
     def _get_server_credentials(self, server_id):
 
         try:
-            r = requests.get(self._get_endpoint(server_id) + '/credentials', headers={
-                'Authorization': 'Bearer ' + self.v2_api_token
-            })
-        except requests.exceptions.RequestException as re:
+            request = open_url(url=self._get_endpoint(server_id) + '/credentials',
+                               headers={'Authorization': 'Bearer ' + self.v2_api_token},
+                               method='GET')
+        except Exception as e:
             self.module.fail_json(
-                msg='Unable to retrieve the credentials for server : {0}. {1}'.format(server_id, re.message)
+                msg='Unable to fetch the server credentials for server id : {0}. {1}'.format(server_id, e.message)
             )
 
-        if r.status_code not in [200]:
+        if request.code not in [200]:
             self.module.fail_json(
                 msg='Failed to retrieve server credentials: %s' %
                 server_id)
 
-        return r.json()
+        return json.loads(request.read())
 
     def _get_endpoint(self, server_id):
         return self.api_url + '/v2/servers/' + self.clc_alias + '/' + server_id
@@ -348,16 +336,18 @@ class ClcServerFact:
 
         elif v2_api_username and v2_api_passwd:
 
-            r = requests.post(self.api_url + '/v2/authentication/login', json={
-                'username': v2_api_username,
-                'password': v2_api_passwd
-            })
+            headers = {"Content-Type": "application/json"}
+            request = open_url(url=self.api_url + '/v2/authentication/login',
+                               method='POST',
+                               headers=headers,
+                               data=json.dumps({'username': v2_api_username,
+                                     'password': v2_api_passwd}))
 
-            if r.status_code not in [200]:
+            if request.code not in [200]:
                 self.module.fail_json(
                     msg='Failed to authenticate with clc V2 api.')
 
-            r = r.json()
+            r = json.loads(request.read())
             self.v2_api_token = r['bearerToken']
             self.clc_alias = r['accountAlias']
 
@@ -378,5 +368,6 @@ def main():
     clc_server_fact.process_request()
 
 from ansible.module_utils.basic import *
+from ansible.module_utils.urls import *
 if __name__ == '__main__':
     main()

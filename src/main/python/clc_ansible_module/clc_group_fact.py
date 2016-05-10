@@ -31,7 +31,7 @@ module: clc_group_fact
 short_description: Get facts about groups in CenturyLink Cloud.
 description:
   - An Ansible module to retrieve facts about groups in CenturyLink Cloud.
-version_added: "2.1"
+version_added: "2.3"
 options:
   group_id:
     description:
@@ -39,7 +39,6 @@ options:
     required: True
 requirements:
     - python = 2.7
-    - requests >= 2.5.0
 author: "CLC Runner (@clc-runner)"
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
@@ -191,13 +190,6 @@ server:
 
 __version__ = '${version}'
 
-try:
-    import requests
-except ImportError:
-    REQUESTS_FOUND = False
-else:
-    REQUESTS_FOUND = True
-
 
 class ClcGroupFact:
 
@@ -207,10 +199,6 @@ class ClcGroupFact:
         """
         self.module = module
 
-        if not REQUESTS_FOUND:
-            self.module.fail_json(
-                msg='requests library is required for this module')
-
     def process_request(self):
         """
         Process the request - Main Code Path
@@ -218,22 +206,24 @@ class ClcGroupFact:
         """
         self._set_clc_credentials_from_env()
         group_id = self.module.params.get('group_id')
+        request = None
 
         try:
-            r = requests.get(self._get_endpoint(group_id), headers={
-                'Authorization': 'Bearer ' + self.v2_api_token
-            })
-        except requests.exceptions.RequestException as re:
+            request = open_url(url=self._get_endpoint(group_id),
+                               headers={'Authorization': 'Bearer ' + self.v2_api_token},
+                               method='GET')
+        except Exception as e:
             self.module.fail_json(
-                msg='Unable to fetch the group facts for group id : {0}. {1}'.format(group_id, re.message)
+                msg='Unable to fetch the group facts for group id : {0}. {1}'.format(group_id, e.message)
             )
 
-        if r.status_code not in [200]:
+        if request.code not in [200]:
             self.module.fail_json(
                 msg='Failed to retrieve group facts: %s' %
                 group_id)
 
-        r = r.json()
+        r = json.loads(request.read())
+        request.close()
         servers = r['servers'] = []
 
         for l in r['links']:
@@ -272,16 +262,18 @@ class ClcGroupFact:
 
         elif v2_api_username and v2_api_passwd:
 
-            r = requests.post(self.api_url + '/v2/authentication/login', json={
-                'username': v2_api_username,
-                'password': v2_api_passwd
-            })
+            headers = {"Content-Type": "application/json"}
+            request = open_url(url=self.api_url + '/v2/authentication/login',
+                               method='POST',
+                               headers=headers,
+                               data=json.dumps({'username': v2_api_username,
+                                     'password': v2_api_passwd}))
 
-            if r.status_code not in [200]:
+            if request.code not in [200]:
                 self.module.fail_json(
                     msg='Failed to authenticate with clc V2 api.')
 
-            r = r.json()
+            r = json.loads(request.read())
             self.v2_api_token = r['bearerToken']
             self.clc_alias = r['accountAlias']
 
@@ -301,6 +293,7 @@ def main():
     clc_group_fact = ClcGroupFact(module)
     clc_group_fact.process_request()
 
-from ansible.module_utils.basic import *  # pylint: disable=W0614
+from ansible.module_utils.basic import *
+from ansible.module_utils.urls import *
 if __name__ == '__main__':
     main()
