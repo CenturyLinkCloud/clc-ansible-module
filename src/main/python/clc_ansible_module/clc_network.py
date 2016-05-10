@@ -325,7 +325,7 @@ class ClcNetwork:
 
     def _create_network(self, params):
       name = params.get('name', None)
-      desc = params.get('desc', None)
+      desc = params.get('description', None)
       request = self.clc.v2.Network.Create(location=params.get('location'))
 
       if params.get('wait',True):
@@ -368,6 +368,7 @@ def main():
         supports_check_mode=False)
     clc_network = ClcNetwork(module)
     clc_network.process_request()
+
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
