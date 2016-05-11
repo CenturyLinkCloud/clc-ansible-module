@@ -28,7 +28,7 @@ use_plugin("exec")
 
 # define project level attributes:
 name = 'clc-ansible-module'
-version = '1.1.9'
+version = '1.1.10'
 summary = "Centurylink Cloud Ansible Modules"
 description = "Ansible extension modules which allow users to interact with Centurylink Cloud to define and manage cloud components."
 authors = [Author ("CenturyLink Cloud", "WFAAS-LLFT@centurylink.com")]
@@ -55,7 +55,7 @@ def initialize( project ):
 	project.get_property('filter_resources_glob').append('**/clc_ansible_module/*.py')
 	# ----------------
 	# install clc-sdk during installation
-	project.depends_on("clc-sdk", "==2.44")
+	project.depends_on("clc-sdk", "==2.45")
 	# ----------------
 	# execute some installation scripts
 	project.set_property('dir_source_main_scripts', 'src/main/python')

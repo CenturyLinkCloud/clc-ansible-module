@@ -57,6 +57,7 @@ options:
   wait:
     description:
       - Whether to wait for the tasks to finish before returning.
+        This doesn't work when state 'present' with a name as the name is being set after the network being created.
     default: True
     required: False
     choices: [True, False]
@@ -93,7 +94,7 @@ EXAMPLES = '''
         description: 'Production Minecraft'
       register: net
 
-    - debug: var=nettwork
+    - debug: var=net
 
 ---
 - name: Delete Network
@@ -101,7 +102,7 @@ EXAMPLES = '''
   gather_facts: False
   connection: local
   tasks:
-    - name: Delete-ification
+    - name: Delete a CLC network based on id
       clc_network:
         location: 'ut1'
         state: absent
@@ -112,7 +113,50 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-TBD
+changed:
+    description: A flag indicating if any change was made or not
+    returned: success
+    type: boolean
+    sample: True
+network:
+    description: The network information
+    returned: success
+    type: dict
+    sample:
+        {
+            "cidr": "10.101.216.0/24",
+            "description": "The testing place",
+            "gateway": "10.101.216.1",
+            "id": "7c5fc52fd9dd48d5a6ab879bf6ab3db9",
+            "links": [
+                {
+                    "href": "/v2-experimental/networks/wftc/ca3/7c5fc52fd9dd48d5a6ab879bf6ab3db9",
+                    "rel": "self",
+                    "verbs": [
+                        "GET",
+                        "PUT"
+                    ]
+                },
+                {
+                    "href": "/v2-experimental/networks/wftc/ca3/7c5fc52fd9dd48d5a6ab879bf6ab3db9/ipAddresses",
+                    "rel": "ipAddresses",
+                    "verbs": [
+                        "GET"
+                    ]
+                },
+                {
+                    "href": "/v2-experimental/networks/wftc/ca3/7c5fc52fd9dd48d5a6ab879bf6ab3db9/release",
+                    "rel": "release",
+                    "verbs": [
+                        "POST"
+                    ]
+                }
+            ],
+            "name": "test9001",
+            "netmask": "255.255.255.0",
+            "type": "private",
+            "vlan": 716
+        }
 '''
 
 __version__ = '${version}'
@@ -151,6 +195,7 @@ class ClcNetwork:
         """
         self.module = module
         self.network_dict = {}
+        self.networks = None
 
         if not CLC_FOUND:
             self.module.fail_json(
@@ -158,7 +203,8 @@ class ClcNetwork:
         if not REQUESTS_FOUND:
             self.module.fail_json(
                 msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
+        if requests.__version__ and LooseVersion(
+                requests.__version__) < LooseVersion('2.5.0'):
             self.module.fail_json(
                 msg='requests library  version should be >= 2.5.0')
 
@@ -214,7 +260,6 @@ class ClcNetwork:
         Process the request - Main Code Path
         :return: Returns with either an exit_json or fail_json
         """
-        changed = False
         network = None
         p = self.module.params
 
@@ -223,22 +268,22 @@ class ClcNetwork:
         self.networks = self._populate_networks(p.get('location'))
 
         if p.get('state') == 'absent':
-          changed = self._ensure_network_absent(p)
+            changed = self._ensure_network_absent(p)
         else:
-          changed, network = self._ensure_network_present(p)
+            changed, network = self._ensure_network_present(p)
 
         if hasattr(network, 'data'):
-          network = network.data
+            network = network.data
         elif hasattr(network, 'requests'):
-          network = {
-            "id": network.requests[0].id,
-            "uri": network.requests[0].uri
-          }
+            network = {
+                "id": network.requests[0].id,
+                "uri": network.requests[0].uri
+            }
 
         self.module.exit_json(changed=changed, network=network)
 
     def _populate_networks(self, location):
-      return self.clc.v2.Networks(location=location)
+        return self.clc.v2.Networks(location=location)
 
     @staticmethod
     def _set_user_agent(clc):
@@ -250,69 +295,70 @@ class ClcNetwork:
             clc.SetRequestsSession(ses)
 
     def _ensure_network_absent(self, params):
-      changed = False
-      location = params.get('location')
+        changed = False
+        location = params.get('location')
 
-      network = self.networks.Get(params.get('id'))
+        network = self.networks.Get(params.get('id'))
 
-      if network is not None:
-        network.Delete(location=location)
-        changed = True
+        if network is not None:
+            if not self.module.check_mode:
+                network.Delete(location=location)
+            changed = True
 
-      return changed
-
-    def _get_search_key(self, params):
-      if params.get('id', None) is not None:
-        return params.get('id', None)
-
-      return params.get('name', None)
+        return changed
 
     def _ensure_network_present(self, params):
-      changed = False
-      search_key = self._get_search_key(params)
-      network = self.networks.Get(search_key)
+        search_key = params.get('id', None) or params.get('name', None)
+        network = self.networks.Get(search_key)
 
-      if network is None:
-        changed = True
-        network = self._create_network(params)
-      else:
-        changed, network = self._update_network(network, params)
+        if network is None:
+            changed = True
+            if not self.module.check_mode:
+                network = self._create_network(params)
+        else:
+            changed, network = self._update_network(network, params)
 
-      return changed, network
+        return changed, network
 
     def _create_network(self, params):
-      name = params.get('name', None)
-      desc = params.get('desc', None)
-      request = self.clc.v2.Network.Create(location=params.get('location'))
+        name = params.get('name', None)
+        desc = params.get('description', None)
+        request = self.clc.v2.Network.Create(location=params.get('location'))
 
-      if params.get('wait',True):
-        uri = request.requests[0].uri
-        if request.WaitUntilComplete() > 0:
-          self.module.fail_json(msg="Unable to create network")
-        network_payload = self.clc.v2.API.Call('GET',
-          self.clc.v2.API.Call('GET', uri)['summary']['links'][0]['href'])
-        request = self.clc.v2.Network(network_payload['id'], network_obj=network_payload)
+        if params.get('wait', True):
+            uri = request.requests[0].uri
+            if request.WaitUntilComplete() > 0:
+                self.module.fail_json(msg="Unable to create network")
+            network_payload = self.clc.v2.API.Call('GET',
+                                                   self.clc.v2.API.Call('GET', uri)['summary']['links'][0]['href'])
+            request = self.clc.v2.Network(
+                network_payload['id'], network_obj=network_payload)
 
-        if name is not None or desc is not None:
-          ignored,request = self._update_network(request, params)
+            if name is not None or desc is not None:
+                ignored, request = self._update_network(request, params)
 
-      return request
+        return request
 
     def _update_network(self, network, params):
-      changed = False
-      location = params.get('location')
-      name = params.get('name', None)
-      desc = params.get('description', None)
+        changed = False
+        location = params.get('location')
+        name = params.get('name', None)
+        desc = params.get('description', None)
 
-      if (name is not None and network.name != name) or (desc is not None and network.description != desc):
-        changed = True
-        update_name = name if name is not None else network.name
-        if desc is not None:
-          network.Update(update_name, description=desc, location=location)
-        else:
-          network.Update(update_name, location=location)
+        if (name is not None and network.name != name) or (
+                desc is not None and network.description != desc):
+            changed = True
+            if not self.module.check_mode:
+                update_name = name if name is not None else network.name
+                if desc is not None:
+                    network.Update(
+                        update_name,
+                        description=desc,
+                        location=location)
+                else:
+                    network.Update(update_name, location=location)
 
-      return changed, network
+        return changed, network
 
 
 def main():
@@ -322,9 +368,10 @@ def main():
     """
     module = AnsibleModule(
         argument_spec=ClcNetwork._define_module_argument_spec(),
-        supports_check_mode=False)
+        supports_check_mode=True)
     clc_network = ClcNetwork(module)
     clc_network.process_request()
+
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
