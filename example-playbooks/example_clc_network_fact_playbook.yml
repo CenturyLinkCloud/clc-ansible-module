@@ -15,11 +15,19 @@
 - name: Example for clc network fact module
   hosts: localhost
   tasks:
-  - name: Get facts on network
+  - name: Get facts on network as item
     clc_network_fact:
       id: '247a03273fd74687b72f029e6c82ab80'
       location: CA3
-    register: network
+    register: fact
 
   - name: output
-    debug: var=network
+    debug: var=fact.network
+
+  - name: Get facts on all networks as array
+    clc_network_fact:
+      location: UC1
+    register: fact
+
+  - name: output
+    debug: var=fact.networks
