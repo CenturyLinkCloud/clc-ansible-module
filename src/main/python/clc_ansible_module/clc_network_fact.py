@@ -183,20 +183,14 @@ class ClcNetworkFact:
         self._set_clc_credentials_from_env()
 
         self.networks = self._get_clc_networks(params.get('location'))
-
-        try:
-            result = self._get_network_details(params)
-        except APIFailedResponse as ex:
-            self.module.fail_json(msg='Unable to gather the facts about network. {0}'.format(ex.response_text))
-
-        self.module.exit_json(network=result.data)
-
-    def _get_network_details(self, params):
-        search_key = params.get('id', None)
-        network = self.networks.Get(search_key)
-        if network is None:
-            return self.module.fail_json(msg='Network: {0} does not exist'.format(search_key))
-        return network
+        requested = params.get('id', None)
+        if requested == None:
+            self.module.exit_json(networks=[n.data for n in self.networks.networks])
+        else:
+            network = self.networks.Get(requested)
+            if network is None:
+                return self.module.fail_json(msg='Network: {0} does not exist'.format(search_key))
+            self.module.exit_json(network=network.data)
 
     def _get_clc_networks(self, location):
         result = None
@@ -215,7 +209,7 @@ class ClcNetworkFact:
         :return: argument spec dictionary
         """
         argument_spec = dict(
-            id=dict(required=True),
+            id=dict(required=False),
             location=dict(required=True)
         )
         return argument_spec
