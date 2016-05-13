@@ -227,8 +227,12 @@ class ClcBlueprintPackage:
                 package_id=package_id,
                 parameters=package_params)
         except CLCException as ex:
+            try:
+                msg = ex.response_text
+            except:
+                msg = ex.message
             self.module.fail_json(msg='Failed to install package : {0} to server {1}. {2}'.format(
-                package_id, server.id, ex.message
+                package_id, server.id, msg
             ))
         return result
 

@@ -1,0 +1,13 @@
+- name: Delete Network
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete-ification
+      clc_network:
+        location: 'ut1'
+        state: absent
+        id: 'vlan_1306_10.81.206'
+      register: net
+
+    - debug: var=net

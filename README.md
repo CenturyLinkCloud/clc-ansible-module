@@ -769,6 +769,59 @@ Create/Delete a Firewall Policy
 | `enabled` | N | True | True, False | If the firewall policy is enabled or disabled
 
 
+
+## clc_network Module
+
+Create or delete Network at CenturyLink Cloud.
+
+###Example Playbook
+```yaml
+---
+- name: Create Network
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Create and update a new network
+      clc_network:
+        location: 'ut1'
+        state: present
+        name: 'ProdNet5000'
+        description: 'Production Minecraft'
+      register: net
+
+    - debug: var=net
+```
+```
+---
+- name: Delete Network
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Delete-ification
+      clc_network:
+        location: 'ut1'
+        state: absent
+        id: 'vlan_1306_10.81.206'
+      register: net
+
+    - debug: var=net
+
+```
+
+###Available Parameters
+
+| Parameter | Required | Default | Choices | Description |
+|-----------|:--------:|:-------:|:-------:|-------------|
+| `description` | N | | | Description for the network |
+| `id` | N | | | Identifier for network to be updated/deleted.  This is required when state is 'absent'.  This is used to find an existing network when state is 'present' and takes precedence over `name`.  The `id` field can be the network id, network name, or network vlan. |
+| `location` | Y | | | Datacenter in which the network lives |
+| `name` | N | | | The Name of the network.  This is used to find an existing network when state is 'present'; if not found, the claimed network is given this name. |
+| `state` | N | present | present, absent | Whether to claim or release the network |
+| `wait` | N | True | True, False | Whether to wait for network create to complete |
+
+
 ## <a id="dyn_inventory"></a>Dynamic Inventory Script
 
 Scans all datacenters and returns an inventory of servers and server groups to Ansible.  This script returns all information about hosts in the inventory _meta dictionary.
