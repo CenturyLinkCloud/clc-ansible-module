@@ -189,7 +189,7 @@ class ClcNetworkFact:
         else:
             network = self.networks.Get(requested)
             if network is None:
-                return self.module.fail_json(msg='Network: {0} does not exist'.format(search_key))
+                return self.module.fail_json(msg='Network: "{0}" does not exist'.format(requested))
             self.module.exit_json(network=network.data)
 
     def _get_clc_networks(self, location):
