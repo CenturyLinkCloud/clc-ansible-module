@@ -913,7 +913,7 @@ class TestClcServerFunctions(unittest.TestCase):
         result = ClcServer._find_network_id(self.module, self.datacenter)
 
         # Assert Result
-        self.datacenter.Networks.assert_called_with(forced_load=True)
+        self.datacenter.Networks.assert_called_with()
         self.datacenter.Networks().Get.assert_called_once_with('AwesomeIdHere')
         self.assertEqual(result, mock_network.id)
         self.assertEqual(self.module.fail_json.called, False)  
