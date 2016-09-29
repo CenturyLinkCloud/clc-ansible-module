@@ -54,6 +54,12 @@ options:
     default: True
     required: False
     choices: [True, False]
+  ignore_failures:
+    description:
+      - Whether to ignore and continue with the servers if any of the server snapshot fails.
+    default: False
+    required: False
+    choices: [True, False]
 requirements:
     - python = 2.7
     - requests >= 2.5.0
@@ -175,38 +181,47 @@ class ClcSnapshot:
         server_ids = p['server_ids']
         expiration_days = p['expiration_days']
         state = p['state']
+        ignore_failures = p['ignore_failures']
         request_list = []
         changed = False
         changed_servers = []
+        failed_servers = []
 
         self._set_clc_credentials_from_env()
         if state == 'present':
-            changed, request_list, changed_servers = self.ensure_server_snapshot_present(
+            changed, request_list, changed_servers, failed_servers = self.ensure_server_snapshot_present(
                 server_ids=server_ids,
-                expiration_days=expiration_days)
+                expiration_days=expiration_days,
+                ignore_failures=ignore_failures)
         elif state == 'absent':
-            changed, request_list, changed_servers = self.ensure_server_snapshot_absent(
-                server_ids=server_ids)
+            changed, request_list, changed_servers, failed_servers = self.ensure_server_snapshot_absent(
+                server_ids=server_ids,
+                ignore_failures=ignore_failures)
         elif state == 'restore':
-            changed, request_list, changed_servers = self.ensure_server_snapshot_restore(
-                server_ids=server_ids)
+            changed, request_list, changed_servers, failed_servers = self.ensure_server_snapshot_restore(
+                server_ids=server_ids,
+                ignore_failures=ignore_failures)
 
         self._wait_for_requests_to_complete(request_list)
         return self.module.exit_json(
             changed=changed,
-            server_ids=changed_servers)
+            server_ids=changed_servers,
+            failed_server_ids=failed_servers)
 
-    def ensure_server_snapshot_present(self, server_ids, expiration_days):
+    def ensure_server_snapshot_present(self, server_ids, expiration_days, ignore_failures):
         """
         Ensures the given set of server_ids have the snapshots created
         :param server_ids: The list of server_ids to create the snapshot
         :param expiration_days: The number of days to keep the snapshot
+        :param ignore_failures: A flag indicating if failures to be ignored
         :return: (changed, request_list, changed_servers)
                  changed: A flag indicating whether any change was made
                  request_list: the list of clc request objects from CLC API call
                  changed_servers: The list of servers ids that are modified
         """
         request_list = []
+        changed_servers = []
+        failed_servers = []
         changed = False
         servers = self._get_servers_from_clc(
             server_ids,
@@ -217,17 +232,22 @@ class ClcSnapshot:
         for server in servers_to_change:
             changed = True
             if not self.module.check_mode:
-                request = self._create_server_snapshot(server, expiration_days)
-                request_list.append(request)
-        changed_servers = [
-            server.id for server in servers_to_change if server.id]
-        return changed, request_list, changed_servers
+                request = self._create_server_snapshot(server=server,
+                                                       expiration_days=expiration_days,
+                                                       ignore_failures=ignore_failures)
+                if request:
+                    request_list.append(request)
+                    changed_servers.append(server.id)
+                else:
+                    failed_servers.append(server.id)
+        return changed, request_list, changed_servers, failed_servers
 
-    def _create_server_snapshot(self, server, expiration_days):
+    def _create_server_snapshot(self, server, expiration_days, ignore_failures):
         """
         Create the snapshot for the CLC server
         :param server: the CLC server object
         :param expiration_days: The number of days to keep the snapshot
+        :param ignore_failures: A flag indicating if failures to be ignored
         :return: the create request object from CLC API Call
         """
         result = None
@@ -236,21 +256,27 @@ class ClcSnapshot:
                 delete_existing=True,
                 expiration_days=expiration_days)
         except CLCException as ex:
-            self.module.fail_json(msg='Failed to create snapshot for server : {0}. {1}'.format(
-                server.id, ex.response_text
-            ))
+            if ignore_failures:
+                return None
+            else:
+                self.module.fail_json(msg='Failed to create snapshot for server : {0}. {1}'.format(
+                    server.id, ex.message
+                ))
         return result
 
-    def ensure_server_snapshot_absent(self, server_ids):
+    def ensure_server_snapshot_absent(self, server_ids, ignore_failures):
         """
         Ensures the given set of server_ids have the snapshots removed
         :param server_ids: The list of server_ids to delete the snapshot
+        :param ignore_failures: A flag indicating if failures to be ignored
         :return: (changed, request_list, changed_servers)
                  changed: A flag indicating whether any change was made
                  request_list: the list of clc request objects from CLC API call
                  changed_servers: The list of servers ids that are modified
         """
         request_list = []
+        changed_servers = []
+        failed_servers = []
         changed = False
         servers = self._get_servers_from_clc(
             server_ids,
@@ -261,37 +287,46 @@ class ClcSnapshot:
         for server in servers_to_change:
             changed = True
             if not self.module.check_mode:
-                request = self._delete_server_snapshot(server)
-                request_list.append(request)
-        changed_servers = [
-            server.id for server in servers_to_change if server.id]
-        return changed, request_list, changed_servers
+                request = self._delete_server_snapshot(server, ignore_failures)
+                if request:
+                    request_list.append(request)
+                    changed_servers.append(server.id)
+                else:
+                    failed_servers.append(server.id)
+        return changed, request_list, changed_servers, failed_servers
 
-    def _delete_server_snapshot(self, server):
+    def _delete_server_snapshot(self, server, ignore_failures):
         """
         Delete snapshot for the CLC server
         :param server: the CLC server object
+        :param ignore_failures: A flag indicating if failures to be ignored
         :return: the delete snapshot request object from CLC API
         """
         result = None
         try:
             result = server.DeleteSnapshot()
         except CLCException as ex:
-            self.module.fail_json(msg='Failed to delete snapshot for server : {0}. {1}'.format(
-                server.id, ex.response_text
-            ))
+            if ignore_failures:
+                return None
+            else:
+                self.module.fail_json(msg='Failed to delete snapshot for server : {0}. {1}'.format(
+                    server.id, ex.message
+                ))
         return result
 
-    def ensure_server_snapshot_restore(self, server_ids):
+    def ensure_server_snapshot_restore(self, server_ids, ignore_failures):
         """
         Ensures the given set of server_ids have the snapshots restored
         :param server_ids: The list of server_ids to delete the snapshot
+        :param ignore_failures: A flag indicating if failures to be ignored
         :return: (changed, request_list, changed_servers)
                  changed: A flag indicating whether any change was made
                  request_list: the list of clc request objects from CLC API call
                  changed_servers: The list of servers ids that are modified
         """
         request_list = []
+        changed_servers = []
+        failed_servers = []
         changed = False
         servers = self._get_servers_from_clc(
             server_ids,
@@ -302,25 +337,31 @@ class ClcSnapshot:
         for server in servers_to_change:
             changed = True
             if not self.module.check_mode:
-                request = self._restore_server_snapshot(server)
-                request_list.append(request)
-        changed_servers = [
-            server.id for server in servers_to_change if server.id]
-        return changed, request_list, changed_servers
+                request = self._restore_server_snapshot(server, ignore_failures)
+                if request:
+                    request_list.append(request)
+                    changed_servers.append(server.id)
+                else:
+                    failed_servers.append(server.id)
+        return changed, request_list, changed_servers, failed_servers
 
-    def _restore_server_snapshot(self, server):
+    def _restore_server_snapshot(self, server, ignore_failures):
         """
         Restore snapshot for the CLC server
         :param server: the CLC server object
+        :param ignore_failures: A flag indicating if failures to be ignored
         :return: the restore snapshot request object from CLC API
         """
         result = None
         try:
             result = server.RestoreSnapshot()
         except CLCException as ex:
-            self.module.fail_json(msg='Failed to restore snapshot for server : {0}. {1}'.format(
-                server.id, ex.response_text
-            ))
+            if ignore_failures:
+                return None
+            else:
+                self.module.fail_json(msg='Failed to restore snapshot for server : {0}. {1}'.format(
+                    server.id, ex.message
+                ))
         return result
 
     def _wait_for_requests_to_complete(self, requests_lst):
@@ -349,6 +390,7 @@ class ClcSnapshot:
             server_ids=dict(type='list', required=True),
             expiration_days=dict(default=7),
             wait=dict(default=True),
+            ignore_failures=dict(default=False),
             state=dict(
                 default='present',
                 choices=[
