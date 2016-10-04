@@ -390,7 +390,7 @@ class ClcSnapshot:
             server_ids=dict(type='list', required=True),
             expiration_days=dict(default=7),
             wait=dict(default=True),
-            ignore_failures=dict(default=False),
+            ignore_failures=dict(type='bool', default=False),
             state=dict(
                 default='present',
                 choices=[
