@@ -563,6 +563,7 @@ Executes a blue print package on existing set of servers.
 | `package_params:` | N | {} |  | The arguments required for the package execution.|
 | `state:` | N | `present` | `present` | If `present` module will deploy the package. |
 | `wait:` | N | True | Boolean| Whether to wait for the tasks to finish before returning. |
+| `ignore_failures` | N | False | Boolean | A flag indicating if the failures to be ignored if any of the servers in the list encountered a failure. |
 
 
 ## clc_loadbalancer Module
