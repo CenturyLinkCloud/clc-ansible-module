@@ -514,6 +514,7 @@ servers:
 __version__ = '${version}'
 
 from time import sleep
+from builtins import object, range, str
 from distutils.version import LooseVersion
 
 try:
@@ -538,7 +539,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcServer:
+class ClcServer(object):
     clc = clc_sdk
 
     def __init__(self, module):
@@ -634,7 +635,7 @@ class ClcServer:
             group = ClcServer._find_group(module=self.module, datacenter=datacenter, lookup_group=p.get('group'))
             servers = group.Servers().Servers()
             group = group.data
-            group['servers'] = map(lambda s: s.id, servers)
+            group['servers'] = [s.id for s in servers]
 
         self.module.exit_json(
             changed=changed,

@@ -142,8 +142,8 @@ class TestClcInvFunctions(unittest.TestCase):
 
         mock_clc_sdk.v2.Server.return_value = server
         result = clc_inv._add_windows_hostvars(hostvars, server)
-        self.assertEquals(result[server.name]['ansible_ssh_port'], 5986)
-        self.assertEquals(result[server.name]['ansible_connection'], 'winrm')
+        self.assertEqual(result[server.name]['ansible_ssh_port'], 5986)
+        self.assertEqual(result[server.name]['ansible_connection'], 'winrm')
 
     @patch('clc_inv._add_windows_hostvars')
     @patch('clc_inv.clc')

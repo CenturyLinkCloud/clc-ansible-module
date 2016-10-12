@@ -46,6 +46,7 @@ import os
 from multiprocessing import Pool
 import itertools
 import json
+from builtins import str
 import clc
 from clc import CLCException, APIFailedResponse
 

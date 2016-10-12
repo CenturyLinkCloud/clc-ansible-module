@@ -161,6 +161,7 @@ network:
 
 __version__ = '${version}'
 
+from builtins import object
 from distutils.version import LooseVersion
 
 try:
@@ -184,7 +185,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcNetwork:
+class ClcNetwork(object):
 
     clc = clc_sdk
     module = None

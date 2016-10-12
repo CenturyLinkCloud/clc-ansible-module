@@ -185,6 +185,7 @@ policy:
 
 __version__ = '${version}'
 
+from builtins import object, str
 from distutils.version import LooseVersion
 
 try:
@@ -208,7 +209,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcAlertPolicy:
+class ClcAlertPolicy(object):
 
     clc = clc_sdk
     module = None

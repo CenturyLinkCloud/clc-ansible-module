@@ -142,6 +142,7 @@ server_ids:
 
 __version__ = '${version}'
 
+from builtins import object
 from distutils.version import LooseVersion
 
 try:
@@ -272,7 +273,7 @@ class ClcPublicIp(object):
         result = None
         try:
             result = server.PublicIPs().Add(ports=ports_to_expose, source_restrictions=source_restrictions)
-        except CLCException, ex:
+        except CLCException as ex:
             self.module.fail_json(msg='Failed to add public ip to the server : {0}. {1}'.format(
                 server.id, ex.response_text
             ))
@@ -309,7 +310,7 @@ class ClcPublicIp(object):
         try:
             for ip_address in server.PublicIPs().public_ips:
                     result = ip_address.Delete()
-        except CLCException, ex:
+        except CLCException as ex:
             self.module.fail_json(msg='Failed to remove public ip from the server : {0}. {1}'.format(
                 server.id, ex.response_text
             ))

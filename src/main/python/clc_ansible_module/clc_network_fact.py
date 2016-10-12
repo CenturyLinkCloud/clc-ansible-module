@@ -120,6 +120,7 @@ network:
 
 __version__ = '{version}'
 
+from builtins import object
 from distutils.version import LooseVersion
 
 try:
@@ -139,7 +140,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcNetworkFact:
+class ClcNetworkFact(object):
 
     def __init__(self, module):
         """
