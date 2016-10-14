@@ -241,6 +241,8 @@ server:
 
 __version__ = '${version}'
 
+from builtins import object
+
 try:
     import requests
 except ImportError:
@@ -249,7 +251,7 @@ else:
     REQUESTS_FOUND = True
 
 
-class ClcServerFact:
+class ClcServerFact(object):
 
     def __init__(self, module):
         """

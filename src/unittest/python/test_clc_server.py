@@ -35,8 +35,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
     def test_clc_module_not_found(self):
         # Setup Mock Import Function
-        import __builtin__ as builtins
-        real_import = builtins.__import__
+        real_import = __import__
         def mock_import(name, *args):
             if name == 'clc': raise ImportError
             return real_import(name, *args)
@@ -52,8 +51,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
     def test_requests_invalid_version(self):
         # Setup Mock Import Function
-        import __builtin__ as builtins
-        real_import = builtins.__import__
+        real_import = __import__
         def mock_import(name, *args):
             if name == 'requests':
                 args[0]['requests'].__version__ = '2.4.0'
@@ -70,8 +68,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
     def test_requests_module_not_found(self):
         # Setup Mock Import Function
-        import __builtin__ as builtins
-        real_import = builtins.__import__
+        real_import = __import__
         def mock_import(name, *args):
             if name == 'requests':
                 args[0]['requests'].__version__ = '2.7.0'

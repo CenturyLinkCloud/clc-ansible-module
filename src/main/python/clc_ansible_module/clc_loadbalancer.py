@@ -225,6 +225,7 @@ loadbalancer:
 __version__ = '${version}'
 
 from time import sleep
+from builtins import object, str
 from distutils.version import LooseVersion
 
 try:
@@ -248,7 +249,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcLoadBalancer:
+class ClcLoadBalancer(object):
 
     clc = None
 

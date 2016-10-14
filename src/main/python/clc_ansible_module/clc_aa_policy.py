@@ -142,6 +142,7 @@ policy:
 
 __version__ = '${version}'
 
+from builtins import object
 from distutils.version import LooseVersion
 
 try:
@@ -165,7 +166,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcAntiAffinityPolicy:
+class ClcAntiAffinityPolicy(object):
 
     clc = clc_sdk
     module = None
@@ -278,7 +279,7 @@ class ClcAntiAffinityPolicy:
             return self.clc.v2.AntiAffinity.Create(
                 name=p['name'],
                 location=p['location'])
-        except CLCException, ex:
+        except CLCException as ex:
             self.module.fail_json(msg='Failed to create anti affinity policy : {0}. {1}'.format(
                 p['name'], ex.response_text
             ))
@@ -292,7 +293,7 @@ class ClcAntiAffinityPolicy:
         try:
             policy = self.policy_dict[p['name']]
             policy.Delete()
-        except CLCException, ex:
+        except CLCException as ex:
             self.module.fail_json(msg='Failed to delete anti affinity policy : {0}. {1}'.format(
                 p['name'], ex.response_text
             ))

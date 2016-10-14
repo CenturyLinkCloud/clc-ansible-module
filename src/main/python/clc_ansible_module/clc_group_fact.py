@@ -192,6 +192,8 @@ server:
 
 __version__ = '${version}'
 
+from builtins import object
+
 try:
     import requests
 except ImportError:
@@ -200,7 +202,7 @@ else:
     REQUESTS_FOUND = True
 
 
-class ClcGroupFact:
+class ClcGroupFact(object):
 
     def __init__(self, module):
         """

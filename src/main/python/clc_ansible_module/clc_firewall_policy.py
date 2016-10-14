@@ -185,8 +185,11 @@ firewall_policy:
 
 __version__ = '${version}'
 
-import urlparse
+from future import standard_library
+standard_library.install_aliases()
+import urllib.parse
 from time import sleep
+from builtins import object, str
 from distutils.version import LooseVersion
 
 try:
@@ -207,7 +210,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcFirewallPolicy:
+class ClcFirewallPolicy(object):
 
     clc = None
 
@@ -306,7 +309,7 @@ class ClcFirewallPolicy:
         :return: policy_id: firewall policy id from creation call
         """
         url = response.get('links')[0]['href']
-        path = urlparse.urlparse(url).path
+        path = urllib.parse.urlparse(url).path
         path_list = os.path.split(path)
         policy_id = path_list[-1]
         return policy_id

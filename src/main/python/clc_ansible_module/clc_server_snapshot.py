@@ -125,6 +125,7 @@ server_ids:
 
 __version__ = '${version}'
 
+from builtins import object
 from distutils.version import LooseVersion
 
 try:
@@ -148,7 +149,7 @@ else:
     CLC_FOUND = True
 
 
-class ClcSnapshot:
+class ClcSnapshot(object):
 
     clc = clc_sdk
     module = None
