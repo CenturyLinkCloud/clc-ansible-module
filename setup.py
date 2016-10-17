@@ -35,8 +35,11 @@ setup(
         'mock',
         'nose',
         'requests>=2.7',
+        'setuptools',
     ],
     packages=find_packages(exclude=('tests',)),
     scripts=['clc_inv.py'],
+    test_suite='nose.collector',
+    tests_require=['nose'],
     keywords='centurylink cloud clc ansible modules'
 )
