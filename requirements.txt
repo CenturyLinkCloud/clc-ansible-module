@@ -1,5 +1,6 @@
 ansible==2.0.2.0
 clc-sdk==2.44
+coverage
 future
 mock
 nose
