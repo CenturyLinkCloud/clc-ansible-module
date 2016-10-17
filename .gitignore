@@ -5,6 +5,9 @@
 coverage.xml
 nosetests.xml
 target
+build/
+*.egg-info/
+.eggs/
 .vagrant/
 *.iml
 *.imr
