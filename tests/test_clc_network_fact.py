@@ -135,7 +135,7 @@ class TestClcNetworkFactFunctions(unittest.TestCase):
         self.assertTrue(under_test.clc._V2_ENABLED)
         self.assertEqual(under_test.clc.ALIAS, 'dummy_alias')
         # Username and password
-        # TODO: Mock requests response from endpoint
+        # Mock requests response from endpoint
 
 if __name__ == '__main__':
     unittest.main()

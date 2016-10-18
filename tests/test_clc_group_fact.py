@@ -89,7 +89,7 @@ class TestClcGroupFactFunctions(unittest.TestCase):
         self.assertEqual(under_test.v2_api_token, 'dummy_token')
         self.assertEqual(under_test.clc_alias, 'dummy_alias')
         # Username and password
-        # TODO: Mock requests response from endpoint
+        # Mock requests response from endpoint
 
 
 if __name__ == '__main__':

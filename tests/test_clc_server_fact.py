@@ -71,7 +71,7 @@ class TestClcServerFactFunctions(unittest.TestCase):
         under_test = ClcServerFact(self.module)
         under_test.api_url = 'http://unittest.example.com'
         under_test.clc_alias = 'test_alias'
-        # TODO: Mock request response from endpoint
+        # Mock request response from endpoint
 
     def test_get_endpoint(self):
         under_test = ClcServerFact(self.module)
@@ -100,7 +100,7 @@ class TestClcServerFactFunctions(unittest.TestCase):
         self.assertEqual(under_test.v2_api_token, 'dummy_token')
         self.assertEqual(under_test.clc_alias, 'dummy_alias')
         # Username and password
-        # TODO: Mock requests response from endpoint
+        # Mock requests response from endpoint
 
 
 if __name__ == '__main__':

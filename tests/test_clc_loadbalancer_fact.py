@@ -128,14 +128,14 @@ class TestClcLoadbalancerFact(unittest.TestCase):
         self.assertTrue(under_test.clc._V2_ENABLED)
         self.assertEqual(under_test.clc.ALIAS, 'dummy_alias')
         # Username and password
-        # TODO: Mock requests response from endpoint
+        # Mock requests response from endpoint
 
     def test_get_loadbalancer_list(self):
         pass
 
     def test_loadbalancer_id(self):
         under_test = ClcLoadbalancerFact(self.module)
-        # TODO: Figure out correct object type
+        # Figure out correct object type
         under_test.lb_dict = [
             {'name': 'lb1', 'id': 'lb_id1'},
             {'name': 'lb2', 'id': 'lb_id2'},
