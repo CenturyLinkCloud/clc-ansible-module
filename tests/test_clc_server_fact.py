@@ -83,18 +83,24 @@ class TestClcServerFactFunctions(unittest.TestCase):
 
     def test_set_clc_credentials_from_env(self):
         # Required combination of credentials not passed
-        with patch.dict('os.environ', {
-                'CLC_V2_API_URL': 'http://unittest.example.com', }):
+        with patch.dict(
+                'os.environ', {
+                    'CLC_V2_API_URL': 'http://unittest.example.com',
+                },
+                clear=True):
             under_test = ClcServerFact(self.module)
             under_test._set_clc_credentials_from_env()
         self.module.fail_json.assert_called_with(
             msg='You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD '
                 'environment variables')
         # Token and alias
-        with patch.dict('os.environ', {
-                'CLC_V2_API_URL': 'http://unittest.example.com',
-                'CLC_V2_API_TOKEN': 'dummy_token',
-                'CLC_ACCT_ALIAS': 'dummy_alias'}):
+        with patch.dict(
+                'os.environ', {
+                    'CLC_V2_API_URL': 'http://unittest.example.com',
+                    'CLC_V2_API_TOKEN': 'dummy_token',
+                    'CLC_ACCT_ALIAS': 'dummy_alias',
+                },
+                clear=True):
             under_test = ClcServerFact(self.module)
             under_test._set_clc_credentials_from_env()
         self.assertEqual(under_test.v2_api_token, 'dummy_token')
