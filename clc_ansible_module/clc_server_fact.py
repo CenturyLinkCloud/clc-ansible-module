@@ -241,8 +241,6 @@ server:
 
 __version__ = '${version}'
 
-from builtins import object
-
 try:
     import requests
 except ImportError:

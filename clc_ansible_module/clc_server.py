@@ -514,7 +514,6 @@ servers:
 __version__ = '${version}'
 
 from time import sleep
-from builtins import object, range, str
 from distutils.version import LooseVersion
 
 try:
