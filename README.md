@@ -7,31 +7,33 @@ These are additional, unofficial Ansible modules for managing CenturyLink Cloud.
 
 ### Installation
 
-```
+```bash
 sudo pip install clc-ansible-module
 ```
-<br>To use this, add the python dist/site-packages directory to to the ***ANSIBLE_LIBRARY*** environment variable, or symlink this directory to ./library underneath the directory containing the playbook that needs it.
 
-The installation will install a dynamic inventory script to /usr/local/bin.  In order to use the script you will need to fully reference the clc\_inv.py script with each Ansible command.  You can avoid having to enter in this script for each command by creating a symlink in /etc/ansible to this script as such:<br>
-```
+To use this, add the python dist/site-packages directory to to the ***ANSIBLE_LIBRARY*** environment variable, or symlink this directory to ./library underneath the directory containing the playbook that needs it.
+
+The installation will install a dynamic inventory script to /usr/local/bin.  In order to use the script you will need to fully reference the clc\_inv.py script with each Ansible command.  You can avoid having to enter in this script for each command by creating a symlink in /etc/ansible to this script as such:
+
+```bash
 ln -s /usr/local/bin/clc_inv.py /etc/ansible/hosts
 ```
 
 ####Validation
 Validate that the clc-ansible-module package has been installed and is functioning:
-```
+```bash
 ansible all -i /usr/local/bin/clc_inv.py --list-hosts
 ```
-<br>
+
 Validate that all packages are install and configured:
-```
+```bash
 ansible-playbook -i /usr/local/bin/clc_inv.py my-playbook.yml
 ```
 
 ####Dependencies
 This module has one dependency  The [clc-python-sdk](https://github.com/CenturyLinkCloud/clc-python-sdk).  You can install it with pip
 
-```
+```bash
 sudo pip install clc-sdk
 ```
 
@@ -40,7 +42,7 @@ sudo pip install clc-sdk
 
 In order to use these playbooks, you must set the following environment variables:
 
-```
+```bash
 export CLC_V2_API_USERNAME=<your Control Portal Username>
 export CLC_V2_API_PASSWD=<your Control Portal Password>
 ```
@@ -87,6 +89,7 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
     - name: debug
       debug: var=clc.server_ids
 ```
+
 ```yaml
 ---
 - name: Create a Linux Server with 3 GBs of app space
@@ -106,6 +109,7 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
     - name: debug
       debug: var=clc
 ```
+
 ```yaml
 ---
 - name: Sample playbook which executes a blueprint package post build.
@@ -290,6 +294,7 @@ Retrieve facts about servers in Centurylink Cloud.
   clc_server_fact:
     server_id: UC1ACCTSRVR10
 ```
+
 ```yaml
 - name: Retrieve Server Facts With Credentials
   clc_server_fact:
@@ -325,7 +330,8 @@ Create or deletes Server Groups at CenturyLink Cloud.
     - name: debug
       debug: var=clc
 ```
-```
+
+```yaml
 ---
 - name: Delete Server Group
   hosts: localhost
@@ -358,6 +364,7 @@ Retrieve facts about groups in Centurylink Cloud.
 
 ###Example Playbook
 ```yaml
+---
 - name: Retrieve Group Facts
   clc_group_fact:
     group_id: 31d13f501459411ba59304f3d47486eb
@@ -370,7 +377,7 @@ Retrieve facts about groups in Centurylink Cloud.
 
 ## clc_aa_policy Module
 
-Create or deletes Anti Affinity Policities at CenturyLink Cloud.
+Create or deletes Anti Affinity Policies at CenturyLink Cloud.
 
 ###Example Playbook
 ```yaml
@@ -390,7 +397,8 @@ Create or deletes Anti Affinity Policities at CenturyLink Cloud.
     - name: debug
       debug: var=policy
 ```
-```
+
+```yaml
 ---
 - name: Delete AA Policy
   hosts: localhost
@@ -444,6 +452,7 @@ Creates a public ip on an existing server or servers.
     - name: debug
       debug: var=clc
 ```
+
 ```yaml
 ---
 - name: Delete Public IP from Server
@@ -493,6 +502,7 @@ Create/Delete/Restore a snapshot on an existing server or servers.
         wait: True
         state: present
 ```
+
 ```yaml
 ---
 - name: Restore a snapshot on a set of servers
@@ -508,6 +518,7 @@ Create/Delete/Restore a snapshot on an existing server or servers.
         wait: True
         state: restore
 ```
+
 ```yaml
 ---
 - name: Delete a snapshot on a set of servers
@@ -538,7 +549,6 @@ Executes a blue print package on existing set of servers.
 
 ### Example Playbook
 ```yaml
----
 ---
 - name: Install a blue print package on set of servers
   hosts: localhost
@@ -588,6 +598,7 @@ Create/Delete a loadbalancer
           - { 'ipAddress': '10.82.152.16', 'privatePort': 80 }
         state: present
 ```
+
 ```yaml
 ---
 - name: Delete LoadbalancerPool
@@ -603,6 +614,7 @@ Create/Delete a loadbalancer
         port: 443
         state: port_absent
 ```
+
 ```yaml
 ---
 - name: Add nodes to an existing loadbalancer pool
@@ -621,6 +633,7 @@ Create/Delete a loadbalancer
           - { 'ipAddress': '10.82.152.18', 'privatePort': 80 }
         state: nodes_present
 ```
+
 ```yaml
 ---
 - name: Remove nodes from an existing loadbalancer pool
@@ -639,6 +652,7 @@ Create/Delete a loadbalancer
           - { 'ipAddress': '10.82.152.18', 'privatePort': 80 }
         state: nodes_absent
 ```
+
 ```yaml
 ---
 - name: Delete Loadbalancer
@@ -690,6 +704,7 @@ Create/Update/Delete an alert policy in CLC
         threshold: 80
         state: present
 ```
+
 ```yaml
 ---
 - name: Delete alert policy example
@@ -739,6 +754,7 @@ Create/Delete a Firewall Policy
         ports: ['any']
         destination_account_alias: WFAD
 ```
+
 ```yaml
 ---
 - name: Delete Firewall Policy
@@ -793,7 +809,8 @@ Create or delete Network at CenturyLink Cloud.
 
     - debug: var=net
 ```
-```
+
+```yaml
 ---
 - name: Delete Network
   hosts: localhost
@@ -843,7 +860,7 @@ ansible all -i inventory/clc_inv.py -m ping
 
 Access the CLC hostvars from a play defined in yaml:
 
-```JSON
+```yaml
 ---
 - name: Read Hostvars for Servers
   hosts: all
@@ -860,20 +877,14 @@ Our recommended approach to working with the clc-ansible-module code base is to 
 ### Create a virtual environment
 - move to your normal development space on your system.  We will be creating our virtual environment in this location.
 - Execute:`
-  virtualenv clc-ansible-module
-  `
+`virtualenv clc-ansible-module`
+`
 - Make the virutual environment active:`
-  . ./clc-ansible-module/bin/activate
-  `
+`. ./clc-ansible-module/bin/activate`
+
 
 ### Install necessary dependencies
-- `pip install nose`
-- `pip install coverage`
-- `pip install pybuilder==0.10.63`
-- `pip install mock`
-- `pip install xmlrunner`
-- `pip install ansible`
-- `pip install clc_sdk=2.44`
+- `pip install -r requirements.txt`
 
 ### Last minute updates to your environment
 Update your active PATH with reference some binaries we just installed.
@@ -881,23 +892,28 @@ Update your active PATH with reference some binaries we just installed.
   `export PATH='pwd'/clc-ansible-module/bin:$PATH`
 
 ### Get the project
-- `cd clc-ansible-module`
-- `mkdir workspace`
-- `cd workspace`
-- `git clone https://github.com/CenturyLinkCloud/clc-ansible-module.git`
-- `cd clc-ansible-module`
+```bash
+cd clc-ansible-module
+mkdir workspace
+cd workspace
+git clone https://github.com/CenturyLinkCloud/clc-ansible-module.git
+cd clc-ansible-module
+```
 
 ### Build the project
-- `mvn clean install`
-	- This step isn't required to build the module set.  It's primarily used to help the Runner team manage changes and releases.
-- `pyb -v`
+```bash
+python ./setup.py build
+python ./setup.py install
+```
+- This step isn't required to build the module set.  It's primarily used to help the Runner team manage changes and releases.
 
 ### Submitting Changes
 #####PR's are welcome!
 
 Please create an Issue in Github against the project prior to doing any custom work or submitting a PR.
 
-All changes must be submitted as PR's against the Develop branch (Github Pull Requests). - `git checkout develop`
+All changes must be submitted as PR's against the Develop branch (Github Pull Requests). - 
+`git checkout develop`
 
 Please create one PR for each change.  Please keep the change small and specific.  
 
