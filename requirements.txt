@@ -1,9 +1,9 @@
 ansible==2.0.2.0
 clc-sdk==2.44
+coverage
 future
 mock
 nose
-PyBuilder
 requests>=2.7
 setuptools
 wheel

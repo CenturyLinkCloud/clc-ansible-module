@@ -125,7 +125,6 @@ server_ids:
 
 __version__ = '${version}'
 
-from builtins import object
 from distutils.version import LooseVersion
 
 try:

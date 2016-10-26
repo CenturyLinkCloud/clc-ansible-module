@@ -189,7 +189,6 @@ from future import standard_library
 standard_library.install_aliases()
 import urllib.parse
 from time import sleep
-from builtins import object, str
 from distutils.version import LooseVersion
 
 try:
