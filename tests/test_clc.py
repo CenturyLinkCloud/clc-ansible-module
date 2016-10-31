@@ -49,7 +49,8 @@ class TestClcApiFunctions(unittest.TestCase):
 
         self.assertEqual(self.module.fail_json.called, True)
 
-    def test_override_v2_api_url_from_environment(self):
+    @patch.object(ApiV2, 'call')
+    def test_override_v2_api_url_from_environment(self, mock_call):
         under_test = ApiV2(self.module)
         original_url = under_test._default_api_url
 

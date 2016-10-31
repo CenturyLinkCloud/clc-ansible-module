@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # Copyright 2015 CenturyLink
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,115 +17,41 @@
 import clc_ansible_module.clc_group as clc_group
 from clc_ansible_module.clc_group import ClcGroup
 
-from clc import CLCException
-import clc as clc_sdk
+import urllib2
 import mock
 from mock import patch
 import unittest
 
-class TestClcServerFunctions(unittest.TestCase):
+class TestClcGroupFunctions(unittest.TestCase):
 
     def setUp(self):
         self.clc = mock.MagicMock()
         self.module = mock.MagicMock()
         self.datacenter = mock.MagicMock()
 
-    def build_mock_request_list(self, mock_server_list=None, status='succeeded'):
-        mock_request_list = [mock.MagicMock()]
-        for request in mock_request_list:
-            reqs = []
-            req1 = mock.MagicMock()
-            req1.Status.return_value = status
-            reqs.append(req1)
-            request.requests=reqs
-            request.Status.return_value = status
+    def build_mock_request_list(self, status_code=200):
+        mock_request_list = []
+        req1 = mock.MagicMock()
+        req1.code = status_code
+        mock_request_list.append(req1)
         return mock_request_list
-
-    def test_clc_module_not_found(self):
-        # Setup Mock Import Function
-        real_import = __import__
-
-        def mock_import(name, *args):
-            if name == 'clc':
-                raise ImportError
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_group)
-            clc_group.ClcGroup(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(
-            msg='clc-python-sdk required for this module')
-
-        # Reset clc_group
-        reload(clc_group)
-
-    def test_requests_invalid_version(self):
-        # Setup Mock Import Function
-        real_import = __import__
-        def mock_import(name, *args):
-            if name == 'requests':
-                args[0]['requests'].__version__ = '2.4.0'
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_group)
-            clc_group.ClcGroup(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(msg='requests library  version should be >= 2.5.0')
-
-        # Reset clc_group
-        reload(clc_group)
-
-    def test_requests_module_not_found(self):
-        # Setup Mock Import Function
-        real_import = __import__
-        def mock_import(name, *args):
-            if name == 'requests':
-                args[0]['requests'].__version__ = '2.7.0'
-                raise ImportError
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_group)
-            clc_group.ClcGroup(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(msg='requests library is required for this module')
-
-        # Reset clc_group
-        reload(clc_group)
-
-    @patch.object(ClcGroup, 'clc')
-    def test_set_clc_credentials_from_env(self, mock_clc_sdk):
-        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',
-                                       'CLC_ACCT_ALIAS': 'TEST'},
-                        clear=True):
-            under_test = ClcGroup(self.module)
-            #under_test._set_clc_credentials_from_env()
-        #self.assertEqual(under_test.v2_api_token, 'dummyToken')
-        #self.assertEqual(under_test.clc_alias, 'TEST')
-        #self.assertEqual(self.module.fail_json.called, False)
 
     def test_define_argument_spec(self):
         result = ClcGroup._define_module_argument_spec()
         self.assertIsInstance(result, dict)
 
-    @patch.object(ClcGroup, 'clc')
-    def test_walk_groups_recursive(self, mock_clc_sdk):
-        mock_child_group = mock.MagicMock()
-        sub_group = mock.MagicMock()
+    def test_walk_groups_recursive(self):
+        group_data = {'name': 'Mock Group', 'id': 'mock_id',
+                      'type': 'mock_type', 'groups': []}
         grp1 = mock.MagicMock()
         grp1.type = 'default'
-        grp2 = mock.MagicMock()
-        sub_group.groups = [grp1, grp2]
-        mock_child_group.Subgroups.return_value = sub_group
+        grp1.children = []
         under_test = ClcGroup(self.module)
-        res = under_test._walk_groups_recursive('parent', mock_child_group)
+        res = under_test._walk_groups_recursive(grp1, group_data)
         self.assertIsNotNone(res)
 
-    @patch.object(ClcGroup, '_set_clc_credentials_from_env')
-    @patch.object(clc_group, 'clc_sdk')
-    def test_process_request_state_present(self, mock_set_creds, mock_clc_sdk):
+    @patch.object(ClcGroup, '_get_group_tree_for_datacenter')
+    def test_process_request_state_present(self, mock_group_tree):
         self.module.params = {
             'location': 'UC1',
             'name': 'MyCoolGroup',
@@ -136,9 +63,8 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_group = mock.MagicMock()
         mock_group.data = {"name": "MyCoolGroup"}
 
-
         under_test = ClcGroup(self.module)
-        under_test.set_clc_credentials_from_env = mock.MagicMock()
+        under_test.api._set_clc_credentials_from_env = mock.MagicMock()
         under_test._ensure_group_is_present = mock.MagicMock(
             return_value=(
                 True,
@@ -151,9 +77,8 @@ class TestClcServerFunctions(unittest.TestCase):
             changed=True,
             group=mock_group.data)
 
-    @patch.object(ClcGroup, '_set_clc_credentials_from_env')
-    @patch.object(clc_group, 'clc_sdk')
-    def test_process_request_state_absent(self, mock_set_cres, mock_clc_sdk):
+    @patch.object(ClcGroup, '_get_group_tree_for_datacenter')
+    def test_process_request_state_absent(self, mock_group_tree):
         self.module.params = {
             'location': 'UC1',
             'name': 'MyCoolGroup',
@@ -167,7 +92,7 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_response = mock.MagicMock()
 
         under_test = ClcGroup(self.module)
-        under_test.set_clc_credentials_from_env = mock.MagicMock()
+        under_test.api._set_clc_credentials_from_env = mock.MagicMock()
         under_test._ensure_group_is_absent = mock.MagicMock(
             return_value=(
                 True,
@@ -181,7 +106,8 @@ class TestClcServerFunctions(unittest.TestCase):
             changed=True,
             group='MyCoolGroup')
 
-    def test_ensure_group_is_present_group_not_exist(self):
+    @patch.object(ClcGroup, '_create_group')
+    def test_ensure_group_is_present_group_not_exist(self, mock_create_group):
 
         # Setup Test
         mock_group = mock.MagicMock()
@@ -189,20 +115,24 @@ class TestClcServerFunctions(unittest.TestCase):
 
         mock_parent = mock.MagicMock()
         mock_parent.name = "MockParent"
+        mock_parent.children = []
         mock_parent.Create.return_value = mock_group
 
         mock_grandparent = mock.MagicMock()
         mock_grandparent.name = "MockGrandparent"
+        mock_grandparent.children = [mock_parent]
+        mock_parent.parent = mock_grandparent
 
         mock_rootgroup = mock.MagicMock()
         mock_rootgroup.name = "MockRootGroup"
-
-        mock_group_dict = {mock_parent.name: (mock_parent, mock_grandparent)}
+        mock_rootgroup.parent = None
+        mock_rootgroup.children = [mock_grandparent]
+        mock_grandparent.parent = mock_rootgroup
 
         self.module.check_mode = False
         under_test = ClcGroup(self.module)
-        under_test.group_dict = mock_group_dict
         under_test.root_group = mock_rootgroup
+        under_test._create_group.return_value = mock_group
 
         # Test
         result_changed, result_group = under_test._ensure_group_is_present(
@@ -212,7 +142,8 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(result_group, mock_group)
         self.assertFalse(self.module.fail_json.called)
 
-    def test_ensure_group_is_present_parent_not_exist(self):
+    @patch.object(ClcGroup, '_create_group')
+    def test_ensure_group_is_present_parent_not_exist(self, mock_create_group):
 
         # Setup Test
         mock_group = mock.MagicMock()
@@ -223,23 +154,26 @@ class TestClcServerFunctions(unittest.TestCase):
 
         mock_rootgroup = mock.MagicMock()
         mock_rootgroup.name = "MockRootGroup"
+        mock_rootgroup.parent = None
+        mock_rootgroup.children = []
 
-        mock_group_dict = {}
 
         under_test = ClcGroup(self.module)
-        under_test.group_dict = mock_group_dict
         under_test.root_group = mock_rootgroup
 
         # Test
         result_changed, result_group = under_test._ensure_group_is_present(
             group_name=mock_group.name, parent_name=mock_parent.name, group_description="Mock Description")
         # Assert Expected Result
+        self.assertFalse(under_test._create_group.called)
         self.module.fail_json.assert_called_once_with(
             msg="parent group: " +
             mock_parent.name +
             " does not exist")
 
-    def test_ensure_group_is_present_parent_and_group_exist(self):
+    @patch.object(ClcGroup, '_create_group')
+    def test_ensure_group_is_present_parent_and_group_exist(self,
+                                                            mock_create_group):
 
         # Setup Test
         mock_group = mock.MagicMock()
@@ -247,20 +181,18 @@ class TestClcServerFunctions(unittest.TestCase):
 
         mock_parent = mock.MagicMock()
         mock_parent.name = "MockParent"
-        mock_parent.Create.return_value = mock_group
-
-        mock_grandparent = mock.MagicMock()
-        mock_grandparent.name = "MockGrandparent"
+        mock_parent.children = [mock_group]
+        mock_group.parent = mock_parent
 
         mock_rootgroup = mock.MagicMock()
         mock_rootgroup.name = "MockRootGroup"
-
-        mock_group_dict = {mock_parent.name: (mock_parent, mock_grandparent),
-                           mock_group.name: (mock_group, mock_parent)}
+        mock_rootgroup.parent = None
+        mock_rootgroup.children = [mock_parent]
+        mock_parent.parent = mock_rootgroup
 
         under_test = ClcGroup(self.module)
-        under_test.group_dict = mock_group_dict
         under_test.root_group = mock_rootgroup
+        under_test._create_group.return_value = mock_group
 
         # Test
         result_changed, result_group = under_test._ensure_group_is_present(
@@ -270,7 +202,8 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(result_group, mock_group)
         self.assertFalse(self.module.fail_json.called)
 
-    def test_ensure_group_is_absent_group_exists(self):
+    @patch.object(ClcGroup, '_delete_group')
+    def test_ensure_group_is_absent_group_exists(self, mock_delete_group):
 
         # Setup Test
         mock_group = mock.MagicMock()
@@ -278,21 +211,28 @@ class TestClcServerFunctions(unittest.TestCase):
 
         mock_parent = mock.MagicMock()
         mock_parent.name = "MockParent"
+        mock_parent.children = [mock_group]
+        mock_group.parent = mock_parent
 
-        mock_group_dict = {mock_group.name: (mock_group, mock_parent)}
+        mock_rootgroup = mock.MagicMock()
+        mock_rootgroup.name = 'MockRootGroup'
+        mock_rootgroup.parent = None
+        mock_rootgroup.children = [mock_parent]
+        mock_parent.parent = mock_rootgroup
 
         self.module.check_mode = False
         under_test = ClcGroup(self.module)
-        under_test.group_dict = mock_group_dict
+        under_test.root_group = mock_rootgroup
 
         # Test
         result_changed, result_group, result = under_test._ensure_group_is_absent(
             group_name=mock_group.name, parent_name=mock_parent.name)
         # Assert Expected Result
         self.assertEqual(result_changed, True)
-        assert mock_group.Delete.call_count == 1
+        self.assertTrue(under_test._delete_group.called)
 
-    def test_ensure_group_is_absent_group_not_exists(self):
+    @patch.object(ClcGroup, '_delete_group')
+    def test_ensure_group_is_absent_group_not_exists(self, mock_delete_group):
 
         # Setup Test
         mock_group = mock.MagicMock()
@@ -300,89 +240,96 @@ class TestClcServerFunctions(unittest.TestCase):
 
         mock_parent = mock.MagicMock()
         mock_parent.name = "MockParent"
+        mock_parent.children = []
 
-        mock_group_dict = {}
+        mock_rootgroup = mock.MagicMock()
+        mock_rootgroup.name = 'MockRootGroup'
+        mock_rootgroup.parent = None
+        mock_rootgroup.children = [mock_parent]
+        mock_parent.parent = mock_rootgroup
 
         under_test = ClcGroup(self.module)
-        under_test.group_dict = mock_group_dict
+        under_test.root_group = mock_rootgroup
 
         # Test
         result_changed, result_group, response = under_test._ensure_group_is_absent(
             group_name=mock_group.name, parent_name=mock_parent.name)
         # Assert Expected Result
         self.assertEqual(result_changed, False)
-        self.assertFalse(mock_group.Delete.called)
+        self.assertFalse(under_test._delete_group.called)
 
     def test_create_group_exception(self):
         # Setup Test
         mock_group = mock.MagicMock()
         mock_group.name = "MockGroup"
 
-        error = CLCException('Failed')
-        error.response_text = 'group failed'
-
         mock_parent = mock.MagicMock()
         mock_parent.name = "MockParent"
-        mock_parent.Create.side_effect = error
-
-        mock_grandparent = mock.MagicMock()
-        mock_grandparent.name = "MockGrandparent"
+        mock_parent.children = [mock_group]
+        mock_group.parent = mock_parent
 
         mock_rootgroup = mock.MagicMock()
         mock_rootgroup.name = "MockRootGroup"
-
-        mock_group_dict = {mock_parent.name: (mock_parent, mock_grandparent),
-                           mock_group.name: (mock_group, mock_parent)}
+        mock_rootgroup.children = [mock_parent]
+        mock_parent.parent = mock_rootgroup
 
         under_test = ClcGroup(self.module)
-        under_test.group_dict = mock_group_dict
         under_test.root_group = mock_rootgroup
+
+        fp = mock.MagicMock()
+        error = urllib2.HTTPError('http://unittest.com', 404, 'NOT FOUND',
+                                  {}, fp)
+        under_test.api = mock.MagicMock()
+        under_test.api.call.side_effect = error
+
         ret = under_test._create_group('test', mock_parent.name, 'test')
         self.assertIsNone(ret, 'The return value should be None')
-        self.module.fail_json.assert_called_once_with(msg='Failed to create group :test. group failed')
+        self.module.fail_json.assert_called_once_with(
+            msg='Failed to create group :test. {0}'.format(error))
 
     def test_delete_group_exception(self):
         # Setup Test
         mock_group = mock.MagicMock()
         mock_group.name = "test"
 
-        error = CLCException('Failed')
-        error.response_text = 'group failed'
-        mock_group.Delete.side_effect = error
-
         mock_parent = mock.MagicMock()
         mock_parent.name = "MockParent"
-
-        mock_grandparent = mock.MagicMock()
-        mock_grandparent.name = "MockGrandparent"
+        mock_parent.children = [mock_group]
+        mock_group.parent = mock_parent
 
         mock_rootgroup = mock.MagicMock()
         mock_rootgroup.name = "MockRootGroup"
-
-        mock_group_dict = {mock_parent.name: (mock_parent, mock_grandparent),
-                           mock_group.name: (mock_group, mock_parent)}
+        mock_rootgroup.children = [mock_parent]
+        mock_parent.parent = mock_rootgroup
 
         under_test = ClcGroup(self.module)
-        under_test.group_dict = mock_group_dict
         under_test.root_group = mock_rootgroup
-        ret = under_test._delete_group('test')
+
+        fp = mock.MagicMock()
+        error = urllib2.HTTPError('http://unittest.com', 404, 'NOT FOUND',
+                                  {}, fp)
+        under_test.api = mock.MagicMock()
+        under_test.api.call.side_effect = error
+
+        ret = under_test._delete_group('test', mock_parent.name)
         self.assertIsNone(ret, 'The return value should be None')
-        self.module.fail_json.assert_called_once_with(msg='Failed to delete group :test. group failed')
+        self.module.fail_json.assert_called_once_with(
+            msg='Failed to delete group :test. {0}'.format(error))
 
     def test_wait_for_requests_to_complete_req_successful(self):
-        mock_request_list = self.build_mock_request_list(status='succeeded')
+        mock_request_list = self.build_mock_request_list(status_code=200)
         under_test = ClcGroup(self.module)._wait_for_requests_to_complete
         under_test(mock_request_list)
         self.assertFalse(self.module.fail_json.called)
 
     def test_wait_for_requests_to_complete_req_failed(self):
-        mock_request_list = self.build_mock_request_list(status='failed')
+        mock_request_list = self.build_mock_request_list(status_code=404)
         under_test = ClcGroup(self.module)._wait_for_requests_to_complete
         under_test(mock_request_list)
         self.module.fail_json.assert_called_once_with(msg='Unable to process group request')
 
     def test_wait_for_requests_to_complete_no_wait(self):
-        mock_request_list = self.build_mock_request_list(status='failed')
+        mock_request_list = self.build_mock_request_list(status_code=404)
         params = {
             'wait': False
         }
