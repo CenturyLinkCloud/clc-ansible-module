@@ -225,6 +225,7 @@ group:
 
 __version__ = '${version}'
 
+import clc_ansible_utils.clc
 from distutils.version import LooseVersion
 
 try:
@@ -258,7 +259,10 @@ class ClcGroup(object):
         Construct module
         """
         self.clc = clc_sdk
+        self.api = clc_ansible_utils.clc.ApiV2(module)
         self.module = module
+        self.root_group = None
+        # TODO: Replace group_dict with a true tree of objects
         self.group_dict = {}
 
         if not CLC_FOUND:
@@ -270,8 +274,6 @@ class ClcGroup(object):
         if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
             self.module.fail_json(
                 msg='requests library  version should be >= 2.5.0')
-        self._headers = {'Content-Type': 'application/json'}
-        self._set_user_agent()
 
     def process_request(self):
         """
@@ -284,7 +286,6 @@ class ClcGroup(object):
         group_description = self.module.params.get('description')
         state = self.module.params.get('state')
 
-        self._set_clc_credentials_from_env()
         self.group_dict = self._get_group_tree_for_datacenter(
             datacenter=location)
 
@@ -317,45 +318,6 @@ class ClcGroup(object):
             wait=dict(type='bool', default=True))
 
         return argument_spec
-
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials on the sdk by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        self.api_url = env.get('CLC_V2_API_URL', 'https://api.ctl.io')
-
-        if v2_api_token and clc_alias:
-            self.v2_api_token = v2_api_token
-            self.clc_alias = clc_alias
-        elif v2_api_username and v2_api_passwd:
-            try:
-                response = open_url(
-                    url=self.api_url + '/v2/authentication/login',
-                    method='POST',
-                    headers=self._headers,
-                    data=json.dumps({'username': v2_api_username,
-                                     'password': v2_api_passwd}))
-            # TODO: Handle different response codes from API
-            except urllib2.HTTPError as ex:
-                return self.module.fail_json(msg=ex)
-            if response.code not in [200]:
-                return self.module.fail_json(
-                    msg='Failed to authenticate with clc V2 api.')
-
-            r = json.loads(response.read())
-            self.v2_api_token = r['bearerToken']
-            self.clc_alias = r['accountAlias']
-            self.clc_location = r['locationAlias']
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
 
     def _ensure_group_is_absent(self, group_name, parent_name):
         """
@@ -473,54 +435,29 @@ class ClcGroup(object):
         :return: a dictionary of groups and parents
         """
         if datacenter is None:
-            datacenter = self.clc_location
+            datacenter = self.api.clc_location
         # TODO: Remove clc_sdk dependency
-        try:
-            headers = {'Authorization': 'Bearer {0}'.format(
-                self.v2_api_token)}
-            headers.update(self._headers)
-            response = open_url(
-                url='{0}/v2/datacenters/{1}/{2}'.format(
-                    self.api_url, self.clc_alias, datacenter),
-                method='GET',
-                headers=headers,
-                data={'GroupLinks': 'true'})
-        # TODO: Handle different response codes from API
-        except urllib2.HTTPError as ex:
-            return self.module.fail_json(msg=ex)
-        #if response.code not in [200]:
-        #    return self.module.fail_json(
-        #        msg='Failed to authenticate with clc V2 api.')
+        response = self.api.call(
+            'GET', '/v2/datacenters/{0}/{1}'.format(self.api.clc_alias,
+                                                    datacenter),
+            data={'GroupLinks': 'true'})
 
         r = json.loads(response.read())
         root_group_id, root_group_name = [(obj['id'], obj['name'])
                                           for obj in r['links']
                                           if obj['rel'] == "group"][0]
 
-        try:
-            headers = {'Authorization': 'Bearer {0}'.format(
-                self.v2_api_token)}
-            headers.update(self._headers)
-            response = open_url(
-                url='{0}/v2/groups/{1}/{2}'.format(
-                    self.api_url, self.clc_alias, root_group_id),
-                method='GET',
-                headers=headers)
-        # TODO: Handle different response codes from API
-        except urllib2.HTTPError as ex:
-            return self.module.fail_json(msg=ex)
+        response = self.api.call(
+            'GET', '/v2/groups/{0}/{1}'.format(self.api.clc_alias,
+                                               root_group_id))
 
         self.group_data = json.loads(response.read())
         # TODO: Replicate functionality of Group.Subgroups()
         # Basically iterate through all the groups and save off the info
         # Need to figure out expected data structure
 
-
-        self.root_group = self.clc.v2.Datacenter(
-            location=datacenter).RootGroup()
-        return self._walk_groups_recursive(
-            parent_group=None,
-            child_group=self.root_group)
+        #self.root_group = self._group_from_data(self.group_data)
+        self.root_group = self._walk_groups_recursive(None, self.group_data)
 
     def _walk_groups_recursive(self, parent_group, group_data):
         """
@@ -529,24 +466,35 @@ class ClcGroup(object):
         :param child_group: clc_sdk.Group - the child group to start the walk
         :return: a dictionary of groups and parents
         """
-        group = self._group_object(group_data)
-        result = {group['name']: (group, parent_group)}
+        group = self._group_from_data(group_data)
+        group.parent = parent_group
         for child_data in group_data['groups']:
             if child_data['type'] != 'default':
                 continue
-            result.update(self._walk_groups_recursive(group, child_data))
-        return result
+            group.children.append(self._walk_groups_recursive(group, child_data))
+        return group
 
-    def _group_object(self, group_data):
+    def _group_from_data(self, group_data):
         """
         Construct a group object that maps JSON dictionary values to attributes
         :param group_data:
         :return: An object that contains
         """
-        group = object()
+        group = clc_ansible_utils.clc.Group()
         for attr in ['id', 'name', 'description', 'type']:
-            setattr(group, attr, group_data[attr])
+            if attr in group_data:
+                setattr(group, attr, group_data[attr])
         return group
+
+    def _group_by_name_recursive(self, group_name, group=None):
+        groups = []
+        if group is None:
+            group = self.root_group
+        if group_name == group.name:
+            groups.append(group)
+        for child_group in group.children:
+            groups += self._group_by_name_recursive(group_name, child_group)
+        return groups
 
     def _wait_for_requests_to_complete(self, requests_lst):
         """
@@ -562,14 +510,6 @@ class ClcGroup(object):
                 if request_details.Status() != 'succeeded':
                     self.module.fail_json(
                         msg='Unable to process group request')
-
-    def _set_user_agent(self):
-        # Helpful ansible open_url params
-        # data, headers, http-agent
-        agent_string = 'ClcAnsibleModule/' + __version__
-        self._headers['Api-Client'] = agent_string
-        self._headers['User-Agent'] = 'Python-urllib2/{0} {1}'.format(
-            urllib2.__version__, agent_string)
 
 
 def main():
