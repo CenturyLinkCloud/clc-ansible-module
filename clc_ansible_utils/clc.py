@@ -97,7 +97,8 @@ class Network(object):
         self.type = None
         if network_data is not None:
             self.data = network_data
-            for attr in ['id', 'name', 'cidr', 'description', 'type']:
+            for attr in ['id', 'name', 'description', 'type',
+                         'cidr', 'gateway', 'netmask']:
                 if attr in network_data:
                     setattr(self, attr, network_data[attr])
 
@@ -399,7 +400,36 @@ def group_path(group, group_id=False, delimiter='/'):
     return delimiter.join(reversed(path_elements))
 
 
-def find_network(module, clc_auth, datacenter, network_id_search=None):
+def networks_in_datacenter(module, clc_auth, datacenter):
+    """
+    Return list of networks in datacenter
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param datacenter: the datacenter to search for a network id
+    :return: A list of Network objects
+    """
+    networks = []
+    if 'clc_location' not in clc_auth:
+        clc_auth = authenticate(module)
+
+    try:
+        temp_auth = clc_auth.copy()
+        temp_auth['v2_api_url'] = 'https://api.ctl.io/v2-experimental/'
+        response = call_clc_api(
+            module, temp_auth,
+            'GET', '/networks/{alias}/{location}'.format(
+                alias=temp_auth['clc_alias'], location=datacenter))
+        networks = [Network(n) for n in response]
+        return networks
+    except ClcApiException:
+        return module.fail_json(
+            msg=str(
+                "Unable to find a network in location: " +
+                datacenter))
+
+
+def find_network(module, clc_auth, datacenter,
+                 network_id_search=None, networks=None):
     """
     Validate the provided network id or return a default.
     :param module: Ansible module being called
@@ -411,34 +441,19 @@ def find_network(module, clc_auth, datacenter, network_id_search=None):
     network_found = None
     # Validates provided network id
     # Allows lookup of network by id, name, or cidr notation
+    if not networks:
+        networks = networks_in_datacenter(module, clc_auth, datacenter)
 
-    try:
-        temp_auth = clc_auth.copy()
-        temp_auth['v2_api_url'] = 'https://api.ctl.io/v2-experimental/'
-        networks = call_clc_api(
-            module, temp_auth,
-            'GET', '/networks/{alias}/{location}'.format(
-                alias=temp_auth['clc_alias'], location=datacenter))
-        if network_id_search:
-            for network in networks:
-                if network_id_search.lower() in [network['id'].lower(),
-                                                 network['name'].lower(),
-                                                 network['cidr'].lower()]:
-                    network_found = network
-                    break
-            if not network_found:
-                return module.fail_json(
-                    msg='No matching network: {network} '
-                        'found in location: {location}'.format(
-                            network=network_id_search, location=datacenter))
-        else:
-            network_found = networks[0]
-        return network_found
-    except ClcApiException:
-        return module.fail_json(
-            msg=str(
-                "Unable to find a network in location: " +
-                datacenter))
+    if network_id_search:
+        for network in networks:
+            if network_id_search.lower() in [network.id.lower(),
+                                             network.name.lower(),
+                                             network.cidr.lower()]:
+                network_found = network
+                break
+    else:
+        network_found = networks[0]
+    return network_found
 
 
 def find_server(module, clc_auth, server_id):

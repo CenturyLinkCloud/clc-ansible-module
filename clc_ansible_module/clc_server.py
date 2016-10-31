@@ -959,7 +959,12 @@ class ClcServer(object):
 
         network = clc_common.find_network(
             self.module, self.clc_auth, datacenter, network_id_search)
-        return network['id']
+        if network is None:
+            return self.module.fail_json(
+                msg='No matching network: {network} '
+                    'found in location: {location}'.format(
+                        network=network_id_search, location=datacenter))
+        return network.id
 
     def _find_aa_policy_id(self):
         """

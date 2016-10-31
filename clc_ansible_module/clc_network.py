@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # CenturyLink Cloud Ansible Modules.
 #
@@ -63,7 +64,6 @@ options:
     choices: [True, False]
 requirements:
     - python = 2.7
-    - requests >= 2.5.0
     - clc-sdk
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
@@ -161,14 +161,8 @@ network:
 
 __version__ = '${version}'
 
-from distutils.version import LooseVersion
-
-try:
-    import requests
-except ImportError:
-    REQUESTS_FOUND = False
-else:
-    REQUESTS_FOUND = True
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
 
 #
 #  Requires the clc-python-sdk.
@@ -193,22 +187,13 @@ class ClcNetwork(object):
         """
         Construct module
         """
+        self.clc_auth = {}
         self.module = module
-        self.network_dict = {}
         self.networks = None
 
         if not CLC_FOUND:
             self.module.fail_json(
                 msg='clc-python-sdk required for this module')
-        if not REQUESTS_FOUND:
-            self.module.fail_json(
-                msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(
-                requests.__version__) < LooseVersion('2.5.0'):
-            self.module.fail_json(
-                msg='requests library  version should be >= 2.5.0')
-
-        self._set_user_agent(self.clc)
 
     @staticmethod
     def _define_module_argument_spec():
@@ -226,34 +211,6 @@ class ClcNetwork(object):
         )
         return argument_spec
 
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials on the sdk by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        api_url = env.get('CLC_V2_API_URL', False)
-
-        if api_url:
-            self.clc.defaults.ENDPOINT_URL_V2 = api_url
-
-        if v2_api_token and clc_alias:
-            self.clc._LOGIN_TOKEN_V2 = v2_api_token
-            self.clc._V2_ENABLED = True
-            self.clc.ALIAS = clc_alias
-        elif v2_api_username and v2_api_passwd:
-            self.clc.v2.SetCredentials(
-                api_username=v2_api_username,
-                api_passwd=v2_api_passwd)
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
-
     # Module Behavior Goodness
     def process_request(self):
         """
@@ -263,8 +220,7 @@ class ClcNetwork(object):
         network = None
         p = self.module.params
 
-        self._set_clc_credentials_from_env()
-
+        self.clc_auth = clc_common.authenticate(self.module)
         self.networks = self._populate_networks(p.get('location'))
 
         if p.get('state') == 'absent':
@@ -283,22 +239,25 @@ class ClcNetwork(object):
         self.module.exit_json(changed=changed, network=network)
 
     def _populate_networks(self, location):
-        return self.clc.v2.Networks(location=location)
+        if 'clc_location' not in self.clc_auth:
+            self.clc_auth = clc_common.authenticate(self.module)
+        if not location:
+            location = self.clc_auth['clc_location']
+        else:
+            # Override authentication with user-provided location
+            self.clc_auth['clc_location'] = location
 
-    @staticmethod
-    def _set_user_agent(clc):
-        if hasattr(clc, 'SetRequestsSession'):
-            agent_string = "ClcAnsibleModule/" + __version__
-            ses = requests.Session()
-            ses.headers.update({"Api-Client": agent_string})
-            ses.headers['User-Agent'] += " " + agent_string
-            clc.SetRequestsSession(ses)
+        return clc_common.networks_in_datacenter(self.module, self.clc_auth,
+                                                 location)
 
     def _ensure_network_absent(self, params):
         changed = False
+        search_key = params.get('id', None) or params.get('name', None)
         location = params.get('location')
 
-        network = self.networks.Get(params.get('id'))
+        network = clc_common.find_network(self.module, self.clc_auth,
+                                          network_search_id=search_key,
+                                          networks=self.networks)
 
         if network is not None:
             if not self.module.check_mode:
@@ -309,7 +268,12 @@ class ClcNetwork(object):
 
     def _ensure_network_present(self, params):
         search_key = params.get('id', None) or params.get('name', None)
-        network = self.networks.Get(search_key)
+        if not search_key:
+            return self.module.fail_json(
+                msg='Must specify either a network name or id')
+        network = clc_common.find_network(self.module, self.clc_auth,
+                                          network_search_id=search_key,
+                                          networks=self.networks)
 
         if network is None:
             changed = True
