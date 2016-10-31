@@ -1,5 +1,5 @@
-ansible==2.0.2.0
-clc-sdk==2.44
+ansible>=2.1
+clc-sdk>=2.45
 coverage
 future
 mock

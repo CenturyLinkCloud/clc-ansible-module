@@ -39,15 +39,15 @@
 
     - name: Wait for SSH to Come up on New Servers
       wait_for: host={{ item.ipaddress }} port=22 delay=5 timeout=320 state=started
-      with_items: clc.servers
+      with_items: {{ clc.servers }}
 
     - name: Update known_hosts With New Servers
       shell: "ssh-keygen -R {{ item.ipaddress }} && ssh-keyscan -t rsa -H {{ item.ipaddress }} >> ~/.ssh/known_hosts"
-      with_items: clc.servers
+      with_items: {{ clc.servers }}
 
     - name: Deploy Ssh Key to New Servers
       shell: "echo '{{ public_key }}'|sshpass -p '{{ serverpass.stdout }}' ssh root@{{ item.ipaddress }} 'cat >> ~/.ssh/authorized_keys'"
-      with_items: clc.servers
+      with_items: {{ clc.servers }}
 
     - name: Add New Servers to the newservers Group
       add_host:
@@ -55,7 +55,7 @@
         ansible_ssh_host={{ item.ipaddress }}
         ansible_ssh_user=root
         groupname=newservers
-      with_items: clc.servers
+      with_items: {{ clc.servers }}
 
 - name: Add Deployment User
   hosts: newservers

@@ -95,14 +95,15 @@ class TestClcServerFunctions(unittest.TestCase):
         reload(clc_group)
 
     def test_clc_set_credentials_w_creds(self):
-        with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
-            with patch.object(clc_group, 'clc_sdk') as mock_clc_sdk:
-                under_test = ClcGroup(self.module)
-                under_test._set_clc_credentials_from_env()
-
-        mock_clc_sdk.v2.SetCredentials.assert_called_once_with(
-            api_username='hansolo',
-            api_passwd='falcon')
+        under_test = ClcGroup(self.module)
+        with patch.dict('os.environ',
+                        {'CLC_V2_API_USERNAME': 'dummy_username',
+                         'CLC_V2_API_PASSWD': 'dummy_passwd'},
+                        clear=True):
+            under_test._set_clc_credentials_from_env()
+        # Should fail with an HTTP error code of 400 for bad user/passwd
+        # TODO: Set up better mock to fully test response from API
+        self.assertEqual(self.module.fail_json.called, True)
 
     def test_clc_set_credentials_w_no_creds(self):
         with patch.dict('os.environ', {}, clear=True):
@@ -118,30 +119,32 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test._set_clc_credentials_from_env()
         self.assertEqual(clc_sdk.defaults.ENDPOINT_URL_V2, original_url)
 
-        with patch.dict('os.environ', {'CLC_V2_API_URL': 'http://unittest.example.com/'}):
+        with patch.dict('os.environ',
+                        {'CLC_V2_API_URL': 'http://unittest.example.com/'},
+                        clear=True):
             under_test._set_clc_credentials_from_env()
 
-        self.assertEqual(
-            clc_sdk.defaults.ENDPOINT_URL_V2,
-            'http://unittest.example.com/')
+        self.assertEqual(under_test.api_url,
+                         'http://unittest.example.com/')
 
         clc_sdk.defaults.ENDPOINT_URL_V2 = original_url
 
-    @patch.object(clc_group, 'clc_sdk')
-    def test_set_user_agent(self, mock_clc_sdk):
-        clc_group.__version__ = "1"
-        ClcGroup._set_user_agent(mock_clc_sdk)
-
-        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
+    def test_set_user_agent(self):
+        under_test = ClcGroup(self.module)
+        self.assertTrue(hasattr(under_test, '_headers'))
+        under_test._set_user_agent()
+        self.assertIn('ClcAnsibleModule', under_test._headers['Api-Client'])
+        self.assertIn('ClcAnsibleModule', under_test._headers['User-Agent'])
 
     @patch.object(ClcGroup, 'clc')
     def test_set_clc_credentials_from_env(self, mock_clc_sdk):
         with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',
-                                       'CLC_ACCT_ALIAS': 'TEST'}):
+                                       'CLC_ACCT_ALIAS': 'TEST'},
+                        clear=True):
             under_test = ClcGroup(self.module)
             under_test._set_clc_credentials_from_env()
-        self.assertEqual(under_test.clc._LOGIN_TOKEN_V2, 'dummyToken')
-        self.assertFalse(mock_clc_sdk.v2.SetCredentials.called)
+        self.assertEqual(under_test.v2_api_token, 'dummyToken')
+        self.assertEqual(under_test.clc_alias, 'TEST')
         self.assertEqual(self.module.fail_json.called, False)
 
     def test_define_argument_spec(self):

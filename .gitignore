@@ -6,6 +6,7 @@ coverage.xml
 nosetests.xml
 target
 build/
+dist/
 *.egg-info/
 .eggs/
 .vagrant/
