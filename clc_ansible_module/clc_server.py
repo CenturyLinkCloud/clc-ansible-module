@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # CenturyLink Cloud Ansible Modules.
 #
@@ -513,15 +514,8 @@ servers:
 
 __version__ = '${version}'
 
-from time import sleep
-from distutils.version import LooseVersion
-
-try:
-    import requests
-except ImportError:
-    REQUESTS_FOUND = False
-else:
-    REQUESTS_FOUND = True
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
 
 #
 #  Requires the clc-python-sdk.
@@ -545,9 +539,10 @@ class ClcServer(object):
         """
         Construct module
         """
+        self.clc_auth = {}
         self.clc = clc_sdk
         self.module = module
-        self.group_dict = {}
+        self.root_group = None
 
         if not CLC_FOUND:
             self.module.fail_json(
@@ -571,10 +566,8 @@ class ClcServer(object):
         new_server_ids = []
         server_dict_array = []
 
-        self._set_clc_credentials_from_env()
-        self.module.params = self._validate_module_params(
-            self.clc,
-            self.module)
+        self.clc_auth = clc_common.authenticate(self.module)
+        self.module.params = self._validate_module_params()
         p = self.module.params
         state = p.get('state')
 
@@ -631,10 +624,14 @@ class ClcServer(object):
         wait = self.module.params.get('wait')
         if wait:
             datacenter = self._find_datacenter(self.clc, self.module)
-            group = ClcServer._find_group(module=self.module, datacenter=datacenter, lookup_group=p.get('group'))
+            group = self._find_group(datacenter, lookup_group=p.get('group'))
+            # TODO: Get servers for group and fix return JSON value
             servers = group.Servers().Servers()
-            group = group.data
-            group['servers'] = [s.id for s in servers]
+            try:
+                group = group.data
+                group['servers'] = [s.id for s in servers]
+            except AttributeError:
+                group = group.name
 
         self.module.exit_json(
             changed=changed,
@@ -726,58 +723,35 @@ class ClcServer(object):
         return {"argument_spec": argument_spec,
                 "mutually_exclusive": mutually_exclusive}
 
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials on the sdk by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        api_url = env.get('CLC_V2_API_URL', False)
-        if api_url:
-            self.clc.defaults.ENDPOINT_URL_V2 = api_url
-
-        if v2_api_token and clc_alias:
-            self.clc._LOGIN_TOKEN_V2 = v2_api_token
-            self.clc._V2_ENABLED = True
-            self.clc.ALIAS = clc_alias
-        elif v2_api_username and v2_api_passwd:
-            self.clc.v2.SetCredentials(
-                api_username=v2_api_username,
-                api_passwd=v2_api_passwd)
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
-
-    @staticmethod
-    def _validate_module_params(clc, module):
+    def _validate_module_params(self):
         """
         Validate the module params, and lookup default values.
         :param clc: clc-sdk instance to use
         :param module: module to validate
         :return: dictionary of validated params
         """
+        clc = self.clc
+        module = self.module
         params = module.params
         datacenter = ClcServer._find_datacenter(clc, module)
 
         # Grab the alias so that we can properly validate server name
-        alias = ClcServer._find_alias(clc, module)
+        alias = self._find_alias()
+
+        root_group = clc_common.group_tree(self.module, self.clc_auth,
+                                           alias=alias, datacenter=datacenter)
 
         ClcServer._validate_types(module)
         ClcServer._validate_name(module, alias)
         ClcServer._validate_counts(module)
 
         params['alias'] = alias
+        params['group'] = self._find_group(datacenter).id
         params['cpu'] = ClcServer._find_cpu(clc, module)
         params['memory'] = ClcServer._find_memory(clc, module)
         params['description'] = ClcServer._find_description(module)
-        params['ttl'] = ClcServer._find_ttl(clc, module)
+        params['ttl'] = ClcServer._find_ttl(module)
         params['template'] = ClcServer._find_template_id(module, datacenter)
-        params['group'] = ClcServer._find_group(module, datacenter).id
         params['network_id'] = ClcServer._find_network_id(module, datacenter)
         params['anti_affinity_policy_id'] = ClcServer._find_aa_policy_id(
             clc,
@@ -787,6 +761,25 @@ class ClcServer(object):
             module)
 
         return params
+
+    def _group_defaults(self, group, key):
+        if not hasattr(group, 'defaults'):
+            try:
+                if 'clc_alias' not in self.clc_auth:
+                    self.clc_auth = clc_common.authenticate(self.module)
+                response = clc_common.call_clc_api(
+                    self.module, self.clc_auth,
+                    'GET', '/groups/{0}/{1}/defaults'.format(
+                        self.clc_auth['clc_alias'], group.id))
+                group.defaults = json.load(response.read())
+            except ClcApiException as ex:
+                self.module.fail_json(
+                    msg='Failed to get group defaults for group: {0}'.format(
+                        group.name))
+        try:
+            return group.defaults[key]['value']
+        except KeyError:
+            return None
 
     @staticmethod
     def _find_datacenter(clc, module):
@@ -808,22 +801,21 @@ class ClcServer(object):
                 msg=str(
                     "Unable to find location: {0}".format(location)))
 
-    @staticmethod
-    def _find_alias(clc, module):
+    def _find_alias(self):
         """
         Find or Validate the Account Alias by calling the CLC API
-        :param clc: clc-sdk instance to use
-        :param module: module to validate
-        :return: clc-sdk.Account instance
+        :return: Account alias
         """
-        alias = module.params.get('alias')
+        alias = self.module.params.get('alias')
         if not alias:
             try:
-                alias = clc.v2.Account.GetAlias()
-            except CLCException as ex:
-                module.fail_json(msg='Unable to find account alias. {0}'.format(
-                    ex.message
-                ))
+                if 'clc_alias' not in self.clc_auth:
+                    self.clc_auth = clc_common.authenticate(self.module)
+                alias = self.clc_auth['clc_alias']
+            except ClcApiException as ex:
+                self.module.fail_json(
+                    msg='Unable to find account alias. {0}'.format(
+                        ex.message))
         return alias
 
     @staticmethod
@@ -936,7 +928,7 @@ class ClcServer(object):
             module.fail_json(msg=str("min_count can't be greater than max_count"))
 
     @staticmethod
-    def _find_ttl(clc, module):
+    def _find_ttl(module):
         """
         Validate that TTL is > 3600 if set, and fail if not
         :param clc: clc-sdk instance to use
@@ -954,7 +946,9 @@ class ClcServer(object):
         if ttl <= 3600:
             return module.fail_json(msg=str("Ttl cannot be <= 3600"))
         else:
-            ttl = clc.v2.time_utils.SecondsToZuluTS(int(time.time()) + ttl)
+            ttl = (datetime.datetime.utcnow() +
+                   datetime.timedelta(seconds=ttl)).strftime(
+                        '%Y-%m-%dT%H:%M:%SZ')
         return ttl
 
     @staticmethod
@@ -1181,7 +1175,7 @@ class ClcServer(object):
                 msg="you must use the 'count_group option with max_count")
 
         servers, running_servers = self._find_running_servers_by_group(
-            module, datacenter, count_group)
+            datacenter, count_group)
 
         if exact_count:
             if len(running_servers) < exact_count:
@@ -1469,8 +1463,7 @@ class ClcServer(object):
                     server.id))
         return result
 
-    @staticmethod
-    def _find_running_servers_by_group(module, datacenter, count_group):
+    def _find_running_servers_by_group(self, datacenter, count_group):
         """
         Find a list of running servers in the provided group
         :param module: the AnsibleModule object
@@ -1478,8 +1471,7 @@ class ClcServer(object):
         :param count_group: the group to count the servers
         :return: list of servers, and list of running servers
         """
-        group = ClcServer._find_group(
-            module=module,
+        group = self._find_group(
             datacenter=datacenter,
             lookup_group=count_group)
 
@@ -1488,62 +1480,31 @@ class ClcServer(object):
 
         return servers, running_servers
 
-    @staticmethod
-    def _find_group(module, datacenter, lookup_group=None):
+    def _find_group(self, datacenter, lookup_group=None):
         """
         Find a server group in a datacenter by calling the CLC API
-        :param module: the AnsibleModule instance
-        :param datacenter: clc-sdk.Datacenter instance to search for the group
+        :param datacenter: Datacenter identifier to search for the group
         :param lookup_group: string name of the group to search for
         :return: clc-sdk.Group instance
         """
+        group = None
         if not lookup_group:
-            lookup_group = module.params.get('group')
+            lookup_group = self.module.params.get('group')
         try:
-            return datacenter.Groups().Get(lookup_group)
-        except CLCException:
+            if not self.root_group:
+                self.root_group = clc_common.group_tree(
+                    self.module, self.clc_auth, datacenter=datacenter)
+            group = clc_common.find_group(self.module, self.root_group,
+                                          lookup_group)
+        except ClcApiException:
             pass
 
-        # The search above only acts on the main
-        result = ClcServer._find_group_recursive(
-            module,
-            datacenter.Groups(),
-            lookup_group)
+        if group is None:
+            self.module.fail_json(
+                msg='Unable to find group: {0} in location: {1}'.format(
+                    lookup_group, datacenter))
 
-        if result is None:
-            module.fail_json(
-                msg=str(
-                    "Unable to find group: " +
-                    lookup_group +
-                    " in location: " +
-                    datacenter.id))
-
-        return result
-
-    @staticmethod
-    def _find_group_recursive(module, group_list, lookup_group):
-        """
-        Find a server group by recursively walking the tree
-        :param module: the AnsibleModule instance to use
-        :param group_list: a list of groups to search
-        :param lookup_group: the group to look for
-        :return: list of groups
-        """
-        result = None
-        for group in group_list.groups:
-            subgroups = group.Subgroups()
-            try:
-                return subgroups.Get(lookup_group)
-            except CLCException:
-                result = ClcServer._find_group_recursive(
-                    module,
-                    subgroups,
-                    lookup_group)
-
-            if result is not None:
-                break
-
-        return result
+        return group
 
     @staticmethod
     def _create_clc_server(
@@ -1682,14 +1643,14 @@ class ClcServer(object):
                 if retry_count == 0:
                     return module.fail_json(
                         msg='Unable to reach the CLC API after {0} attempts'.format(retries))
-                sleep(back_out)
+                time.sleep(back_out)
                 back_out *= 2
             except requests.exceptions.ConnectionError as ce:
                 # retry on connection error
                 if retry_count == 0:
                     return module.fail_json(
                         msg='Unable to connect to the CLC API after {0} attempts. {1}'.format(retries, ce.message))
-                sleep(back_out)
+                time.sleep(back_out)
                 back_out *= 2
 
     @staticmethod
@@ -1713,5 +1674,6 @@ def main():
     clc_server.process_request()
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
+from ansible.module_utils.urls import *  # pylint: disable=W0614
 if __name__ == '__main__':
     main()
