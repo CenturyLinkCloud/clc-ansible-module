@@ -17,6 +17,9 @@
 import clc_ansible_module.clc_group as clc_group
 from clc_ansible_module.clc_group import ClcGroup
 
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
+
 import urllib2
 import mock
 from mock import patch
@@ -50,8 +53,10 @@ class TestClcGroupFunctions(unittest.TestCase):
         res = under_test._walk_groups_recursive(grp1, group_data)
         self.assertIsNotNone(res)
 
+    @patch.object(clc_group, 'clc_common')
     @patch.object(ClcGroup, '_get_group_tree_for_datacenter')
-    def test_process_request_state_present(self, mock_group_tree):
+    def test_process_request_state_present(self, mock_group_tree,
+                                           mock_clc_common):
         self.module.params = {
             'location': 'UC1',
             'name': 'MyCoolGroup',
@@ -64,7 +69,6 @@ class TestClcGroupFunctions(unittest.TestCase):
         mock_group.data = {"name": "MyCoolGroup"}
 
         under_test = ClcGroup(self.module)
-        under_test.api._set_clc_credentials_from_env = mock.MagicMock()
         under_test._ensure_group_is_present = mock.MagicMock(
             return_value=(
                 True,
@@ -77,8 +81,10 @@ class TestClcGroupFunctions(unittest.TestCase):
             changed=True,
             group=mock_group.data)
 
+    @patch.object(clc_group, 'clc_common')
     @patch.object(ClcGroup, '_get_group_tree_for_datacenter')
-    def test_process_request_state_absent(self, mock_group_tree):
+    def test_process_request_state_absent(self, mock_group_tree,
+                                          mock_clc_common):
         self.module.params = {
             'location': 'UC1',
             'name': 'MyCoolGroup',
@@ -92,7 +98,6 @@ class TestClcGroupFunctions(unittest.TestCase):
         mock_response = mock.MagicMock()
 
         under_test = ClcGroup(self.module)
-        under_test.api._set_clc_credentials_from_env = mock.MagicMock()
         under_test._ensure_group_is_absent = mock.MagicMock(
             return_value=(
                 True,
@@ -258,7 +263,8 @@ class TestClcGroupFunctions(unittest.TestCase):
         self.assertEqual(result_changed, False)
         self.assertFalse(under_test._delete_group.called)
 
-    def test_create_group_exception(self):
+    @patch.object(clc_group, 'clc_common')
+    def test_create_group_exception(self, mock_clc_common):
         # Setup Test
         mock_group = mock.MagicMock()
         mock_group.name = "MockGroup"
@@ -275,19 +281,19 @@ class TestClcGroupFunctions(unittest.TestCase):
 
         under_test = ClcGroup(self.module)
         under_test.root_group = mock_rootgroup
+        under_test.clc_auth = {'clc_alias': 'MockClcAlias'}
 
-        fp = mock.MagicMock()
-        error = urllib2.HTTPError('http://unittest.com', 404, 'NOT FOUND',
-                                  {}, fp)
-        under_test.api = mock.MagicMock()
-        under_test.api.call.side_effect = error
+        error = ClcApiException()
+        error.message = 'Mock Error Message'
+        mock_clc_common.call_clc_api.side_effect = error
 
         ret = under_test._create_group('test', mock_parent.name, 'test')
         self.assertIsNone(ret, 'The return value should be None')
         self.module.fail_json.assert_called_once_with(
-            msg='Failed to create group :test. {0}'.format(error))
+            msg='Failed to create group :test. {0}'.format(error.message))
 
-    def test_delete_group_exception(self):
+    @patch.object(clc_group, 'clc_common')
+    def test_delete_group_exception(self, mock_clc_common):
         # Setup Test
         mock_group = mock.MagicMock()
         mock_group.name = "test"
@@ -304,17 +310,16 @@ class TestClcGroupFunctions(unittest.TestCase):
 
         under_test = ClcGroup(self.module)
         under_test.root_group = mock_rootgroup
+        under_test.clc_auth = {'clc_alias': 'MockClcAlias'}
 
-        fp = mock.MagicMock()
-        error = urllib2.HTTPError('http://unittest.com', 404, 'NOT FOUND',
-                                  {}, fp)
-        under_test.api = mock.MagicMock()
-        under_test.api.call.side_effect = error
+        error = ClcApiException()
+        error.message = 'Mock Error Message'
+        mock_clc_common.call_clc_api.side_effect = error
 
         ret = under_test._delete_group('test', mock_parent.name)
         self.assertIsNone(ret, 'The return value should be None')
         self.module.fail_json.assert_called_once_with(
-            msg='Failed to delete group :test. {0}'.format(error))
+            msg='Failed to delete group :test. {0}'.format(error.message))
 
     def test_wait_for_requests_to_complete_req_successful(self):
         mock_request_list = self.build_mock_request_list(status_code=200)
