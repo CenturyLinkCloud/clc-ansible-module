@@ -761,7 +761,8 @@ class TestClcServerFunctions(unittest.TestCase):
         }
 
         # Function Under Test
-        ClcServer._find_datacenter(module=self.module, clc=self.clc)
+        under_test = ClcServer(self.module)
+        under_test._find_datacenter()
 
         # assert result
         self.clc.v2.Datacenter.assert_called_once_with("MyMockGroup")
