@@ -746,9 +746,11 @@ class ClcServer(object):
         ClcServer._validate_counts(module)
 
         params['alias'] = alias
-        params['group'] = self._find_group(datacenter).id
-        params['cpu'] = ClcServer._find_cpu(clc, module)
-        params['memory'] = ClcServer._find_memory(clc, module)
+        group = self._find_group(datacenter)
+        group.defaults = self._group_defaults(group)
+        params['group'] = group.id
+        params['cpu'] = self._find_cpu(group)
+        params['memory'] = self._find_memory(group)
         params['description'] = ClcServer._find_description(module)
         params['ttl'] = ClcServer._find_ttl(module)
         params['template'] = ClcServer._find_template_id(module, datacenter)
@@ -762,20 +764,24 @@ class ClcServer(object):
 
         return params
 
-    def _group_defaults(self, group, key):
+    def _group_defaults(self, group):
+        try:
+            if 'clc_alias' not in self.clc_auth:
+                self.clc_auth = clc_common.authenticate(self.module)
+            response = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'GET', '/groups/{0}/{1}/defaults'.format(
+                    self.clc_auth['clc_alias'], group.id))
+            defaults = json.loads(response.read())
+        except ClcApiException as ex:
+            return self.module.fail_json(
+                msg='Failed to get group defaults for group: {0}'.format(
+                    group.name))
+        return defaults
+
+    def _group_default_value(self, group, key):
         if not hasattr(group, 'defaults'):
-            try:
-                if 'clc_alias' not in self.clc_auth:
-                    self.clc_auth = clc_common.authenticate(self.module)
-                response = clc_common.call_clc_api(
-                    self.module, self.clc_auth,
-                    'GET', '/groups/{0}/{1}/defaults'.format(
-                        self.clc_auth['clc_alias'], group.id))
-                group.defaults = json.load(response.read())
-            except ClcApiException as ex:
-                self.module.fail_json(
-                    msg='Failed to get group defaults for group: {0}'.format(
-                        group.name))
+            group.defaults = self._group_defaults(group)
         try:
             return group.defaults[key]['value']
         except KeyError:
@@ -818,50 +824,38 @@ class ClcServer(object):
                         ex.message))
         return alias
 
-    @staticmethod
-    def _find_cpu(clc, module):
+    def _find_cpu(self, group):
         """
         Find or validate the CPU value by calling the CLC API
-        :param clc: clc-sdk instance to use
-        :param module: module to validate
+        :group: Group object for which to find defaults
         :return: Int value for CPU
         """
-        cpu = module.params.get('cpu')
-        group_id = module.params.get('group_id')
-        alias = module.params.get('alias')
-        state = module.params.get('state')
+        cpu = self.module.params.get('cpu')
+        state = self.module.params.get('state')
 
         if not cpu and state == 'present':
-            group = clc.v2.Group(id=group_id,
-                                 alias=alias)
-            if group.Defaults("cpu"):
-                cpu = group.Defaults("cpu")
-            else:
-                module.fail_json(
-                    msg=str("Can\'t determine a default cpu value. Please provide a value for cpu."))
+            cpu = self._group_default_value(group, 'cpu')
+            if cpu is None:
+                self.module.fail_json(
+                    msg=str("Can\'t determine a default cpu value. "
+                            "Please provide a value for cpu."))
         return cpu
 
-    @staticmethod
-    def _find_memory(clc, module):
+    def _find_memory(self, group):
         """
         Find or validate the Memory value by calling the CLC API
-        :param clc: clc-sdk instance to use
-        :param module: module to validate
+        :group: Group object for which to find defaults
         :return: Int value for Memory
         """
-        memory = module.params.get('memory')
-        group_id = module.params.get('group_id')
-        alias = module.params.get('alias')
-        state = module.params.get('state')
+        memory = self.module.params.get('memory')
+        state = self.module.params.get('state')
 
         if not memory and state == 'present':
-            group = clc.v2.Group(id=group_id,
-                                 alias=alias)
-            if group.Defaults("memory"):
-                memory = group.Defaults("memory")
-            else:
-                module.fail_json(msg=str(
-                    "Can\'t determine a default memory value. Please provide a value for memory."))
+            memory = self._group_default_value(group, 'memory')
+            if memory is None:
+                self.module.fail_json(msg=str(
+                    "Can\'t determine a default memory value. "
+                    "Please provide a value for memory."))
         return memory
 
     @staticmethod
