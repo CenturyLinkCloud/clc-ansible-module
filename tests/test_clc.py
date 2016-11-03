@@ -31,16 +31,25 @@ class TestClcCommonFunctions(unittest.TestCase):
         self.datacenter = mock.MagicMock()
 
     def test_authenticate_w_creds(self):
+        test_clc_auth = {
+            'v2_api_url': 'https://api.ctl.io/v2/',
+            'v2_api_token': 'mock_token',
+            'clc_alias': 'mock_alias',
+            'clc_location': 'mock_location',
+        }
+        auth_return = {
+            'bearerToken': test_clc_auth['v2_api_token'],
+            'accountAlias': test_clc_auth['clc_alias'],
+            'locationAlias': test_clc_auth['clc_location']
+        }
         with patch.object(clc_common, 'call_clc_api') as mock_method:
+            mock_method.return_value = auth_return
             with patch.dict('os.environ',
                             {'CLC_V2_API_USERNAME': 'dummy_username',
-                            'CLC_V2_API_PASSWD': 'dummy_passwd'},
+                             'CLC_V2_API_PASSWD': 'dummy_passwd'},
                             clear=True):
                 clc_common.authenticate(self.module)
         # Should fail with an HTTP error code of 400 for bad user/passwd
-        test_clc_auth = {
-            'v2_api_url': 'https://api.ctl.io/v2/',
-        }
         # TODO: Set up better mock to fully test response from API
         mock_method.assert_called_with(
             self.module, test_clc_auth,
@@ -52,18 +61,19 @@ class TestClcCommonFunctions(unittest.TestCase):
             clc_common.authenticate(self.module)
         self.assertEqual(self.module.fail_json.called, True)
 
-    def test_override_v2_api_url_from_environment(self):
+    @patch.object(clc_common, 'call_clc_api')
+    def test_override_v2_api_url_from_environment(self, mock_call_api):
         original_url = 'https://api.ctl.io/v2/'
         clc_auth = clc_common.authenticate(self.module)
         self.assertEqual(clc_auth['v2_api_url'], original_url)
         with patch.dict('os.environ',
-                        {'CLC_V2_API_URL': 'http://unittest.example.com/',
+                        {'CLC_V2_API_URL': 'https://unittest.example.com/',
                          'CLC_V2_API_TOKEN': 'dummy_token',
                          'CLC_ACCT_ALIAS': 'dummy_alias',
                          'CLC_LOCATION': 'dummy_location'},
                         clear=True):
             clc_auth = clc_common.authenticate(self.module)
-        self.assertEqual(clc_auth['v2_api_url'], 'http://unittest.example.com/')
+        self.assertEqual(clc_auth['v2_api_url'], 'https://unittest.example.com/')
 
     def test_set_user_agent(self):
         headers = clc_common._default_headers()
@@ -85,11 +95,11 @@ class TestClcCommonFunctions(unittest.TestCase):
             if '/datacenters/' in args[3]:
                 datacenter_data = {'links': [
                     {'rel': 'group', 'id': 'root_id', 'name': 'root_name'}]}
-                return StringIO.StringIO(json.dumps(datacenter_data))
+                return datacenter_data
             elif '/groups/' in args[3]:
                 group_data = {'name': 'Mock Group', 'id': 'mock_id',
                               'type': 'mock_type', 'groups': []}
-                return StringIO.StringIO(json.dumps(group_data))
+                return group_data
 
         clc_auth = {'v2_api_url': 'mock_url',
                     'v2_api_token': 'mock_token',

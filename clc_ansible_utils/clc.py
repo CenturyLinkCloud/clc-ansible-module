@@ -57,6 +57,20 @@ class Group(object):
                     setattr(self, attr, group_data[attr])
 
 
+class Server(object):
+
+    def __init__(self, server_data):
+        self.id = None
+        self.name = None
+        self.description = None
+        if server_data is not None:
+            self.data = server_data
+            for attr in ['id', 'name', 'description', 'status',
+                         'locationId', 'groupId']:
+                if attr in server_data:
+                    setattr(self, attr, server_data[attr])
+
+
 def _default_headers():
     # Helpful ansible open_url params
     # data, headers, http-agent
@@ -111,7 +125,11 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None):
     except urllib2.HTTPError as ex:
         raise ClcApiException(
             'Error calling CenturyLink Cloud API: {0}'.format(ex.message))
-    return response
+    try:
+        return json.loads(response.read())
+    except:
+        raise ClcApiException(
+            'Error converting CenturyLink Cloud API response to JSON')
 
 
 def authenticate(module):
@@ -137,15 +155,11 @@ def authenticate(module):
             'clc_location': clc_location,
         })
     elif v2_api_username and v2_api_passwd:
-        response = call_clc_api(
+        r = call_clc_api(
             module, clc_auth,
             'POST', '/authentication/login',
             data={'username': v2_api_username,
                   'password': v2_api_passwd})
-        if response.code not in [200]:
-            return module.fail_json(
-                msg='Failed to authenticate with clc V2 api.')
-        r = json.loads(response.read())
         clc_auth.update({
             'v2_api_token': r['bearerToken'],
             'clc_alias': r['accountAlias'],
@@ -186,23 +200,21 @@ def group_tree(module, clc_auth, alias=None, datacenter=None):
         datacenter = clc_auth['clc_location']
     if alias is None:
         alias = clc_auth['clc_alias']
-    response = call_clc_api(
+    r = call_clc_api(
         module, clc_auth,
         'GET', '/datacenters/{0}/{1}'.format(
             alias, datacenter),
         data={'GroupLinks': 'true'})
 
-    r = json.loads(response.read())
     root_group_id, root_group_name = [(obj['id'], obj['name'])
                                       for obj in r['links']
                                       if obj['rel'] == "group"][0]
 
-    response = call_clc_api(
+    group_data = call_clc_api(
         module, clc_auth,
         'GET', '/groups/{0}/{1}'.format(
             alias, root_group_id))
 
-    group_data = json.loads(response.read())
     return _walk_groups(None, group_data)
 
 
@@ -270,3 +282,39 @@ def group_path(group, group_id=False, delimiter='/'):
         group = group.parent
     return delimiter.join(reversed(path_elements))
 
+
+def _find_server(module, clc_auth, server_id):
+    """
+    Find server information based on server_id
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param server_id: ID for server for which to retrieve data
+    :return: Server object
+    """
+    try:
+        r = call_clc_api(
+            module, clc_auth,
+            'GET', 'servers/{0}/{1}'.format(
+                clc_auth['clc_alias'], server_id))
+        server = Server(r)
+        return server
+    except ClcApiException as ex:
+        return module.fail_json(
+            msg='Failed to get server information '
+                'for server id: {0}:'.format(server_id))
+
+
+def servers_in_group(module, clc_auth, group):
+    """
+    Return a list of servers from
+    :param module:
+    :param clc_auth:
+    :param group:
+    :return:
+    """
+    server_lst = [obj['id'] for obj in group.data['links'] if
+                  obj['rel'] == 'server']
+    servers = []
+    for server_id in server_lst:
+        servers.append(_find_server(module, clc_auth, server_id))
+    return servers

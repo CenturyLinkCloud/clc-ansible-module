@@ -388,12 +388,11 @@ class ClcGroup(object):
             description = group_name
         # TODO: Check for proper HTTP response code
         try:
-            response = clc_common.call_clc_api(
+            group_data = clc_common.call_clc_api(
                 self.module, self.clc_auth,
                 'POST', '/groups/{0}'.format(self.clc_auth['clc_alias']),
                 data={'name': group_name, 'description': description,
                       'parentGroupId': parent.id})
-            group_data = json.loads(response.read())
             group = clc_common.Group(group_data)
         except ClcApiException as ex:
             self.module.fail_json(msg='Failed to create group :{0}. {1}'.format(
