@@ -251,8 +251,8 @@ class ClcGroup(object):
 
         # TODO: Initialize credentials from non-private method
         self.clc_auth = clc_common.authenticate(self.module)
-        self.root_group = self._get_group_tree_for_datacenter(
-            datacenter=location)
+        self.root_group = clc_common.group_tree(self.module, self.clc_auth,
+                                                datacenter=location)
 
         if state == "absent":
             changed, group, requests_lst = self._ensure_group_is_absent(
@@ -316,7 +316,8 @@ class ClcGroup(object):
         response = None
         if parent_name is None:
             parent_name = self.root_group.name
-        group = self._group_by_name(group_name, parent_name=parent_name)
+        group = clc_common.find_group(self.module, self.root_group,
+                                      group_name, parent_info=parent_name)
         # TODO: Check for proper HTTP response code
         try:
             response = clc_common.call_clc_api(
@@ -355,7 +356,8 @@ class ClcGroup(object):
                                           parent_name=parent_name)
 
         if parent_exists and child_exists:
-            group = self._group_by_name(group_name, parent_name=parent_name)
+            group = clc_common.find_group(self.module, self.root_group,
+                                          group_name, parent_info=parent_name)
             changed = False
         elif parent_exists and not child_exists:
             if not self.module.check_mode:
@@ -380,7 +382,8 @@ class ClcGroup(object):
         :return: clc_sdk.Group - the created group
         """
         group = None
-        parent = self._group_by_name(parent_name)
+        parent = clc_common.find_group(self.module, self.root_group,
+                                       parent_name)
         if not description:
             description = group_name
         # TODO: Check for proper HTTP response code
@@ -406,117 +409,14 @@ class ClcGroup(object):
         """
         result = False
         if parent_name:
-            group = self._group_by_name(group_name, parent_name=parent_name)
+            group = clc_common.find_group(self.module, self.root_group,
+                                          group_name, parent_info=parent_name)
         else:
-            group = self._group_by_name(group_name)
+            group = clc_common.find_group(self.module, self.root_group,
+                                          group_name)
         if group:
             result = True
         return result
-
-    def _get_group_tree_for_datacenter(self, datacenter=None):
-        """
-        Walk the tree of groups for a datacenter
-        :param datacenter: string - the datacenter to walk (ex: 'UC1')
-        :return: Group object for root group containing list of children
-        """
-        if datacenter is None:
-            datacenter = self.clc_auth['clc_location']
-        response = clc_common.call_clc_api(
-            self.module, self.clc_auth,
-            'GET', '/datacenters/{0}/{1}'.format(
-                self.clc_auth['clc_alias'], datacenter),
-            data={'GroupLinks': 'true'})
-
-        r = json.loads(response.read())
-        root_group_id, root_group_name = [(obj['id'], obj['name'])
-                                          for obj in r['links']
-                                          if obj['rel'] == "group"][0]
-
-        response = clc_common.call_clc_api(
-            self.module, self.clc_auth,
-            'GET', '/groups/{0}/{1}'.format(
-                self.clc_auth['clc_alias'], root_group_id))
-
-        group_data = json.loads(response.read())
-        return self._walk_groups_recursive(None, group_data)
-
-    def _walk_groups_recursive(self, parent_group, group_data):
-        """
-        Walk a parent-child tree of groups, starting with the provided child group
-        :param parent_group: clc.Group - Parent of group described by group_data
-        :param group_data: dict - Dict of data from JSON API return
-        :return: Group object from data, containing list of children
-        """
-        group = clc_common.Group(group_data)
-        group.parent = parent_group
-        for child_data in group_data['groups']:
-            if child_data['type'] != 'default':
-                continue
-            group.children.append(self._walk_groups_recursive(group, child_data))
-        return group
-
-    def _group_by_name(self, group_name, group=None, parent_name=None):
-        """
-        :param group_name: Name of group to search form
-        :param group: Optional group under which to search
-        :param parent_name:  Optional name of parent
-        :return: Group object found, or None if no groups found.
-        Will return an error if multiple groups found matching parameters.
-        """
-        groups = self._group_by_name_recursive(
-            group_name, group=group, parent_name=parent_name)
-        if len(groups) > 1:
-            error_message = 'Found {0:d} groups with name: \"{1}\"'.format(
-                len(groups), group_name)
-            if parent_name is None:
-                error_message += ' in root group \"{0}\".'.format(
-                    self.root_group.name)
-            else:
-                error_message += ' in group: \"{0}\".'.format(parent_name)
-            error_message += ' Group ids: ' + ', '.join([g.id for g in groups])
-            return self.module.fail_json(msg=error_message)
-        elif len(groups) == 1:
-            return groups[0]
-        else:
-            return None
-
-    def _group_by_name_recursive(self, group_name, group=None,
-                                 parent_name=None):
-        """
-        :param group_name: Name of group to search for
-        :param group: Optional group under which to search
-        :param parent_name: Optional name of parent
-        :return: List of groups found matching the described parameters
-        """
-        groups = []
-        if group is None:
-            group = self.root_group
-        if group_name == group.name:
-            if parent_name is None:
-                groups.append(group)
-            elif group.parent is not None and parent_name == group.parent.name:
-                groups.append(group)
-        for child_group in group.children:
-            groups += self._group_by_name_recursive(group_name,
-                                                    group=child_group,
-                                                    parent_name=parent_name)
-        return groups
-
-    def _group_full_path(self, group, id=False, delimiter=' / '):
-        """
-        :param group: Group object for which to show full ancestry
-        :param id: Optional flag to show group id hierarchy
-        :param delimiter: Optional delimiter
-        :return:
-        """
-        path_elements = []
-        while group is not None:
-            if id:
-                path_elements.insert(0, group.id)
-            else:
-                path_elements.insert(0, group.name)
-            group = group.parent
-        return delimiter.join(path_elements)
 
     def _wait_for_requests_to_complete(self, requests_lst):
         """

@@ -19,6 +19,8 @@ from clc_ansible_utils.clc import ClcApiException
 import mock
 from mock import patch
 import unittest
+import StringIO
+import json
 
 
 class TestClcCommonFunctions(unittest.TestCase):
@@ -67,3 +69,64 @@ class TestClcCommonFunctions(unittest.TestCase):
         headers = clc_common._default_headers()
         self.assertIn('ClcAnsibleModule', headers['Api-Client'])
         self.assertIn('ClcAnsibleModule', headers['User-Agent'])
+
+    def test_walk_groups(self):
+        group_data = {'name': 'Mock Group', 'id': 'mock_id',
+                      'type': 'mock_type', 'groups': []}
+        grp1 = mock.MagicMock()
+        grp1.type = 'default'
+        grp1.children = []
+        res = clc_common._walk_groups(grp1, group_data)
+        self.assertIsNotNone(res)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_group_tree(self, mock_call):
+        def call_api_side_effect(*args, **kwargs):
+            if '/datacenters/' in args[3]:
+                datacenter_data = {'links': [
+                    {'rel': 'group', 'id': 'root_id', 'name': 'root_name'}]}
+                return StringIO.StringIO(json.dumps(datacenter_data))
+            elif '/groups/' in args[3]:
+                group_data = {'name': 'Mock Group', 'id': 'mock_id',
+                              'type': 'mock_type', 'groups': []}
+                return StringIO.StringIO(json.dumps(group_data))
+
+        clc_auth = {'v2_api_url': 'mock_url',
+                    'v2_api_token': 'mock_token',
+                    'clc_location': 'mock_location',
+                    'clc_alias': 'mock_alias'}
+
+        clc_common.call_clc_api.side_effect = call_api_side_effect
+
+        clc_common.group_tree(self.module, clc_auth)
+        self.assertEqual(clc_common.call_clc_api.call_count, 2)
+
+    def test_find_group(self):
+        mock_group = mock.MagicMock()
+        mock_group.name = "MockGroup"
+
+        mock_parent = mock.MagicMock()
+        mock_parent.name = "MockParent"
+        mock_parent.children = [mock_group]
+        mock_group.parent = mock_parent
+
+        mock_rootgroup = mock.MagicMock()
+        mock_rootgroup.name = "MockRootGroup"
+        mock_rootgroup.parent = None
+        mock_rootgroup.children = [mock_parent]
+        mock_parent.parent = mock_rootgroup
+
+        self.assertEqual(
+            clc_common.find_group(
+                self.module, mock_rootgroup, 'MockGroup'),
+            mock_group)
+        self.assertEqual(
+            clc_common.find_group(
+                self.module, mock_rootgroup, 'MockGroup', 'MockParent'),
+            mock_group)
+        self.assertIsNone(
+            clc_common.find_group(
+                self.module, mock_rootgroup, 'MissingGroup'))
+        self.assertIsNone(
+            clc_common.find_group(
+                self.module, mock_rootgroup, 'MockGroup', 'MissingParent'))

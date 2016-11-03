@@ -43,20 +43,8 @@ class TestClcGroupFunctions(unittest.TestCase):
         result = ClcGroup._define_module_argument_spec()
         self.assertIsInstance(result, dict)
 
-    def test_walk_groups_recursive(self):
-        group_data = {'name': 'Mock Group', 'id': 'mock_id',
-                      'type': 'mock_type', 'groups': []}
-        grp1 = mock.MagicMock()
-        grp1.type = 'default'
-        grp1.children = []
-        under_test = ClcGroup(self.module)
-        res = under_test._walk_groups_recursive(grp1, group_data)
-        self.assertIsNotNone(res)
-
     @patch.object(clc_group, 'clc_common')
-    @patch.object(ClcGroup, '_get_group_tree_for_datacenter')
-    def test_process_request_state_present(self, mock_group_tree,
-                                           mock_clc_common):
+    def test_process_request_state_present(self, mock_clc_common):
         self.module.params = {
             'location': 'UC1',
             'name': 'MyCoolGroup',
@@ -82,9 +70,7 @@ class TestClcGroupFunctions(unittest.TestCase):
             group=mock_group.data)
 
     @patch.object(clc_group, 'clc_common')
-    @patch.object(ClcGroup, '_get_group_tree_for_datacenter')
-    def test_process_request_state_absent(self, mock_group_tree,
-                                          mock_clc_common):
+    def test_process_request_state_absent(self, mock_clc_common):
         self.module.params = {
             'location': 'UC1',
             'name': 'MyCoolGroup',
