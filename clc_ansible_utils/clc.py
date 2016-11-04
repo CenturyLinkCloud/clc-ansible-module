@@ -77,6 +77,21 @@ class Server(object):
                 pass
 
 
+class Network(object):
+
+    def __init__(self, network_data):
+        self.id = None
+        self.name = None
+        self.cidr = None
+        self.description = None
+        self.type = None
+        if network_data is not None:
+            self.data = network_data
+            for attr in ['id', 'name', 'cidr', 'description', 'type']:
+                if attr in network_data:
+                    setattr(self, attr, network_data[attr])
+
+
 def _default_headers():
     # Helpful ansible open_url params
     # data, headers, http-agent
