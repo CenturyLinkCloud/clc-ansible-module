@@ -31,6 +31,7 @@ __version__ = '${version}'
 
 import os
 import json
+import math
 import urllib
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
@@ -65,10 +66,15 @@ class Server(object):
         self.description = None
         if server_data is not None:
             self.data = server_data
-            for attr in ['id', 'name', 'description', 'status',
+            for attr in ['id', 'name', 'description', 'status', 'powerState'
                          'locationId', 'groupId']:
                 if attr in server_data:
                     setattr(self, attr, server_data[attr])
+            try:
+                self.data['details']['memoryGB'] = int(
+                    math.floor(self.data['details']['memoryMB']/1024))
+            except:
+                pass
 
 
 def _default_headers():

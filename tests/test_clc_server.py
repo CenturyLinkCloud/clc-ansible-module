@@ -721,10 +721,10 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertTrue('argument_spec' in result)
         self.assertTrue('mutually_exclusive' in result)
 
-    def test_find_running_servers_by_group(self):
+    @patch.object(ClcServer, '_find_group')
+    @patch.object(clc_common, 'servers_in_group')
+    def test_find_running_servers_by_group(self, mock_servers, mock_find_group):
         # Setup
-        mock_group = create_autospec(clc_sdk.v2.Group)
-
         mock_running_server = mock.MagicMock()
         mock_running_server.status = 'active'
         mock_running_server.powerState = 'started'
@@ -733,14 +733,13 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_stopped_server.status = 'active'
         mock_stopped_server.powerState = 'stopped'
 
-        mock_group.Servers().Servers.return_value = [mock_running_server, mock_stopped_server]
-
-        self.datacenter.Groups().Get.return_value = mock_group
+        mock_servers.return_value = [mock_running_server, mock_stopped_server]
 
         # Function Under Test
         under_test = ClcServer(self.module)
-        result_servers, result_runningservers = under_test._find_running_servers_by_group(self.datacenter,
-                                                                                          "MyCoolGroup")
+        result_servers, result_runningservers = under_test._find_running_servers_by_group(
+            'dummy_group',
+            "MyCoolGroup")
 
         # Results
         self.assertEqual(len(result_servers), 2)
@@ -754,7 +753,8 @@ class TestClcServerFunctions(unittest.TestCase):
 
         self.datacenter.reset_mock()
 
-    def test_find_datacenter(self):
+    @patch.object(clc_common, 'authenticate')
+    def test_find_datacenter(self, mock_authenticate):
         # Setup Test
         self.module.params = {
             'location': "MyMockGroup"
@@ -764,8 +764,9 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test = ClcServer(self.module)
         under_test._find_datacenter()
 
-        # assert result
-        self.clc.v2.Datacenter.assert_called_once_with("MyMockGroup")
+        mock_authenticate.assert_called_once()
+        self.assertTrue(under_test.clc_auth['clc_location'], 'MyMockGroup')
+        self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_common, 'find_group')
     @patch.object(clc_common, 'group_tree')
@@ -776,14 +777,15 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Function Under Test
         under_test = ClcServer(self.module)
+        under_test.root_group = mock_rootgroup
         result_group = under_test._find_group(self.datacenter, "MyCoolGroup")
 
         # Assert Result
         clc_common.find_group.assert_called_once_with(
             self.module, mock_rootgroup,
             'MyCoolGroup')
-        self.datacenter.Groups().Get.assert_called_once_with("MyCoolGroup")
-        self.assertEqual(self.module.called, False)
+        self.assertEqual(self.module.fail_json.called, False)
+
 
     @patch.object(clc_common, 'find_group')
     @patch.object(clc_common, 'group_tree')
@@ -807,53 +809,67 @@ class TestClcServerFunctions(unittest.TestCase):
     def test_find_group_w_recursive_lookup(self,
                                            mock_clc_sdk):
         # Setup
-        mock_datacenter = mock.MagicMock()
         mock_group_to_find = mock.MagicMock()
-        mock_group = mock.MagicMock()
-        mock_subgroup = mock.MagicMock()
-        mock_subsubgroup = mock.MagicMock()
-
         mock_group_to_find.name = "TEST_RECURSIVE_GRP"
 
-        mock_datacenter.Groups().Get.side_effect = CLCException()
-        mock_datacenter.Groups().groups = [mock_group]
+        mock_rootgroup = mock.MagicMock()
+        mock_rootgroup.name = 'rootgroup'
+        mock_rootgroup.parent = None
 
-        mock_group.Subgroups().Get.side_effect = CLCException()
-        mock_group.Subgroups().groups = [mock_subgroup]
+        mock_subgroup = mock.MagicMock()
+        mock_subgroup.name = 'subgroup'
+        mock_rootgroup.children = [mock_subgroup]
+        mock_subgroup.parent = mock_rootgroup
 
-        mock_subgroup.Subgroups().Get.side_effect = CLCException()
-        mock_subgroup.Subgroups().groups = [mock_subsubgroup]
+        mock_subsubgroup = mock.MagicMock()
+        mock_subsubgroup.name = 'subsubgroup'
+        mock_subgroup.children = [mock_subsubgroup]
+        mock_subsubgroup.parent = mock_subgroup
 
-        mock_subsubgroup.Subgroups().Get.return_value = mock_group_to_find
+        mock_subsubgroup.children = [mock_group_to_find]
+        mock_group_to_find.parent = mock_subsubgroup
 
         # Test
         under_test = ClcServer(self.module)
-        result = under_test._find_group(datacenter=mock_datacenter,
+        under_test.root_group = mock_rootgroup
+        result = under_test._find_group('datacenter',
                                         lookup_group="TEST_RECURSIVE_GRP")
         # Assert
         self.assertEqual(mock_group_to_find, result)
 
-    def test_find_template(self):
-        self.module.params = {"template": "MyCoolTemplate", "state": "present"}
-        self.datacenter.Templates().Search = mock.MagicMock()
-
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_template(self, mock_call_api):
         # Function Under Test
-        result_template = ClcServer._find_template_id(module=self.module, datacenter=self.datacenter)
+        under_test = ClcServer(self.module)
+        under_test.module.params = {"template": "MyCoolTemplate",
+                                    "state": "present"}
+        datacenter = 'mock_datacenter'
+        clc_auth = {'clc_alias': 'mock_alias'}
+        under_test.clc_auth = clc_auth
+        result_template = under_test._find_template_id(datacenter)
 
         # Assert Result
-        self.datacenter.Templates().Search.assert_called_once_with("MyCoolTemplate")
+        mock_call_api.assert_called_once_with(
+            under_test.module, under_test.clc_auth, 'GET',
+            '/datacenters/mock_alias/mock_datacenter/deploymentCapabilities')
         self.assertEqual(self.module.fail_json.called, False)
 
-    def test_find_template_not_found(self):
-        self.module.params = {"template": "MyCoolTemplateNotFound", "state": "present"}
-        self.datacenter.Templates().Search = mock.MagicMock(side_effect=clc_sdk.CLCException("Template not found"))
-
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_template_not_found(self, mock_call_api):
         # Function Under Test
-        result_template = ClcServer._find_template_id(module=self.module, datacenter=self.datacenter)
+        under_test = ClcServer(self.module)
+        under_test.module.params = {"template": "MyCoolTemplateNotFound",
+                                    "state": "present"}
+        clc_auth = {'clc_alias': 'mock_alias'}
+        datacenter = 'mock_datacenter'
+        under_test.clc_auth = clc_auth
+        result_template = under_test._find_template_id(datacenter)
 
         # Assert Result
-        self.datacenter.Templates().Search.assert_called_once_with("MyCoolTemplateNotFound")
-        self.assertEqual(self.module.fail_json.called, True)
+        mock_call_api.assert_called_once_with(
+            under_test.module, under_test.clc_auth, 'GET',
+            '/datacenters/mock_alias/mock_datacenter/deploymentCapabilities')
+        self.assertIsNone(result_template)
 
     def test_find_network_id_default(self):
         # Setup
@@ -958,52 +974,62 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_get_anti_affinity_policy_id_singe_match(self, mock_clc_sdk):
-        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
-                                                [{'name' : 'test1', 'id' : '111'},
-                                                 {'name' : 'test2', 'id' : '222'}]}]
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_aa_policy_id_singe_match(self, mock_call_api):
+        mock_call_api.return_value = {
+            'items': [{'name': 'test1', 'id': '111'},
+                      {'name': 'test2', 'id': '222'}]}
 
-        policy_id = ClcServer._get_anti_affinity_policy_id(mock_clc_sdk, None, 'alias', 'test1')
-        self.assertEqual('111', policy_id)
+        under_test = ClcServer(self.module)
+        under_test.clc_auth = {'clc_alias': 'mock_alias'}
+        under_test.module.params = {'anti_affinity_policy_name': 'test1'}
+        self.assertEqual('111', under_test._find_aa_policy_id())
 
-    @patch.object(clc_server, 'AnsibleModule')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_find_aa_policy_id_no_match(self, mock_clc_sdk, mock_ansible_module):
-        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
-                                                [{'name' : 'test1', 'id' : '111'},
-                                                 {'name' : 'test2', 'id' : '222'}]}]
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_aa_policy_id_no_match(self, mock_call_api):
+        mock_call_api.return_value = {
+            'items': [{'name': 'test1', 'id': '111'},
+                      {'name': 'test2', 'id': '222'}]}
 
         params = {
             'alias': 'test',
             'anti_affinity_policy_id': None,
             'anti_affinity_policy_name': 'nothing'
         }
-        mock_ansible_module.params = params
-        ClcServer._find_aa_policy_id(mock_clc_sdk, mock_ansible_module)
-        mock_ansible_module.fail_json.assert_called_with(
-            msg='No anti affinity policy was found with policy name : nothing')
-
-    @patch.object(clc_server, 'AnsibleModule')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_get_anti_affinity_policy_id_duplicate_match(self, mock_clc_sdk, mock_ansible_module):
-        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
-                                                [{'name' : 'test1', 'id' : '111'},
-                                                 {'name' : 'test2', 'id' : '222'},
-                                                 {'name' : 'test1', 'id' : '111'}]}]
-
-        policy_id = ClcServer._get_anti_affinity_policy_id(mock_clc_sdk, mock_ansible_module, 'alias', 'test1')
-        mock_ansible_module.fail_json.assert_called_with(
-            msg='multiple anti affinity policies were found with policy name : test1')
-
-    @patch.object(clc_server, 'clc_sdk')
-    def test_get_anti_affinity_policy_id_get_fail(self, mock_clc_sdk):
-        error = APIFailedResponse()
-        error.response_text = 'Mock failure message'
-        mock_clc_sdk.v2.API.Call.side_effect = error
         under_test = ClcServer(self.module)
-        under_test._get_anti_affinity_policy_id(mock_clc_sdk, self.module, 'alias', 'aa_policy_name')
-        self.module.fail_json.assert_called_with(msg='Unable to fetch anti affinity policies for account: alias. Mock failure message')
+        under_test.clc_auth = {'clc_alias': 'mock_alias'}
+        under_test.module.params = params
+        under_test._find_aa_policy_id()
+        under_test.module.fail_json.assert_called_with(
+            msg='No anti affinity policy was found with policy name: nothing')
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_aa_policy_id_duplicate_match(self, mock_call_api):
+        mock_call_api.return_value = {
+            'items': [{'name': 'test1', 'id': '111'},
+                      {'name': 'test2', 'id': '222'},
+                      {'name': 'test1', 'id': '111'}]}
+
+        under_test = ClcServer(self.module)
+        under_test.clc_auth = {'clc_alias': 'mock_alias'}
+        under_test.module.params = {'anti_affinity_policy_name': 'test1'}
+
+        policy_id = under_test._find_aa_policy_id()
+        under_test.module.fail_json.assert_called_with(
+            msg='Multiple anti affinity policies found for name: test1')
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_aa_policy_id_get_fail(self, mock_call_api):
+        error = ClcApiException()
+        error.message = 'Mock failure message'
+        mock_call_api.side_effect = error
+        under_test = ClcServer(self.module)
+        under_test.clc_auth = {'clc_alias': 'mock_alias'}
+        under_test.module.params = {'anti_affinity_policy_id': 'mock_id'}
+        under_test._find_aa_policy_id()
+        self.module.fail_json.assert_called_with(
+            msg='Unable to fetch anti affinity policies for '
+                'account: mock_alias. Mock failure message')
 
     @patch.object(clc_server, 'clc_sdk')
     def test_create_clc_server_exception(self, mock_clc_sdk):
@@ -1018,68 +1044,71 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test._create_clc_server(mock_clc_sdk, self.module, server_params)
         self.module.fail_json.assert_called_with(msg='Unable to create the server: test server. Mock failure message')
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_find_datacenter_no_location(self, mock_clc_sdk):
-        error = CLCException()
-        mock_account = mock.MagicMock()
-        mock_account.data = {
-            'primaryDataCenter': 'TESTDC'
-        }
-        mock_clc_sdk.v2.Account.return_value = mock_account
-        mock_clc_sdk.v2.Datacenter.return_value = 'DCRESULT'
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_datacenter_no_location(self, mock_call_api):
         params = {
             'state': 'present',
         }
-        self.module.params = params
         under_test = ClcServer(self.module)
-        ret = under_test._find_datacenter(mock_clc_sdk, self.module)
-        self.assertEqual(ret, 'DCRESULT')
+        under_test.module.params = params
+        under_test.clc_auth = {'clc_alias': 'dummy_alias',
+                               'clc_location': 'dummy_location'}
+        ret = under_test._find_datacenter()
+        self.assertEqual(ret, 'dummy_location')
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_find_datacenter_exception(self, mock_clc_sdk):
-        error = CLCException()
-        mock_clc_sdk.v2.Datacenter.side_effect = error
+    @patch.object(clc_common, 'authenticate')
+    def test_find_datacenter_exception(self, mock_authenticate):
+        error = ClcApiException()
+        mock_authenticate.side_effect = error
         params = {
             'state': 'present',
             'location': 'testdc'
         }
-        self.module.params = params
         under_test = ClcServer(self.module)
-        under_test._find_datacenter(mock_clc_sdk, self.module)
-        self.module.fail_json.assert_called_with(msg='Unable to find location: testdc')
+        under_test.module.params = params
+        under_test._find_datacenter()
+        self.module.fail_json.assert_called_with(
+            msg='Unable to find location: testdc')
 
-    def test_find_group_no_result(self):
-        mock_dc = mock.MagicMock()
-        mock_dc.id = 'testdc'
-        mock_dc.Groups().Get.side_effect = CLCException()
+    @patch.object(clc_common, 'find_group')
+    def test_find_group_no_result(self, mock_find_group):
+        datacenter = 'testdc'
+        mock_find_group.side_effect = ClcApiException()
+
         under_test = ClcServer(self.module)
-        ret = under_test._find_group(mock_dc, 'lookup_group')
-        self.module.fail_json.assert_called_with(msg='Unable to find group: lookup_group in location: testdc')
+        under_test.root_group = mock.MagicMock()
+        ret = under_test._find_group(datacenter, 'lookup_group')
+        self.module.fail_json.assert_called_with(
+            msg='Unable to find group: lookup_group in location: testdc')
         self.assertEqual(ret, None)
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_find_cpu_exception(self, mock_clc_sdk):
+    def test_find_cpu_exception(self):
         params = {
             'state': 'present'
         }
         mock_group = mock.MagicMock()
-        mock_group.Defaults.return_value = None
-        mock_clc_sdk.v2.Group.return_value = mock_group
-        self.module.params = params
-        ClcServer._find_cpu(mock_clc_sdk, self.module)
-        self.module.fail_json.assert_called_with(msg="Can't determine a default cpu value. Please provide a value for cpu.")
+        under_test = ClcServer(self.module)
+        under_test.module.params = params
+        under_test._group_default_value = mock.MagicMock()
+        under_test._group_default_value.return_value = None
+        under_test._find_cpu(mock_group)
+        self.module.fail_json.assert_called_with(
+            msg="Can't determine a default cpu value. "
+                "Please provide a value for cpu.")
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_find_memory_exception(self, mock_clc_sdk):
+    def test_find_memory_exception(self):
         params = {
             'state': 'present'
         }
         mock_group = mock.MagicMock()
-        mock_group.Defaults.return_value = None
-        mock_clc_sdk.v2.Group.return_value = mock_group
-        self.module.params = params
-        ClcServer._find_memory(mock_clc_sdk, self.module)
-        self.module.fail_json.assert_called_with(msg="Can't determine a default memory value. Please provide a value for memory.")
+        under_test = ClcServer(self.module)
+        under_test.module.params = params
+        under_test._group_default_value = mock.MagicMock()
+        under_test._group_default_value.return_value = None
+        under_test._find_memory(mock_group)
+        self.module.fail_json.assert_called_with(
+            msg="Can't determine a default memory value. "
+                "Please provide a value for memory.")
 
     def test_validate_types_exception_standard(self):
         params = {
@@ -1185,25 +1214,28 @@ class TestClcServerFunctions(unittest.TestCase):
                           'server_id',
                           'alert_policy_id')
 
-    @patch.object(clc_server, 'AnsibleModule')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_get_alert_policy_id_by_name_dup_match(self, mock_clc_sdk, mock_ansible_module):
-        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
-                                                [{'name' : 'test1', 'id' : '111'},
-                                                 {'name' : 'test2', 'id' : '222'},
-                                                 {'name' : 'test1', 'id' : '111'}]}]
+    @patch.object(clc_common, 'call_clc_api')
+    def test_get_alert_policy_id_by_name_dup_match(self, mock_call_api):
+        mock_call_api.return_value = {
+            'items': [{'name' : 'test1', 'id' : '111'},
+                      {'name' : 'test2', 'id' : '222'},
+                      {'name' : 'test1', 'id' : '111'}]}
 
-        ClcServer._get_alert_policy_id_by_name(mock_clc_sdk, mock_ansible_module, 'alias', 'test1')
-        mock_ansible_module.fail_json.assert_called_with(
+        under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'dummy_alias'
+        under_test._get_alert_policy_id_by_name('test1')
+        self.module.fail_json.assert_called_with(
             msg='multiple alert policies were found with policy name : test1')
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_get_alert_policy_id_by_name(self, mock_clc_sdk):
-        mock_clc_sdk.v2.API.Call.side_effect = [{'items' :
-                                                [{'name' : 'test1', 'id' : '111'},
-                                                 {'name' : 'test2', 'id' : '222'}]}]
+    @patch.object(clc_common, 'call_clc_api')
+    def test_get_alert_policy_id_by_name(self, mock_call_api):
+        mock_call_api.return_value = {
+            'items': [{'name': 'test1', 'id': '111'},
+                      {'name': 'test2', 'id': '222'}]}
 
-        policy_id = ClcServer._get_alert_policy_id_by_name(mock_clc_sdk, None, 'alias', 'test1')
+        under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'dummy_alias'
+        policy_id = under_test._get_alert_policy_id_by_name('test1')
         self.assertEqual('111', policy_id)
 
     @patch.object(clc_server, 'AnsibleModule')

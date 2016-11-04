@@ -151,7 +151,7 @@ options:
     required: False
   network_id:
     description:
-      - The network UUID on which to create servers.
+      - The network on which to create servers. Searches by UUID, name, or cidr.
     default: None
     required: False
   packages:
@@ -625,7 +625,6 @@ class ClcServer(object):
         if wait:
             datacenter = self._find_datacenter()
             group = self._find_group(datacenter, lookup_group=p.get('group'))
-            # TODO: Get servers for group and fix return JSON value
             try:
                 servers = clc_common.servers_in_group(
                     self.module, self.clc_auth, group)
@@ -752,14 +751,10 @@ class ClcServer(object):
         params['memory'] = self._find_memory(group)
         params['description'] = ClcServer._find_description(module)
         params['ttl'] = ClcServer._find_ttl(module)
-        params['template'] = ClcServer._find_template_id(module, datacenter)
-        params['network_id'] = ClcServer._find_network_id(module, datacenter)
-        params['anti_affinity_policy_id'] = ClcServer._find_aa_policy_id(
-            clc,
-            module)
-        params['alert_policy_id'] = ClcServer._find_alert_policy_id(
-            clc,
-            module)
+        params['template'] = self._find_template_id(datacenter)
+        params['network_id'] = self._find_network_id(datacenter)
+        params['anti_affinity_policy_id'] = self._find_aa_policy_id()
+        params['alert_policy_id'] = self._find_alert_policy_id()
 
         return params
 
@@ -794,13 +789,13 @@ class ClcServer(object):
         try:
             if 'clc_location' not in self.clc_auth:
                 self.clc_auth = clc_common.authenticate(self.module)
-                if not location:
-                    location = self.clc_auth['clc_location']
-                else:
-                    # Override authentication with user-provided location
-                    self.clc_auth['clc_location'] = location
+            if not location:
+                location = self.clc_auth['clc_location']
+            else:
+                # Override authentication with user-provided location
+                self.clc_auth['clc_location'] = location
             return location
-        except CLCException as ex:
+        except ClcApiException as ex:
             self.module.fail_json(
                 msg=str(
                     "Unable to find location: {0}".format(location)))
@@ -814,11 +809,11 @@ class ClcServer(object):
         try:
             if 'clc_alias' not in self.clc_auth:
                 self.clc_auth = clc_common.authenticate(self.module)
-                if not alias:
-                    alias = self.clc_auth['clc_alias']
-                else:
-                    # Override authentication with user-provided alias
-                    self.clc_auth['clc_alias'] = alias
+            if not alias:
+                alias = self.clc_auth['clc_alias']
+            elif alias:
+                # Override authentication with user-provided alias
+                self.clc_auth['clc_alias'] = alias
             return alias
         except ClcApiException as ex:
             self.module.fail_json(
@@ -926,7 +921,6 @@ class ClcServer(object):
     def _find_ttl(module):
         """
         Validate that TTL is > 3600 if set, and fail if not
-        :param clc: clc-sdk instance to use
         :param module: module to validate
         :return: validated ttl
         """
@@ -946,103 +940,132 @@ class ClcServer(object):
                         '%Y-%m-%dT%H:%M:%SZ')
         return ttl
 
-    @staticmethod
-    def _find_template_id(module, datacenter):
+    def _find_template_id(self, datacenter):
         """
         Find the template id by calling the CLC API.
         :param module: the module to validate
         :param datacenter: the datacenter to search for the template
         :return: a valid clc template id
         """
-        lookup_template = module.params.get('template')
-        state = module.params.get('state')
-        type = module.params.get('type')
+        lookup_template = self.module.params.get('template')
+        state = self.module.params.get('state')
+        server_type = self.module.params.get('type')
         result = None
+        if lookup_template is None:
+            return result
 
-        if state == 'present' and type != 'bareMetal':
+        if state == 'present' and server_type != 'bareMetal':
             try:
-                result = datacenter.Templates().Search(lookup_template)[0].id
-            except CLCException:
-                module.fail_json(
+                templates = clc_common.call_clc_api(
+                    self.module, self.clc_auth,
+                    'GET', '/datacenters/{0}/{1}/deploymentCapabilities'.format(
+                        self.clc_auth['clc_alias'], datacenter))['templates']
+                for template in templates:
+                    if template['name'].lower().find(
+                            lookup_template.lower()) != -1:
+                        return template['name']
+            except ClcApiException:
+                self.module.fail_json(
                     msg=str(
                         "Unable to find a template: " +
                         lookup_template +
                         " in location: " +
-                        datacenter.id))
+                        datacenter))
         return result
 
-    @staticmethod
-    def _find_network_id(module, datacenter):
+    def _find_network_id(self, datacenter):
         """
         Validate the provided network id or return a default.
-        :param module: the module to validate
         :param datacenter: the datacenter to search for a network id
         :return: a valid network id
         """
-        network_id = module.params.get('network_id')
+        network_id = self.module.params.get('network_id')
         # Validates provided network id
         # Allows lookup of network by id, name, or cidr notation
-        if network_id:
-          network_id = datacenter.Networks(forced_load=True).Get(network_id).id
 
-        if not network_id:
-            try:
-                network_id = datacenter.Networks().networks[0].id
-                # -- added for clc-sdk 2.23 compatibility
-                # datacenter_networks = clc_sdk.v2.Networks(
-                #   networks_lst=datacenter._DeploymentCapabilities()['deployableNetworks'])
-                # network_id = datacenter_networks.networks[0].id
-                # -- end
-            except CLCException:
-                module.fail_json(
-                    msg=str(
-                        "Unable to find a network in location: " +
-                        datacenter.id))
+        try:
+            temp_auth = self.clc_auth.copy()
+            temp_auth['v2_api_url'] = 'https://api.ctl.io/v2-experimental/'
+            networks = clc_common.call_clc_api(
+                self.module, temp_auth,
+                'GET', '/networks/{0}/{1}'.format(
+                    temp_auth['clc_alias'], datacenter))
+            if network_id:
+                for network in networks:
+                    if network_id.lower() in [network['id'].lower(),
+                                              network['name'].lower(),
+                                              network['cidr'].lower()]:
+                        network_id = network['id']
+                        break
+                if not network_id:
+                    return self.module.fail_json(
+                        msg='No matching network: {0} '
+                            'found in location: {1}'.format(
+                                network_id, datacenter))
+            else:
+                network_id = networks[0]['id']
+            return network_id
+        except ClcApiException:
+            return self.module.fail_json(
+                msg=str(
+                    "Unable to find a network in location: " +
+                    datacenter))
 
-        return network_id
-
-    @staticmethod
-    def _find_aa_policy_id(clc, module):
+    def _find_aa_policy_id(self):
         """
         Validate if the anti affinity policy exist for the given name and throw error if not
-        :param clc: the clc-sdk instance
-        :param module: the module to validate
         :return: aa_policy_id: the anti affinity policy id of the given name.
         """
-        aa_policy_id = module.params.get('anti_affinity_policy_id')
-        aa_policy_name = module.params.get('anti_affinity_policy_name')
-        if not aa_policy_id and aa_policy_name:
-            alias = module.params.get('alias')
-            aa_policy_id = ClcServer._get_anti_affinity_policy_id(
-                clc,
-                module,
-                alias,
-                aa_policy_name)
-            if not aa_policy_id:
-                module.fail_json(
-                    msg='No anti affinity policy was found with policy name : %s' % aa_policy_name)
+        aa_policy_id = self.module.params.get('anti_affinity_policy_id')
+        aa_policy_name = self.module.params.get('anti_affinity_policy_name')
+
+        aa_policy_ids = []
+        if aa_policy_id or aa_policy_name:
+            try:
+                aa_policies = clc_common.call_clc_api(
+                    self.module, self.clc_auth,
+                    'GET', '/antiAffinityPolicies/{0}'.format(
+                        self.clc_auth['clc_alias']))
+                for policy in aa_policies['items']:
+                    if (aa_policy_id and
+                            policy['id'].lower() == aa_policy_id.lower()):
+                        aa_policy_ids.append(policy['id'])
+                    elif (aa_policy_name and
+                            policy['name'].lower() == aa_policy_name.lower()):
+                        aa_policy_ids.append(policy['id'])
+            except ClcApiException as ex:
+                return self.module.fail_json(
+                    msg='Unable to fetch anti affinity policies for '
+                        'account: {0}. {1}'.format(
+                            self.clc_auth['clc_alias'], ex.message))
+
+            if len(aa_policy_ids) != 1:
+                if aa_policy_id:
+                    policy_str = 'id: {0}'.format(aa_policy_id)
+                else:
+                    policy_str = 'name: {0}'.format(aa_policy_name)
+                if len(aa_policy_ids) == 0:
+                    err_msg = 'No anti affinity policy was found with policy '
+                else:
+                    err_msg = 'Multiple anti affinity policies found for '
+                return self.module.fail_json(msg=(err_msg+policy_str))
+
+            aa_policy_id = aa_policy_ids[0]
+
         return aa_policy_id
 
-    @staticmethod
-    def _find_alert_policy_id(clc, module):
+    def _find_alert_policy_id(self):
         """
         Validate if the alert policy exist for the given name and throw error if not
-        :param clc: the clc-sdk instance
-        :param module: the module to validate
         :return: alert_policy_id: the alert policy id of the given name.
         """
-        alert_policy_id = module.params.get('alert_policy_id')
-        alert_policy_name = module.params.get('alert_policy_name')
+        alert_policy_id = self.module.params.get('alert_policy_id')
+        alert_policy_name = self.module.params.get('alert_policy_name')
         if not alert_policy_id and alert_policy_name:
-            alias = module.params.get('alias')
-            alert_policy_id = ClcServer._get_alert_policy_id_by_name(
-                clc=clc,
-                module=module,
-                alias=alias,
-                alert_policy_name=alert_policy_name
-            )
+            alert_policy_id = self._get_alert_policy_id_by_name(
+                alert_policy_name=alert_policy_name)
             if not alert_policy_id:
-                module.fail_json(
+                self.module.fail_json(
                     msg='No alert policy exist with name : %s' % alert_policy_name)
         return alert_policy_id
 
@@ -1331,27 +1354,30 @@ class ClcServer(object):
                 'Failed to associate alert policy to the server : {0} with Error {1}'.format(
                     server_id, str(e.response_text)))
 
-    @staticmethod
-    def _get_alert_policy_id_by_name(clc, module, alias, alert_policy_name):
+    def _get_alert_policy_id_by_name(self, alert_policy_name):
         """
         Returns the alert policy id for the given alert policy name
-        :param clc: the clc-sdk instance to use
-        :param module: the AnsibleModule object
         :param alias: the clc account alias
         :param alert_policy_name: the name of the alert policy
         :return: alert_policy_id: the alert policy id
         """
         alert_policy_id = None
-        policies = clc.v2.API.Call('GET', '/v2/alertPolicies/%s' % alias)
-        if not policies:
-            return alert_policy_id
-        for policy in policies.get('items'):
-            if policy.get('name') == alert_policy_name:
-                if not alert_policy_id:
-                    alert_policy_id = policy.get('id')
-                else:
-                    return module.fail_json(
-                        msg='multiple alert policies were found with policy name : %s' % alert_policy_name)
+        try:
+            alert_policies = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'GET', '/alertPolicies/{0}'.format(self.clc_auth['clc_alias']))
+            for policy in alert_policies['items']:
+                if policy['name'].lower() == alert_policy_name.lower():
+                    if not alert_policy_id:
+                        alert_policy_id = policy.get('id')
+                    else:
+                        return self.module.fail_json(
+                            msg='multiple alert policies were found with policy name : %s' % alert_policy_name)
+        except ClcApiException as ex:
+                return self.module.fail_json(
+                    msg='Unable to fetch alert policies for '
+                        'account: {0}. {1}'.format(
+                            self.clc_auth['clc_alias'], ex.message))
         return alert_policy_id
 
     @staticmethod
@@ -1461,8 +1487,7 @@ class ClcServer(object):
     def _find_running_servers_by_group(self, datacenter, count_group):
         """
         Find a list of running servers in the provided group
-        :param module: the AnsibleModule object
-        :param datacenter: the clc-sdk.Datacenter instance to use to lookup the group
+        :param datacenter: name of the datacenter in which to lookup the group
         :param count_group: the group to count the servers
         :return: list of servers, and list of running servers
         """
@@ -1470,8 +1495,9 @@ class ClcServer(object):
             datacenter=datacenter,
             lookup_group=count_group)
 
-        servers = group.Servers().Servers()
-        running_servers = [s for s in servers if (s.status == 'active' and s.powerState == 'started')]
+        servers = clc_common.servers_in_group(self.module, self.clc_auth, group)
+        running_servers = [s for s in servers if (s.status == 'active' and
+                                                  s.powerState == 'started')]
 
         return servers, running_servers
 
@@ -1568,36 +1594,6 @@ class ClcServer(object):
             server_params.get('alias'))
 
         return result
-
-    @staticmethod
-    def _get_anti_affinity_policy_id(clc, module, alias, aa_policy_name):
-        """
-        retrieves the anti affinity policy id of the server based on the name of the policy
-        :param clc: the clc-sdk instance to use
-        :param module: the AnsibleModule object
-        :param alias: the CLC account alias
-        :param aa_policy_name: the anti affinity policy name
-        :return: aa_policy_id: The anti affinity policy id
-        """
-        aa_policy_id = None
-        try:
-            aa_policies = clc.v2.API.Call(method='GET',
-                                          url='antiAffinityPolicies/%s' % alias)
-        except APIFailedResponse as ex:
-            return module.fail_json(msg='Unable to fetch anti affinity policies for account: {0}. {1}'.format(
-                alias, ex.response_text))
-        for aa_policy in aa_policies.get('items'):
-            if aa_policy.get('name') == aa_policy_name:
-                if not aa_policy_id:
-                    aa_policy_id = aa_policy.get('id')
-                else:
-                    return module.fail_json(
-                        msg='multiple anti affinity policies were found with policy name : %s' % aa_policy_name)
-        return aa_policy_id
-
-    #
-    #  This is the function that gets patched to the Request.server object using a lamda closure
-    #
 
     @staticmethod
     def _find_server_by_uuid_w_retry(
