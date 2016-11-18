@@ -122,8 +122,8 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None):
         raise TypeError('Headers for API request must be a dict')
     else:
         headers = _default_headers().update(headers)
-    if data is not None and not isinstance(data, dict):
-        raise TypeError('Data for API request must be a dict')
+    if data is not None and not isinstance(data, (dict, list)):
+        raise TypeError('Data for API request must be JSON Serrializable')
     # Obtain Bearer token if we do not already have it
     if 'authentication/login' not in url:
         if 'v2_api_token' not in clc_auth:
@@ -325,17 +325,27 @@ def _find_server(module, clc_auth, server_id):
                 'for server id: {0}:'.format(server_id))
 
 
+def servers_by_id(module, clc_auth, server_ids):
+    """
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param server_ids: list of server IDs for which to retrieve data
+    :return: List of server objects containing information from API Calls
+    """
+    servers = []
+    for server_id in server_ids:
+        servers.append(_find_server(module, clc_auth, server_id))
+    return servers
+
+
 def servers_in_group(module, clc_auth, group):
     """
     Return a list of servers from
-    :param module:
-    :param clc_auth:
-    :param group:
-    :return:
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param group: Group object to search for servers
+    :return: List of server objects containing information from API Calls
     """
     server_lst = [obj['id'] for obj in group.data['links'] if
                   obj['rel'] == 'server']
-    servers = []
-    for server_id in server_lst:
-        servers.append(_find_server(module, clc_auth, server_id))
-    return servers
+    return servers_by_id(module, clc_auth, server_lst)

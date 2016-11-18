@@ -1150,8 +1150,10 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_with(msg='Ttl cannot be <= 3600')
 
     def test_startstop_servers_invalid_list(self):
-        ClcServer._start_stop_servers(self.module, self.clc, {'id': 'value'})
-        self.module.fail_json.assert_called_with(msg='server_ids should be a list of servers, aborting')
+        under_test = ClcServer(self.module)
+        under_test._start_stop_servers({'id': 'value'})
+        self.module.fail_json.assert_called_with(
+            msg='server_ids should be a list of servers, aborting')
 
     def test_delete_servers_invalid_list(self):
         ClcServer._delete_servers(self.module, self.clc, {'id': 'value'})
@@ -1238,36 +1240,49 @@ class TestClcServerFunctions(unittest.TestCase):
         policy_id = under_test._get_alert_policy_id_by_name('test1')
         self.assertEqual('111', policy_id)
 
-    @patch.object(clc_server, 'AnsibleModule')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_change_server_power_state_started(self, mock_clc_sdk, mock_ansible_module):
-        server = mock.MagicMock()
-        server.PowerOn.return_value = 'OK'
-        result = ClcServer._change_server_power_state(mock_ansible_module, server, 'started')
-        self.assertEqual(result, 'OK')
-        self.assertEqual(mock_ansible_module.fail_json.called, False)
-
-    @patch.object(clc_server, 'AnsibleModule')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_change_server_power_state_stopped(self, mock_clc_sdk, mock_ansible_module):
-        server = mock.MagicMock()
-        server.ShutDown.return_value = None
-        server.PowerOff.return_value = 'OK'
-        result = ClcServer._change_server_power_state(mock_ansible_module, server, 'stopped')
-        self.assertEqual(result, 'OK')
-        self.assertEqual(mock_ansible_module.fail_json.called, False)
-
-    @patch.object(clc_server, 'AnsibleModule')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_change_server_power_state_error(self, mock_clc_sdk, mock_ansible_module):
-        error = CLCException('Failed')
+    @patch.object(clc_common, 'call_clc_api')
+    def test_change_server_power_state_started(self, mock_call_api):
         server = mock.MagicMock()
         server.id = 'server1'
-        server.ShutDown.return_value = None
-        server.PowerOff.side_effect = error
-        result = ClcServer._change_server_power_state(mock_ansible_module, server, 'stopped')
+        response = [{'server': 'server1', 'isQueued': False}]
+        mock_call_api.return_value = response
+        under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'mock_alias'
+        result = under_test._change_server_power_state(server, 'started')
+        self.assertEqual(result, response)
+        mock_call_api.assert_called_once_with(
+            under_test.module, under_test.clc_auth,
+            'POST', '/operations/mock_alias/servers/powerOn',
+            data=[server.id])
+        self.assertEqual(self.module.fail_json.called, False)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_change_server_power_state_stopped(self, mock_call_api):
+        server = mock.MagicMock()
+        server.id = 'server1'
+        response = [{'server': 'server1', 'isQueued': False}]
+        mock_call_api.return_value = response
+        under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'mock_alias'
+        result = under_test._change_server_power_state(server, 'stopped')
+        self.assertEqual(result, response)
+        mock_call_api.assert_called_once_with(
+            under_test.module, under_test.clc_auth,
+            'POST', '/operations/mock_alias/servers/shutDown',
+            data=[server.id])
+        self.assertEqual(self.module.fail_json.called, False)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_change_server_power_state_error(self, mock_call_api):
+        error = ClcApiException('Failed')
+        server = mock.MagicMock()
+        server.id = 'server1'
+        mock_call_api.side_effect = error
+        under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'mock_alias'
+        result = under_test._change_server_power_state(server, 'stopped')
         self.assertEqual(result, None)
-        mock_ansible_module.fail_json.assert_called_with(msg='Unable to change power state for server server1')
+        self.module.fail_json.assert_called_with(msg='Unable to change power state for server server1')
 
     @patch.object(clc_server, 'AnsibleModule')
     @patch.object(clc_server, 'clc_sdk')
@@ -1456,22 +1471,21 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(changed, True)
         self.assertEqual(terminated_server_ids, ['mockid1'])
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_start_stop_servers(self, mock_clc_sdk):
+    @patch.object(clc_common, 'servers_by_id')
+    def test_start_stop_servers(self, mock_servers_by_id):
         params = {
             'wait': False
         }
         self.module.params = params
         mock_server = mock.MagicMock()
         mock_server.id = 'mockid1'
-        mock_servers = mock.MagicMock()
-        mock_servers.id = 'temp1'
-        mock_servers.Servers.return_value = [mock_server]
-        mock_clc_sdk.v2.Servers.return_value = mock_servers
+        mock_servers = [mock_server]
+        mock_servers_by_id.return_value = mock_servers
         self.module.check_mode = False
         under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'mock_alias'
         changed, server_dict_array, result_server_ids = \
-            under_test._start_stop_servers(self.module, mock_clc_sdk, ['server1', 'server2'])
+            under_test._start_stop_servers(['server1', 'server2'])
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, True)
         self.assertEqual(result_server_ids, ['mockid1'])
@@ -1492,7 +1506,8 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_server.Refresh.side_effect = error
         mock_servers = [mock_server]
         under_test._refresh_servers(self.module, mock_servers)
-        self.module.fail_json.assert_called_with(msg='Unable to refresh the server mock_server_id. Mock fail message')
+        self.module.fail_json.assert_called_with(
+            msg='Unable to refresh the servers. Mock fail message')
 
     @patch.object(clc_server, 'clc_common')
     def test_find_alias_exception(self, mock_clc_common):

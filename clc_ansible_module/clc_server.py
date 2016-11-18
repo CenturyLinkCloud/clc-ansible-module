@@ -764,12 +764,12 @@ class ClcServer(object):
                 self.clc_auth = clc_common.authenticate(self.module)
             defaults = clc_common.call_clc_api(
                 self.module, self.clc_auth,
-                'GET', '/groups/{0}/{1}/defaults'.format(
-                    self.clc_auth['clc_alias'], group.id))
+                'GET', '/groups/{alias}/{id}/defaults'.format(
+                    alias=self.clc_auth['clc_alias'], id=group.id))
         except ClcApiException as ex:
             return self.module.fail_json(
-                msg='Failed to get group defaults for group: {0}'.format(
-                    group.name))
+                msg='Failed to get group defaults for group: {name}'.format(
+                    name=group.name))
         return defaults
 
     def _group_default_value(self, group, key):
@@ -798,7 +798,8 @@ class ClcServer(object):
         except ClcApiException as ex:
             self.module.fail_json(
                 msg=str(
-                    "Unable to find location: {0}".format(location)))
+                    "Unable to find location: {location}".format(
+                        location=location)))
 
     def _find_alias(self):
         """
@@ -817,8 +818,8 @@ class ClcServer(object):
             return alias
         except ClcApiException as ex:
             self.module.fail_json(
-                msg='Unable to find account alias. {0}'.format(
-                    ex.message))
+                msg='Unable to find account alias. {msg}'.format(
+                    msg=ex.message))
 
     def _find_cpu(self, group):
         """
@@ -958,8 +959,9 @@ class ClcServer(object):
             try:
                 templates = clc_common.call_clc_api(
                     self.module, self.clc_auth,
-                    'GET', '/datacenters/{0}/{1}/deploymentCapabilities'.format(
-                        self.clc_auth['clc_alias'], datacenter))['templates']
+                    'GET', '/datacenters/{alias}/{location}/deploymentCapabilities'.format(
+                        alias=self.clc_auth['clc_alias'],
+                        location=datacenter))['templates']
                 for template in templates:
                     if template['name'].lower().find(
                             lookup_template.lower()) != -1:
@@ -988,8 +990,8 @@ class ClcServer(object):
             temp_auth['v2_api_url'] = 'https://api.ctl.io/v2-experimental/'
             networks = clc_common.call_clc_api(
                 self.module, temp_auth,
-                'GET', '/networks/{0}/{1}'.format(
-                    temp_auth['clc_alias'], datacenter))
+                'GET', '/networks/{alias}/{location}'.format(
+                    alias=temp_auth['clc_alias'], location=datacenter))
             if network_id:
                 for network in networks:
                     if network_id.lower() in [network['id'].lower(),
@@ -999,9 +1001,9 @@ class ClcServer(object):
                         break
                 if not network_id:
                     return self.module.fail_json(
-                        msg='No matching network: {0} '
-                            'found in location: {1}'.format(
-                                network_id, datacenter))
+                        msg='No matching network: {network} '
+                            'found in location: {location}'.format(
+                                network=network_id, location=datacenter))
             else:
                 network_id = networks[0]['id']
             return network_id
@@ -1024,8 +1026,8 @@ class ClcServer(object):
             try:
                 aa_policies = clc_common.call_clc_api(
                     self.module, self.clc_auth,
-                    'GET', '/antiAffinityPolicies/{0}'.format(
-                        self.clc_auth['clc_alias']))
+                    'GET', '/antiAffinityPolicies/{alias}'.format(
+                        alias=self.clc_auth['clc_alias']))
                 for policy in aa_policies['items']:
                     if (aa_policy_id and
                             policy['id'].lower() == aa_policy_id.lower()):
@@ -1036,14 +1038,14 @@ class ClcServer(object):
             except ClcApiException as ex:
                 return self.module.fail_json(
                     msg='Unable to fetch anti affinity policies for '
-                        'account: {0}. {1}'.format(
-                            self.clc_auth['clc_alias'], ex.message))
+                        'account: {alias}. {msg}'.format(
+                            alias=self.clc_auth['clc_alias'], msg=ex.message))
 
             if len(aa_policy_ids) != 1:
                 if aa_policy_id:
-                    policy_str = 'id: {0}'.format(aa_policy_id)
+                    policy_str = 'id: {id}'.format(id=aa_policy_id)
                 else:
-                    policy_str = 'name: {0}'.format(aa_policy_name)
+                    policy_str = 'name: {name}'.format(name=aa_policy_name)
                 if len(aa_policy_ids) == 0:
                     err_msg = 'No anti affinity policy was found with policy '
                 else:
@@ -1130,7 +1132,7 @@ class ClcServer(object):
                 servers.append(server)
 
         self._wait_for_requests(module, request_list)
-        self._refresh_servers(module, servers)
+        servers = self._refresh_servers(servers)
 
         ip_failed_servers = self._add_public_ip_to_servers(
             module=module,
@@ -1251,21 +1253,20 @@ class ClcServer(object):
                 module.fail_json(
                     msg='Unable to process server request')
 
-    @staticmethod
-    def _refresh_servers(module, servers):
+    def _refresh_servers(self, servers):
         """
         Loop through a list of servers and refresh them.
-        :param module: the AnsibleModule object
-        :param servers: list of clc-sdk.Server instances to refresh
+        :param servers: list of Server objects to refresh
         :return: none
         """
-        for server in servers:
-            try:
-                server.Refresh()
-            except CLCException as ex:
-                module.fail_json(msg='Unable to refresh the server {0}. {1}'.format(
-                    server.id, ex.message
-                ))
+        server_ids = [s.id for s in servers]
+        try:
+            refreshed_ids = clc_common.servers_by_id(self.module, self.clc_auth, server_ids)
+        except ClcApiException as ex:
+            self.module.fail_json(
+                msg='Unable to refresh servers.  {msg}'.format(
+                    ex.message))
+        return refreshed_ids
 
     @staticmethod
     def _add_public_ip_to_servers(
@@ -1351,8 +1352,9 @@ class ClcServer(object):
                     }))
         except APIFailedResponse as e:
             raise CLCException(
-                'Failed to associate alert policy to the server : {0} with Error {1}'.format(
-                    server_id, str(e.response_text)))
+                'Failed to associate alert policy to the server : {id} '
+                'with Error {msg}'.format(
+                    id=server_id, msg=str(e.response_text)))
 
     def _get_alert_policy_id_by_name(self, alert_policy_name):
         """
@@ -1365,7 +1367,8 @@ class ClcServer(object):
         try:
             alert_policies = clc_common.call_clc_api(
                 self.module, self.clc_auth,
-                'GET', '/alertPolicies/{0}'.format(self.clc_auth['clc_alias']))
+                'GET', '/alertPolicies/{alias}'.format(
+                    alias=self.clc_auth['clc_alias']))
             for policy in alert_policies['items']:
                 if policy['name'].lower() == alert_policy_name.lower():
                     if not alert_policy_id:
@@ -1376,8 +1379,8 @@ class ClcServer(object):
         except ClcApiException as ex:
                 return self.module.fail_json(
                     msg='Unable to fetch alert policies for '
-                        'account: {0}. {1}'.format(
-                            self.clc_auth['clc_alias'], ex.message))
+                        'account: {alias}. {msg}'.format(
+                            alias=self.clc_auth['clc_alias'], msg=ex.message))
         return alert_policy_id
 
     @staticmethod
@@ -1408,16 +1411,13 @@ class ClcServer(object):
 
         return True, server_dict_array, terminated_server_ids
 
-    @staticmethod
-    def _start_stop_servers(module, clc, server_ids):
+    def _start_stop_servers(self, server_ids):
         """
         Start or Stop the servers on the provided list
-        :param module: the AnsibleModule object
-        :param clc: the clc-sdk instance to use
         :param server_ids: list of servers to start or stop
         :return: a list of dictionaries with server information about the servers that were started or stopped
         """
-        p = module.params
+        p = self.module.params
         state = p.get('state')
         changed = False
         changed_servers = []
@@ -1426,23 +1426,23 @@ class ClcServer(object):
         request_list = []
 
         if not isinstance(server_ids, list) or len(server_ids) < 1:
-            return module.fail_json(
+            return self.module.fail_json(
                 msg='server_ids should be a list of servers, aborting')
 
-        servers = clc.v2.Servers(server_ids).Servers()
+        servers = clc_common.servers_by_id(self.module, self.clc_auth,
+                                           server_ids)
         for server in servers:
             if server.powerState != state:
                 changed_servers.append(server)
-                if not module.check_mode:
+                if not self.module.check_mode:
                     request_list.append(
-                        ClcServer._change_server_power_state(
-                            module,
+                        self._change_server_power_state(
                             server,
                             state))
                 changed = True
 
-        ClcServer._wait_for_requests(module, request_list)
-        ClcServer._refresh_servers(module, changed_servers)
+        ClcServer._wait_for_requests(self.module, request_list)
+        changed_servers = self._refresh_servers(changed_servers)
 
         for server in set(changed_servers + servers):
             try:
@@ -1458,8 +1458,7 @@ class ClcServer(object):
 
         return changed, server_dict_array, result_server_ids
 
-    @staticmethod
-    def _change_server_power_state(module, server, state):
+    def _change_server_power_state(self, server, state):
         """
         Change the server powerState
         :param module: the module to check for intended state
@@ -1470,16 +1469,18 @@ class ClcServer(object):
         result = None
         try:
             if state == 'started':
-                result = server.PowerOn()
+                operation = 'powerOn'
             else:
-                # Try to shut down the server and fall back to power off when unable to shut down.
-                result = server.ShutDown()
-                if result and hasattr(result, 'requests') and result.requests[0]:
-                    return result
-                else:
-                    result = server.PowerOff()
-        except CLCException:
-            module.fail_json(
+                operation = 'shutDown'
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'POST', '/operations/{alias}/servers/{operation}'.format(
+                    alias=self.clc_auth['clc_alias'], operation=operation),
+                data=[server.id])
+            # TODO: check whether server shutDown, if not run powerOff
+
+        except ClcApiException:
+            self.module.fail_json(
                 msg='Unable to change power state for server {0}'.format(
                     server.id))
         return result
@@ -1522,8 +1523,9 @@ class ClcServer(object):
 
         if group is None:
             self.module.fail_json(
-                msg='Unable to find group: {0} in location: {1}'.format(
-                    lookup_group, datacenter))
+                msg='Unable to find group: {group} '
+                    'in location: {location}'.format(
+                        group=lookup_group, location=datacenter))
 
         return group
 
@@ -1573,10 +1575,9 @@ class ClcServer(object):
 
             result = clc.v2.Requests(res)
         except APIFailedResponse as ex:
-            return module.fail_json(msg='Unable to create the server: {0}. {1}'.format(
-                server_params.get('name'),
-                ex.response_text
-            ))
+            return module.fail_json(
+                msg='Unable to create the server: {name}. {msg}'.format(
+                    name=server_params.get('name'), msg=ex.response_text))
 
         #
         # Patch the Request object so that it returns a valid server
@@ -1633,14 +1634,18 @@ class ClcServer(object):
                         (svr_uuid, e.response_status_code, e.message))
                 if retry_count == 0:
                     return module.fail_json(
-                        msg='Unable to reach the CLC API after {0} attempts'.format(retries))
+                        msg='Unable to reach the CLC API '
+                            'after {num} attempts'.format(
+                                num=retries))
                 time.sleep(back_out)
                 back_out *= 2
             except requests.exceptions.ConnectionError as ce:
                 # retry on connection error
                 if retry_count == 0:
                     return module.fail_json(
-                        msg='Unable to connect to the CLC API after {0} attempts. {1}'.format(retries, ce.message))
+                        msg='Unable to connect to the CLC API '
+                            'after {num} attempts. {msg}'.format(
+                                num=retries, msg=ce.message))
                 time.sleep(back_out)
                 back_out *= 2
 
