@@ -532,16 +532,22 @@ class TestClcServerFunctions(unittest.TestCase):
                                                       partially_created_server_ids=[])
         self.assertFalse(self.module.fail_json.called)
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_find_server_by_uuid_404_response(self,
-                                              mock_clc_sdk):
+
+    @patch.object(clc_common, 'Server')
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_server_by_uuid_404_response(self, mock_call_api,
+                                              mock_clc_server):
         # Define Mock Objects
         mock_server = mock.MagicMock()
 
         # Set Mock Server Return Values
-        mock_server.id = 'TEST_SERVER'
-        mock_server.data = {'name': 'TEST_SERVER'}
-        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
+        mock_server.id = 'TEST_ID'
+        mock_server.name = 'TEST_NAME'
+        mock_server.data = {
+            'id': 'TEST_ID',
+            'name': 'TEST_NAME',
+            'details': {'ipAddresses': [{'internal': '1.2.3.4'}]},
+        }
 
         num_api_errors_to_generate = [1]
 
@@ -549,38 +555,38 @@ class TestClcServerFunctions(unittest.TestCase):
         def _api_call_return_values(*args, **kwargs):
             if num_api_errors_to_generate[0] > 0:
                 num_api_errors_to_generate[0] -= 1
-                error = APIFailedResponse()
-                error.response_status_code = 404
+                error = ClcApiException(message='ERROR_MESSAGE', code=404)
+                error.code = 404
                 raise error
             else:
-                return {'id': '12345'}
+                return mock_server.data
 
-        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
-        mock_clc_sdk.v2.Server.return_value  = mock_server
-        mock_clc_sdk.v2.Account.GetAlias.return_value  = 'TST'
+        mock_call_api.side_effect = _api_call_return_values
+        mock_clc_server.return_value = mock_server
 
         # Test
         under_test = ClcServer(self.module)
-        result = under_test._find_server_by_uuid_w_retry(clc=mock_clc_sdk,
-                                                         module=self.module,
-                                                         svr_uuid='12345',
-                                                         alias=None,
-                                                         retries=2)
+        under_test.clc_auth['clc_alias'] = 'mock_alias'
+        result = under_test._find_server_by_uuid_w_retry(
+            svr_uuid='12345', alias=None, retries=2, back_out=0)
 
         # Assert
         self.assertEqual(result, mock_server)
         self.assertFalse(self.module.fail_json.called)
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_find_server_by_uuid_too_many_404_responses(self,
-                                                        mock_clc_sdk):
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_server_by_uuid_too_many_404_responses(self, mock_call_api):
         # Define Mock Objects
         mock_server = mock.MagicMock()
 
         # Set Mock Server Return Values
-        mock_server.id = 'TEST_SERVER'
-        mock_server.data = {'name': 'TEST_SERVER'}
-        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
+        mock_server.id = 'TEST_ID'
+        mock_server.name = 'TEST_NAME'
+        mock_server.data = {
+            'id': 'TEST_ID',
+            'name': 'TEST_NAME',
+            'details': {'ipAddresses': [{'internal': '1.2.3.4'}]},
+        }
 
         num_api_errors_to_generate = [2]
 
@@ -588,92 +594,50 @@ class TestClcServerFunctions(unittest.TestCase):
         def _api_call_return_values(*args, **kwargs):
             if num_api_errors_to_generate[0] > 0:
                 num_api_errors_to_generate[0] -= 1
-                error = APIFailedResponse()
-                error.response_status_code = 404
+                error = ClcApiException(message='ERROR_MESSAGE', code=404)
                 raise error
             else:
-                return {'id': '12345'}
+                return mock_server.data
 
-        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
-        mock_clc_sdk.v2.Server.return_value  = mock_server
+        mock_call_api.side_effect = _api_call_return_values
 
         # Test
         under_test = ClcServer(self.module)
-        result = under_test._find_server_by_uuid_w_retry(clc=mock_clc_sdk,
-                                                         module=self.module,
-                                                         svr_uuid='12345',
-                                                         alias='TST',
-                                                         retries=2)
+        result = under_test._find_server_by_uuid_w_retry(
+            svr_uuid='12345', alias='TST', retries=2, back_out=0)
 
         # Assert
-        self.module.fail_json.assert_called_with(msg='Unable to reach the CLC API after 2 attempts')
+        self.module.fail_json.assert_called_with(
+            msg='Unable to reach the CLC API after 2 attempts')
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_find_server_by_uuid_connection_error(self,
-                                                  mock_clc_sdk):
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_server_by_uuid_other_api_error_response(self, mock_call_api):
         # Define Mock Objects
         mock_server = mock.MagicMock()
 
         # Set Mock Server Return Values
-        mock_server.id = 'TEST_SERVER'
-        mock_server.data = {'name': 'TEST_SERVER'}
-        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
-
-        num_api_errors_to_generate = [2]
-
-        # Setup Mock API Responses
-        def _api_call_return_values(*args, **kwargs):
-            if num_api_errors_to_generate[0] > 0:
-                num_api_errors_to_generate[0] -= 1
-                error = requests.exceptions.ConnectionError()
-                error.response_status_code = 404
-                error.message = "Connection Error"
-                raise error
-            else:
-                return {'id': '12345'}
-
-        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
-        mock_clc_sdk.v2.Server.return_value  = mock_server
-
-        # Test
-        under_test = ClcServer(self.module)
-        result = under_test._find_server_by_uuid_w_retry(clc=mock_clc_sdk,
-                                                         module=self.module,
-                                                         svr_uuid='12345',
-                                                         alias='TST',
-                                                         retries=2)
-
-        # Assert
-        self.module.fail_json.assert_called_with(msg='Unable to connect to the CLC API after 2 attempts. Connection Error')
-
-    @patch.object(clc_server, 'clc_sdk')
-    def test_find_server_by_uuid_other_api_error_response(self,
-                                                          mock_clc_sdk):
-        # Define Mock Objects
-        mock_server = mock.MagicMock()
-
         # Set Mock Server Return Values
-        mock_server.id = 'TEST_SERVER'
-        mock_server.data = {'name': 'TEST_SERVER'}
-        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
-        api_error = APIFailedResponse()
-        api_error.response_status_code = 500
-        api_error.message = "ERROR_MESSAGE"
+        mock_server.id = 'TEST_ID'
+        mock_server.name = 'TEST_NAME'
+        mock_server.data = {
+            'id': 'TEST_ID',
+            'name': 'TEST_NAME',
+            'details': {'ipAddresses': [{'internal': '1.2.3.4'}]},
+        }
+        api_error = ClcApiException(message='ERROR_MESSAGE', code=500)
 
-        mock_clc_sdk.v2.API.Call.side_effect = api_error
-        mock_clc_sdk.v2.Server.return_value  = mock_server
+        mock_call_api.side_effect = api_error
 
         # Test
         under_test = ClcServer(self.module)
-        result = under_test._find_server_by_uuid_w_retry(clc=mock_clc_sdk,
-                                                         module=self.module,
-                                                         svr_uuid='12345',
-                                                         alias='TST')
+        result = under_test._find_server_by_uuid_w_retry(
+            svr_uuid='12345', alias='TST', back_out=0)
 
         # Assert
-        self.module.fail_json.assert_called_with(msg='A failure response was received from CLC API when'
-                                                     ' attempting to get details for a server:  '
-                                                     'UUID=12345, Code=500, Message=ERROR_MESSAGE')
+        self.module.fail_json.assert_called_with(
+            msg='A failure response was received from CLC API when'
+                ' attempting to get details for a server:  '
+                'UUID=12345, Code=500, Message=ERROR_MESSAGE')
 
     def test_clc_set_credentials_w_creds(self):
         with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
@@ -805,9 +769,7 @@ class TestClcServerFunctions(unittest.TestCase):
             self.module, mock_rootgroup,
             'DefaultGroupFromModuleParamsLookup')
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_find_group_w_recursive_lookup(self,
-                                           mock_clc_sdk):
+    def test_find_group_w_recursive_lookup(self):
         # Setup
         mock_group_to_find = mock.MagicMock()
         mock_group_to_find.name = "TEST_RECURSIVE_GRP"
@@ -1368,7 +1330,8 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(created_server_ids, [])
         self.assertEqual(partial_created_servers_ids, [])
 
-    def test_enforce_count_missing_argument(self):
+    @patch.object(ClcServer, '_find_datacenter')
+    def test_enforce_count_missing_argument(self, mock_find_datacenter):
         params = {
             'state': 'present',
             'exact_count': 1
@@ -1378,8 +1341,10 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test._enforce_count(self.module, self.clc)
         self.module.fail_json.assert_called_with(msg="you must use the 'count_group' option with exact_count")
 
+    @patch.object(ClcServer, '_find_datacenter')
     @patch.object(ClcServer, '_find_running_servers_by_group')
-    def test_enforce_count_no_change(self, mock_running_servers):
+    def test_enforce_count_no_change(self, mock_running_servers,
+                                     mock_find_datacenter):
         mock_server_list = [mock.MagicMock()]
         mock_running_servers.return_value = (mock_server_list, mock_server_list)
         params = {
@@ -1413,9 +1378,11 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(len(failed_servers), 1)
         self.assertEqual(failed_servers[0].id, 'server1')
 
+    @patch.object(ClcServer, '_find_datacenter')
     @patch.object(ClcServer, '_create_servers')
     @patch.object(ClcServer, '_find_running_servers_by_group')
-    def test_enforce_count_min_count(self, mock_running_servers, mock_create_servers):
+    def test_enforce_count_min_count(self, mock_running_servers,
+                                     mock_create_servers, mock_find_datacenter):
         mock_server_list = [mock.MagicMock()]
         mock_create_servers.return_value = ('test_server', mock_server_list, mock_server_list, True)
         mock_running_servers.return_value = (mock_server_list, mock_server_list)
@@ -1431,9 +1398,11 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(changed, True)
         self.assertEqual(server_dict_array, 'test_server')
 
+    @patch.object(ClcServer, '_find_datacenter')
     @patch.object(ClcServer, '_delete_servers')
     @patch.object(ClcServer, '_find_running_servers_by_group')
-    def test_enforce_count_max_count(self, mock_running_servers, mock_delete_servers):
+    def test_enforce_count_max_count(self, mock_running_servers,
+                                     mock_delete_servers, mock_find_datacenter):
         mock_server_list = [mock.MagicMock()]
         mock_server_list[0].id = 'mockid1'
         mock_server_list.append(mock.MagicMock())
@@ -1471,8 +1440,11 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(changed, True)
         self.assertEqual(terminated_server_ids, ['mockid1'])
 
+    @patch.object(ClcServer, '_change_server_power_state')
+    @patch.object(ClcServer, '_refresh_servers')
     @patch.object(clc_common, 'servers_by_id')
-    def test_start_stop_servers(self, mock_servers_by_id):
+    def test_start_stop_servers(self, mock_servers_by_id, mock_refresh,
+                                mock_power_state):
         params = {
             'wait': False
         }
@@ -1484,6 +1456,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.check_mode = False
         under_test = ClcServer(self.module)
         under_test.clc_auth['clc_alias'] = 'mock_alias'
+        under_test._refresh_servers.return_value = mock_servers
         changed, server_dict_array, result_server_ids = \
             under_test._start_stop_servers(['server1', 'server2'])
         self.assertFalse(self.module.fail_json.called)
@@ -1497,17 +1470,19 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test._wait_for_requests(self.module, [mock_request])
         self.module.fail_json.assert_called_with(msg='Unable to process server request')
 
-    def test_refresh_servers_fail(self):
-        error = CLCException()
+    @patch.object(clc_common, 'servers_by_id')
+    def test_refresh_servers_fail(self, mock_servers_by_id):
+        error = ClcApiException()
         error.message = 'Mock fail message'
         under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'mock_alias'
         mock_server = mock.MagicMock()
         mock_server.id = 'mock_server_id'
-        mock_server.Refresh.side_effect = error
+        mock_servers_by_id.side_effect = [error]
         mock_servers = [mock_server]
-        under_test._refresh_servers(self.module, mock_servers)
+        under_test._refresh_servers(mock_servers)
         self.module.fail_json.assert_called_with(
-            msg='Unable to refresh the servers. Mock fail message')
+            msg='Unable to refresh servers. Mock fail message')
 
     @patch.object(clc_server, 'clc_common')
     def test_find_alias_exception(self, mock_clc_common):

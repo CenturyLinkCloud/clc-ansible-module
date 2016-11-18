@@ -39,7 +39,13 @@ from ansible.module_utils.urls import *  # pylint: disable=W0614
 
 
 class ClcApiException(Exception):
-    pass
+
+    def __init__(self, message=None, code=None):
+        if message is not None:
+            super(self.__class__, self).__init__(message)
+        else:
+            super(self.__class__, self).__init__()
+        self.code = code
 
 
 class Group(object):
@@ -98,8 +104,8 @@ def _default_headers():
     headers = {}
     agent_string = 'ClcAnsibleModule/' + __version__
     headers['Api-Client'] = agent_string
-    headers['User-Agent'] = 'Python-urllib2/{0} {1}'.format(
-         urllib2.__version__, agent_string)
+    headers['User-Agent'] = 'Python-urllib2/{version} {agent}'.format(
+         version=urllib2.__version__, agent=agent_string)
     return headers
 
 
@@ -128,7 +134,8 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None):
     if 'authentication/login' not in url:
         if 'v2_api_token' not in clc_auth:
             clc_auth = authenticate(module)
-        headers['Authorization'] = 'Bearer {0}'.format(clc_auth['v2_api_token'])
+        headers['Authorization'] = 'Bearer {token}'.format(
+            token=clc_auth['v2_api_token'])
     if data is not None:
         if method.upper() == 'GET':
             url += '?' + urllib.urlencode(data)
@@ -138,19 +145,61 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None):
             headers['Content-Type'] = 'application/json'
     try:
         response = open_url(
-            url='{0}/{1}'.format(clc_auth['v2_api_url'].rstrip('/'),
-                                 url.lstrip('/')),
+            url='{endpoint}/{path}'.format(
+                endpoint=clc_auth['v2_api_url'].rstrip('/'),
+                path=url.lstrip('/')),
             method=method,
             headers=headers,
             data=data)
     except urllib2.HTTPError as ex:
-        raise ClcApiException(
-            'Error calling CenturyLink Cloud API: {0}'.format(ex.message))
+        api_ex = ClcApiException(
+            message='Error calling CenturyLink Cloud API: {msg}'.format(
+                msg=ex.message),
+            code=ex.code)
+        raise api_ex
     try:
         return json.loads(response.read())
     except:
         raise ClcApiException(
             'Error converting CenturyLink Cloud API response to JSON')
+
+
+def operation_status(module, clc_auth, operation_id):
+    """
+    Call back to the CLC API to determine status
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param operation_id: Operation id for which to check the status
+    :return: Status of the operation, one of the below values
+    ('notStarted, 'executing', 'succeeded', 'failed', 'resumed', 'unknown')
+    """
+    response = call_clc_api(
+        module, clc_auth,
+        'GET', '/operations/{alias}/status/{id}'.format(
+            alias=clc_auth['clc_alias'], id=operation_id))
+    return response['status']
+
+
+def wait_until_complete(module, clc_auth, operation_id, poll_freq=2):
+    """
+    Wail until CLC API operation is complete
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param operation_id: Operation id for which to wait for completion
+    :param poll_freq: How frequently to poll the CLC API
+    :return:
+    """
+    time_completed = None
+    while not time_completed:
+        status = operation_status(module, clc_auth, operation_id)
+        if status == 'succeeded':
+            time_completed = time.time()
+        elif status in ('failed', 'resumed', 'unknown'):
+            time_completed = time.time()
+            raise ClcApiException(
+                'Execution of operation {id} {status}'.format(
+                    id=operation_id, status=status))
+        time.sleep(poll_freq)
 
 
 def authenticate(module):
@@ -223,8 +272,8 @@ def group_tree(module, clc_auth, alias=None, datacenter=None):
         alias = clc_auth['clc_alias']
     r = call_clc_api(
         module, clc_auth,
-        'GET', '/datacenters/{0}/{1}'.format(
-            alias, datacenter),
+        'GET', '/datacenters/{alias}/{location}'.format(
+            alias=alias, location=datacenter),
         data={'GroupLinks': 'true'})
 
     root_group_id, root_group_name = [(obj['id'], obj['name'])
@@ -233,8 +282,8 @@ def group_tree(module, clc_auth, alias=None, datacenter=None):
 
     group_data = call_clc_api(
         module, clc_auth,
-        'GET', '/groups/{0}/{1}'.format(
-            alias, root_group_id))
+        'GET', '/groups/{alias}/{id}'.format(
+            alias=alias, id=root_group_id))
 
     return _walk_groups(None, group_data)
 
@@ -273,12 +322,13 @@ def find_group(module, search_group, group_info, parent_info=None):
     groups = _find_group_recursive(
         search_group, group_info, parent_info=parent_info)
     if len(groups) > 1:
-        error_message = 'Found {0:d} groups with name: \"{1}\"'.format(
-            len(groups), group_info)
+        error_message = 'Found {num:d} groups with name: \"{name}\"'.format(
+            num=len(groups), name=group_info)
         if parent_info is None:
             error_message += ', no parent group specified.'
         else:
-            error_message += ' in group: \"{0}\".'.format(parent_info)
+            error_message += ' in group: \"{name}\".'.format(
+                name=parent_info)
         error_message += ' Group ids: ' + ', '.join([g.id for g in groups])
         return module.fail_json(msg=error_message)
     elif len(groups) == 1:
@@ -315,14 +365,14 @@ def _find_server(module, clc_auth, server_id):
     try:
         r = call_clc_api(
             module, clc_auth,
-            'GET', 'servers/{0}/{1}'.format(
-                clc_auth['clc_alias'], server_id))
+            'GET', 'servers/{alias}/{id}'.format(
+                alias=clc_auth['clc_alias'], id=server_id))
         server = Server(r)
         return server
     except ClcApiException as ex:
         return module.fail_json(
             msg='Failed to get server information '
-                'for server id: {0}:'.format(server_id))
+                'for server id: {id}:'.format(id=server_id))
 
 
 def servers_by_id(module, clc_auth, server_ids):

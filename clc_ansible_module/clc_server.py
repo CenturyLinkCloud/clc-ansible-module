@@ -1263,9 +1263,9 @@ class ClcServer(object):
         try:
             refreshed_ids = clc_common.servers_by_id(self.module, self.clc_auth, server_ids)
         except ClcApiException as ex:
-            self.module.fail_json(
-                msg='Unable to refresh servers.  {msg}'.format(
-                    ex.message))
+            return self.module.fail_json(
+                msg='Unable to refresh servers. {msg}'.format(
+                    msg=ex.message))
         return refreshed_ids
 
     @staticmethod
@@ -1596,56 +1596,47 @@ class ClcServer(object):
 
         return result
 
-    @staticmethod
-    def _find_server_by_uuid_w_retry(
-            clc, module, svr_uuid, alias=None, retries=25, back_out=2):
+    def _find_server_by_uuid_w_retry(self, svr_uuid, alias=None,
+                                     retries=5, back_out=2):
         """
-        Find the clc server by the UUID returned from the provisioning request.  Retry the request if a 404 is returned.
-        :param clc: the clc-sdk instance to use
-        :param module: the AnsibleModule object
+        Find the clc server by the UUID returned from the provisioning request.
+        Retry the request if a 404 is returned.
         :param svr_uuid: UUID of the server
-        :param retries: the number of retry attempts to make prior to fail. default is 5
+        :param retries: the number of retry attempts to make prior to fail.
+        default is 5
         :param alias: the Account Alias to search
-        :return: a clc-sdk.Server instance
+        :return: a clc_common.Server instance
         """
         if not alias:
-            alias = clc.v2.Account.GetAlias()
+            if 'clc_alias' not in self.clc_auth:
+                clc_common.authenticate(self.module)
+            alias = self.clc_auth['clc_alias']
 
-        # Wait and retry if the api returns a 404 or a connection error from requests module
+        # Wait and retry if the api returns a 404
         retry_count = retries
         while True:
             retry_count -= 1
             try:
-                server_obj = clc.v2.API.Call(
-                    method='GET', url='servers/%s/%s?uuid=true' %
-                    (alias, svr_uuid))
-                server_id = server_obj['id']
-                server = clc.v2.Server(
-                    id=server_id,
-                    alias=alias,
-                    server_obj=server_obj)
+                server_data = clc_common.call_clc_api(
+                    self.module, self.clc_auth,
+                    'GET', url='/servers/{alias}/{id}'.format(
+                        alias=alias, id=svr_uuid),
+                    data={'uuid': 'true'})
+                server = clc_common.Server(server_data)
                 return server
 
-            except APIFailedResponse as e:
-                if e.response_status_code != 404:
-                    return module.fail_json(
+            except ClcApiException as e:
+                if e.code != 404:
+                    return self.module.fail_json(
                         msg='A failure response was received from CLC API when '
-                        'attempting to get details for a server:  UUID=%s, Code=%i, Message=%s' %
-                        (svr_uuid, e.response_status_code, e.message))
+                            'attempting to get details for a server:  '
+                            'UUID={id}, Code={code}, Message={msg}'.format(
+                                id=svr_uuid, code=e.code, msg=e.message))
                 if retry_count == 0:
-                    return module.fail_json(
+                    return self.module.fail_json(
                         msg='Unable to reach the CLC API '
                             'after {num} attempts'.format(
                                 num=retries))
-                time.sleep(back_out)
-                back_out *= 2
-            except requests.exceptions.ConnectionError as ce:
-                # retry on connection error
-                if retry_count == 0:
-                    return module.fail_json(
-                        msg='Unable to connect to the CLC API '
-                            'after {num} attempts. {msg}'.format(
-                                num=retries, msg=ce.message))
                 time.sleep(back_out)
                 back_out *= 2
 

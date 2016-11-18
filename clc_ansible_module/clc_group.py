@@ -322,11 +322,12 @@ class ClcGroup(object):
         try:
             response = clc_common.call_clc_api(
                 self.module, self.clc_auth,
-                'DELETE', '/groups/{0}/{1}'.format(
-                    self.clc_auth['clc_alias'], group.id))
+                'DELETE', '/groups/{alias}/{id}'.format(
+                    alias=self.clc_auth['clc_alias'], id=group.id))
         except ClcApiException as ex:
-            self.module.fail_json(msg='Failed to delete group :{0}. {1}'.format(
-                group_name, ex.message))
+            self.module.fail_json(
+                msg='Failed to delete group :{name}. {msg}'.format(
+                    name=group_name, msg=ex.message))
         return response
 
     def _ensure_group_is_present(
@@ -369,7 +370,8 @@ class ClcGroup(object):
             changed = True
         else:
             self.module.fail_json(
-                msg='parent group: {0} does not exist'.format(parent_name))
+                msg='parent group: \"{name}\" does not exist'.format(
+                    name=parent_name))
 
         return changed, group
 
@@ -390,13 +392,15 @@ class ClcGroup(object):
         try:
             group_data = clc_common.call_clc_api(
                 self.module, self.clc_auth,
-                'POST', '/groups/{0}'.format(self.clc_auth['clc_alias']),
+                'POST', '/groups/{alias}'.format(
+                    alias=self.clc_auth['clc_alias']),
                 data={'name': group_name, 'description': description,
                       'parentGroupId': parent.id})
             group = clc_common.Group(group_data)
         except ClcApiException as ex:
-            self.module.fail_json(msg='Failed to create group :{0}. {1}'.format(
-                group_name, ex.message))
+            self.module.fail_json(
+                msg='Failed to create group :{name}. {msg}'.format(
+                    name=group_name, msg=ex.message))
         return group
 
     def _group_exists(self, group_name, parent_name):
