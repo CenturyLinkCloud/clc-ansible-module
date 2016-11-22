@@ -1161,20 +1161,17 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test.process_request()
         self.module.fail_json.assert_called_with(msg='template parameter is required for new instance')
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_add_alert_policy_to_server_exception(self, mock_clc_sdk):
-        error = APIFailedResponse()
-        error.response_text = 'Mock failure message'
-        mock_clc_sdk.v2.API.Call.side_effect = error
+    @patch.object(clc_common, 'call_clc_api')
+    def test_add_alert_policy_to_server_exception(self, mock_call_api):
+        error = ClcApiException('Mock failure message')
+        mock_call_api.side_effect = error
         under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'mock_alias'
         server_params = {
-            'alias': 'mock',
             'name': 'test server'
         }
-        self.assertRaises(CLCException,
+        self.assertRaises(ClcApiException,
                           under_test._add_alert_policy_to_server,
-                          mock_clc_sdk,
-                          'alias',
                           'server_id',
                           'alert_policy_id')
 
@@ -1246,37 +1243,38 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(result, None)
         self.module.fail_json.assert_called_with(msg='Unable to change power state for server server1')
 
-    @patch.object(clc_server, 'AnsibleModule')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_add_alert_policy_to_servers(self, mock_clc_sdk, mock_ansible_module):
+    @patch.object(clc_common, 'call_clc_api')
+    def test_add_alert_policy_to_servers(self, mock_call_api):
         params = {
-            'alias': 'test',
             'alert_policy_id': '123',
         }
-        mock_ansible_module.params = params
-        mock_ansible_module.check_mode = False
+        self.module.params = params
+        self.module.check_mode = False
         server = mock.MagicMock()
         server.id = 'server1'
         servers = [server]
-        result = ClcServer._add_alert_policy_to_servers(mock_clc_sdk, mock_ansible_module, servers)
+        under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'test'
+        result = under_test._add_alert_policy_to_servers(servers)
         self.assertEqual(result, [])
-        self.assertFalse(mock_ansible_module.fail_json.called)
+        self.assertFalse(self.module.fail_json.called)
 
-    @patch.object(clc_server, 'AnsibleModule')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_add_alert_policy_to_servers_error(self, mock_clc_sdk, mock_ansible_module):
-        error = CLCException('Failed')
-        mock_clc_sdk.v2.API.Call.side_effect = error
+    @patch.object(clc_common, 'call_clc_api')
+    def test_add_alert_policy_to_servers_error(self, mock_call_api):
+        error = ClcApiException('Failed')
+        mock_call_api.side_effect = error
         params = {
-            'alias': 'test',
             'alert_policy_id': '123',
         }
-        mock_ansible_module.params = params
-        mock_ansible_module.check_mode = False
+        self.module.params = params
+        self.module.check_mode = False
         server = mock.MagicMock()
         server.id = 'server1'
         servers = [server]
-        result = ClcServer._add_alert_policy_to_servers(mock_clc_sdk, mock_ansible_module, servers)
+        under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'test'
+        result = under_test._add_alert_policy_to_servers(servers)
+        self.assertEqual(result, servers)
         self.assertEqual(result[0].id, 'server1')
 
     @patch.object(clc_server, 'AnsibleModule')

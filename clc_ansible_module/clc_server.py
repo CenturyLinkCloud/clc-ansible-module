@@ -1305,8 +1305,7 @@ class ClcServer(object):
         ClcServer._wait_for_requests(module, request_list)
         return failed_servers
 
-    @staticmethod
-    def _add_alert_policy_to_servers(clc, module, servers):
+    def _add_alert_policy_to_servers(self, servers):
         """
         Associate the alert policy to servers
         :param clc: the clc-sdk instance to use
@@ -1315,46 +1314,37 @@ class ClcServer(object):
         :return: failed_servers: the list of servers which failed while associating alert policy
         """
         failed_servers = []
-        p = module.params
+        p = self.module.params
         alert_policy_id = p.get('alert_policy_id')
-        alias = p.get('alias')
 
-        if alert_policy_id and not module.check_mode:
+        if alert_policy_id and not self.module.check_mode:
             for server in servers:
                 try:
-                    ClcServer._add_alert_policy_to_server(
-                        clc=clc,
-                        alias=alias,
+                    self._add_alert_policy_to_server(
                         server_id=server.id,
                         alert_policy_id=alert_policy_id)
-                except CLCException:
+                except ClcApiException:
                     failed_servers.append(server)
         return failed_servers
 
-    @staticmethod
-    def _add_alert_policy_to_server(
-            clc, alias, server_id, alert_policy_id):
+    def _add_alert_policy_to_server(self, server_id, alert_policy_id):
         """
         Associate an alert policy to a clc server
-        :param clc: the clc-sdk instance to use
-        :param alias: the clc account alias
         :param server_id: The clc server id
         :param alert_policy_id: the alert policy id to be associated to the server
         :return: none
         """
         try:
-            clc.v2.API.Call(
-                method='POST',
-                url='servers/%s/%s/alertPolicies' % (alias, server_id),
-                payload=json.dumps(
-                    {
-                        'id': alert_policy_id
-                    }))
-        except APIFailedResponse as e:
-            raise CLCException(
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'POST', '/servers/{alias}/{id}/alertPolicies'.format(
+                    alias=self.clc_auth['clc_alias'], id=server_id),
+                data={'id': alert_policy_id})
+        except ClcApiException as e:
+            raise ClcApiException(
                 'Failed to associate alert policy to the server : {id} '
                 'with Error {msg}'.format(
-                    id=server_id, msg=str(e.response_text)))
+                    id=server_id, msg=str(e.message)))
 
     def _get_alert_policy_id_by_name(self, alert_policy_name):
         """
