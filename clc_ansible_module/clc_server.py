@@ -981,7 +981,8 @@ class ClcServer(object):
         :param datacenter: the datacenter to search for a network id
         :return: a valid network id
         """
-        network_id = self.module.params.get('network_id')
+        network_id = None
+        network_id_search = self.module.params.get('network_id')
         # Validates provided network id
         # Allows lookup of network by id, name, or cidr notation
 
@@ -992,18 +993,18 @@ class ClcServer(object):
                 self.module, temp_auth,
                 'GET', '/networks/{alias}/{location}'.format(
                     alias=temp_auth['clc_alias'], location=datacenter))
-            if network_id:
+            if network_id_search:
                 for network in networks:
-                    if network_id.lower() in [network['id'].lower(),
-                                              network['name'].lower(),
-                                              network['cidr'].lower()]:
+                    if network_id_search.lower() in [network['id'].lower(),
+                                                     network['name'].lower(),
+                                                     network['cidr'].lower()]:
                         network_id = network['id']
                         break
                 if not network_id:
                     return self.module.fail_json(
                         msg='No matching network: {network} '
                             'found in location: {location}'.format(
-                                network=network_id, location=datacenter))
+                                network=network_id_search, location=datacenter))
             else:
                 network_id = networks[0]['id']
             return network_id
