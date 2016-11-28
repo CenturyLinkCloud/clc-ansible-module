@@ -17,9 +17,6 @@ import unittest
 import requests
 from uuid import UUID
 import os
-import clc as clc_sdk
-from clc import CLCException
-from clc import APIFailedResponse
 import mock
 from mock import patch, create_autospec
 
@@ -33,31 +30,19 @@ from clc_ansible_module.clc_server import ClcServer
 class TestClcServerFunctions(unittest.TestCase):
 
     def setUp(self):
-        self.clc = mock.MagicMock()
         self.module = mock.MagicMock()
         self.datacenter = mock.MagicMock()
         self.server = ClcServer(self.module)
         self.server.clc_common = mock.MagicMock()
 
-    def test_clc_module_not_found(self):
-        # Setup Mock Import Function
-        real_import = __import__
-        def mock_import(name, *args):
-            if name == 'clc': raise ImportError
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_server)
-            ClcServer(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(msg='clc-python-sdk required for this module')
-
-        # Reset
-        reload(clc_server)
-
     @patch.object(clc_server, 'clc_common')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_process_request_state_absent(self, mock_clc_sdk, mock_clc_common):
+    @patch.object(ClcServer, '_find_group')
+    @patch.object(ClcServer, '_find_datacenter')
+    @patch.object(ClcServer, '_delete_servers')
+    def test_process_request_state_absent(self, mock_delete_servers,
+                                          mock_find_datacenter,
+                                          mock_find_group,
+                                          mock_clc_common):
         # Setup Test
         self.module.params = {
             'state': 'absent',
@@ -69,41 +54,43 @@ class TestClcServerFunctions(unittest.TestCase):
         }
 
         mock_server = mock.MagicMock()
-        mock_request = mock.MagicMock()
         mock_server.id = 'TEST_SERVER'
-        mock_server.Delete.return_value = mock_request
 
-        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
+        mock_delete_servers.return_value = (True, [], [mock_server.id])
+        mock_find_datacenter.return_value = 'mock_dc'
 
         # Set Mock Group Return values
         mock_existing_server = mock.MagicMock()
         mock_existing_server.id = "EXISTING_SERVER"
         mock_result_group = mock.MagicMock()
-        mock_result_group.data = { "id":"1111111" }
-        mock_result_group.Servers().Servers.return_value = [ mock_existing_server ]
+        mock_result_group.data = {'id': '1111111'}
 
-        # Set Mock Group Values
-        mock_group = mock.MagicMock()
-        mock_group.Defaults.return_value = 1
-        mock_group.id = '12345'
-
-        mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = [ mock_group, mock_result_group ]
+        mock_find_group.return_value = mock_result_group
+        mock_clc_common.servers_in_group.return_value = [mock_existing_server]
 
         # Test
         under_test = ClcServer(self.module)
         under_test.process_request()
 
         # Assert
-        self.module.exit_json.assert_called_once_with(changed=True,
-                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER" ]},
-                                                      servers=[],
-                                                      server_ids=['TEST_SERVER'],
-                                                      partially_created_server_ids=[])
+        self.module.exit_json.assert_called_once_with(
+            changed=True,
+            group={"id": "1111111", "servers": ["EXISTING_SERVER"]},
+            servers=[],
+            server_ids=['TEST_SERVER'],
+            partially_created_server_ids=[])
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_server, 'clc_common')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_process_request_exact_count_1_server_w_pubip(self, mock_clc_sdk,
+    @patch.object(ClcServer, '_validate_module_params')
+    @patch.object(ClcServer, '_find_group')
+    @patch.object(ClcServer, '_find_datacenter')
+    @patch.object(ClcServer, '_enforce_count')
+    def test_process_request_exact_count_1_server_no_wait(self,
+                                                          mock_enforce_count,
+                                                          mock_find_datacenter,
+                                                          mock_find_group,
+                                                          mock_validate_params,
                                                           mock_clc_common):
         # Setup Fixture
         self.module.params = {
@@ -121,71 +108,50 @@ class TestClcServerFunctions(unittest.TestCase):
             'public_ip_ports': [80]
         }
 
-        # Define Mock Objects
-        mock_server = mock.MagicMock()
-        mock_requests = mock.MagicMock()
-        mock_single_request = mock.MagicMock()
-        mock_group = mock.MagicMock()
-        mock_template = mock.MagicMock()
-        mock_network = mock.MagicMock()
-
         # Set Mock Server Return Values
+        mock_server = mock.MagicMock()
         mock_server.id = 'TEST_SERVER'
-        mock_server.data = {'name': 'TEST_SERVER'}
-        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
-        mock_server.PublicIPs().public_ips = ['5.6.7.8']
+        mock_server.data = {'id': 'TEST_SERVER',
+                            'name': 'TEST_SERVER',
+                            'details': {
+                                'ipAddresses': [
+                                    {'internal': '1.2.3.4',
+                                     'public': '5.6.7.8'}
+                                    ]
+                                },
+                            'ipaddress': '1.2.3.4',
+                            'publicip': '5.6.7.8'
+                            }
 
-        # Set Mock Request Return Values
-        mock_single_request.Server.return_value = mock_server
-        mock_requests.WaitUntilComplete.return_value = 0
-        mock_requests.requests = [mock_single_request]
-
-        # Set Mock Template / Network Values
-        mock_template.id = 'TEST_TEMPLATE'
-        mock_network.id = '12345'
-
-        # Set Mock Group Values
-        mock_group.Defaults.return_value = 1
-        mock_group.id = '12345'
-
-        # Setup Mock API Responses
-        def _api_call_return_values(*args, **kwargs):
-            if kwargs.get('method') == 'GET':
-                return {'id': '12345'}
-            if kwargs.get('method') == 'POST':
-                return {'links': [{'rel': 'self', 'id': '12345'}]}
-
-        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
-        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
-        mock_clc_sdk.v2.Group.return_value = mock_group
-        mock_clc_sdk.v2.Server.return_value = mock_server
-        mock_clc_sdk.v2.Account.GetAlias.return_value = 'TST'
-        mock_clc_sdk.v2.Datacenter().Templates().Search().__getitem__.return_value = mock_template
-        mock_clc_sdk.v2.Datacenter().Networks().networks.__getitem__.return_value = mock_network
-        mock_clc_sdk.v2.Requests.return_value = mock_requests
-        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
-
-        self.module.check_mode = False
+        mock_validate_params.return_value = self.module.params
+        mock_enforce_count.return_value = ([mock_server.data], ['TEST_SERVER'],
+                                           [], True)
 
         # Test
+        self.module.check_mode = False
         under_test = ClcServer(self.module)
         under_test.process_request()
 
         # Assert
-        mock_server.PublicIPs().Add.assert_called_with([{'protocol': 'TCP', 'port': 80}])
-        self.module.exit_json.assert_called_once_with(changed=True,
-                                                      group=None,
-                                                      servers=[{'publicip': '5.6.7.8',
-                                                                'ipaddress': '1.2.3.4',
-                                                                'name': 'TEST_SERVER'}],
-                                                      server_ids=['TEST_SERVER'],
-                                                      partially_created_server_ids=[])
+        self.assertFalse(mock_find_datacenter.called)
+        self.assertFalse(mock_find_group.called)
+        self.assertFalse(mock_clc_common.servers_in_group.called)
+        self.module.exit_json.assert_called_once_with(
+            changed=True, group=None, servers=[mock_server.data],
+            server_ids=['TEST_SERVER'], partially_created_server_ids=[])
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_server, 'clc_common')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_process_request_exact_count_1_server_w_no_alert_pol_name(
-            self, mock_clc_sdk, mock_clc_common):
+    @patch.object(ClcServer, '_validate_module_params')
+    @patch.object(ClcServer, '_find_group')
+    @patch.object(ClcServer, '_find_datacenter')
+    @patch.object(ClcServer, '_enforce_count')
+    def test_process_request_exact_count_1_server_wait(self,
+                                                       mock_enforce_count,
+                                                       mock_find_datacenter,
+                                                       mock_find_group,
+                                                       mock_validate_params,
+                                                       mock_clc_common):
         # Setup Fixture
         self.module.params = {
             'state': 'present',
@@ -197,158 +163,59 @@ class TestClcServerFunctions(unittest.TestCase):
             'wait': True,
             'exact_count': 1,
             'count_group': 'Default Group',
-            'add_public_ip': False,
+            'add_public_ip': True,
             'public_ip_protocol': 'TCP',
-            'public_ip_ports': [80],
-            'alert_policy_name': 'test alert policy'
+            'public_ip_ports': [80]
         }
-        self.module.check_mode = False
-
-        # Define Mock Objects
-        mock_server = mock.MagicMock()
-        mock_requests = mock.MagicMock()
-        mock_single_request = mock.MagicMock()
-        mock_group = mock.MagicMock()
-        mock_template = mock.MagicMock()
-        mock_network = mock.MagicMock()
 
         # Set Mock Server Return Values
+        mock_server = mock.MagicMock()
         mock_server.id = 'TEST_SERVER'
-        mock_server.data = {'name': 'TEST_SERVER'}
-        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
-        mock_server.PublicIPs().public_ips = ['5.6.7.8']
+        mock_server.data = {'id': 'TEST_SERVER',
+                            'name': 'TEST_SERVER',
+                            'details': {
+                                'ipAddresses': [
+                                    {'internal': '1.2.3.4',
+                                     'public': '5.6.7.8'}
+                                    ]
+                                },
+                            'ipaddress': '1.2.3.4',
+                            'publicip': '5.6.7.8'
+                            }
+        mock_group = mock.MagicMock()
+        mock_group.data = {'id': '1111111'}
 
-        # Set Mock Request Return Values
-        mock_single_request.Server.return_value = mock_server
-        mock_requests.WaitUntilComplete.return_value = 0
-        mock_requests.requests = [mock_single_request]
-
-        # Set Mock Template / Network Values
-        mock_template.id = 'TEST_TEMPLATE'
-        mock_network.id = '12345'
-
-        # Set Mock Group Values
-        mock_group.Defaults.return_value = 1
-        mock_group.id = '12345'
-
-        # Setup Mock API Responses
-        def _api_call_return_values(*args, **kwargs):
-            if kwargs.get('method') == 'GET':
-                return {'id': '12345','name': 'test alert policy'}
-            if kwargs.get('method') == 'POST':
-                return {'links': [{'rel': 'self', 'id': '12345'}]}
-
-        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_group
-        mock_clc_sdk.v2.Group.return_value = mock_group
-        mock_clc_sdk.v2.Server.return_value = mock_server
-        mock_clc_sdk.v2.Account.GetAlias.return_value = 'TST'
-        mock_clc_sdk.v2.Datacenter().Templates().Search().__getitem__.return_value = mock_template
-        mock_clc_sdk.v2.Datacenter().Networks().networks.__getitem__.return_value = mock_network
-        mock_clc_sdk.v2.Requests.return_value = mock_requests
-        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
-
-        self.module.check_mode = False
+        mock_validate_params.return_value = self.module.params
+        mock_enforce_count.return_value = ([mock_server.data], ['TEST_SERVER'],
+                                           [], True)
+        mock_find_datacenter.return_value = 'mock_dc'
+        mock_find_group.return_value = mock_group
+        mock_clc_common.servers_in_group.return_value = [mock_server]
 
         # Test
+        self.module.check_mode = False
         under_test = ClcServer(self.module)
         under_test.process_request()
 
         # Assert
-        self.assertTrue(self.module.fail_json.called)
-        self.module.fail_json.assert_called_with(msg='No alert policy exist with name : test alert policy')
+        self.module.exit_json.assert_called_once_with(
+            changed=True,
+            group={'id': '1111111', 'servers': ['TEST_SERVER']},
+            servers=[mock_server.data],
+            server_ids=['TEST_SERVER'],
+            partially_created_server_ids=[])
+        self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_server, 'clc_common')
-    @patch.object(ClcServer, '_get_alert_policy_id_by_name')
-    @patch.object(ClcServer, '_set_clc_credentials_from_env')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_process_request_count_1_server_w_alert_pol_name(
-            self, mock_clc_sdk, mock_get_alert_policy, mock_clc_common):
-        # Setup Fixture
-        self.module.params = {
-            'state': 'present',
-            'name': 'TEST',
-            'location': 'UC1',
-            'type': 'standard',
-            'template': 'TEST_TEMPLATE',
-            'storage_type': 'standard',
-            'wait': True,
-            'count': 1,
-            'count_group': 'Default Group',
-            'add_public_ip': False,
-            'public_ip_protocol': 'TCP',
-            'public_ip_ports': [80],
-            'alert_policy_name': 'test alert policy'
-        }
-
-        # Define Mock Objects
-        mock_server = mock.MagicMock()
-        mock_requests = mock.MagicMock()
-        mock_single_request = mock.MagicMock()
-        mock_group = mock.MagicMock()
-        mock_template = mock.MagicMock()
-        mock_network = mock.MagicMock()
-
-        # Set Mock Server Return Values
-        mock_server.id = 'TEST_SERVER'
-        mock_server.data = {'name': 'TEST_SERVER'}
-        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
-
-        # Set Mock Request Return Values
-        mock_single_request.Server.return_value = mock_server
-        mock_requests.WaitUntilComplete.return_value = 0
-        mock_requests.requests = [mock_single_request]
-
-        # Set Mock Template / Network Values
-        mock_template.id = 'TEST_TEMPLATE'
-        mock_network.id = '12345'
-
-        # Set Mock Group Values
-        mock_group.Defaults.return_value = 1
-        mock_group.id = '12345'
-
-        # Set Mock Group Return values
-        mock_existing_server = mock.MagicMock()
-        mock_existing_server.id = "EXISTING_SERVER"
-        mock_result_group = mock.MagicMock()
-        mock_result_group.data = { "id":"1111111" }
-        mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
-
-        # Setup Mock API Responses
-        def _api_call_return_values(*args, **kwargs):
-            if kwargs.get('method') == 'GET':
-                return {'id': '12345','name': 'test alert policy'}
-            if kwargs.get('method') == 'POST':
-                return {'links': [{'rel': 'self', 'id': '12345'}] }
-
-        mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = [ mock_group, mock_result_group ]
-        mock_clc_sdk.v2.Group.return_value = mock_group
-        mock_clc_sdk.v2.Server.return_value = mock_server
-        mock_clc_sdk.v2.Account.GetAlias.return_value = 'TST'
-        mock_clc_sdk.v2.Datacenter().Templates().Search().__getitem__.return_value = mock_template
-        mock_clc_sdk.v2.Datacenter().Networks().networks.__getitem__.return_value = mock_network
-        mock_clc_sdk.v2.Requests.return_value = mock_requests
-        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
-        mock_get_alert_policy.return_value = '12345'
-
-        self.module.check_mode = False
-
-        # Test
-        under_test = ClcServer(self.module)
-        under_test.process_request()
-
-        #Assert
-        #self.assertFalse(self.module.fail_json.called)
-        self.assertTrue(self.module.exit_json.called)
-        self.module.exit_json.assert_called_once_with(changed=True,
-                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER", "TEST_SERVER" ]},
-                                                      servers=[{'ipaddress': '1.2.3.4',
-                                                                'name': 'TEST_SERVER'}],
-                                                      server_ids=['TEST_SERVER'],
-                                                      partially_created_server_ids=[])
-    
-    @patch.object(clc_server, 'clc_common')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_process_request_count_1_bare_metal_server(self, mock_clc_sdk,
+    @patch.object(ClcServer, '_validate_module_params')
+    @patch.object(ClcServer, '_find_group')
+    @patch.object(ClcServer, '_find_datacenter')
+    @patch.object(ClcServer, '_create_servers')
+    def test_process_request_count_1_bare_metal_server(self,
+                                                       mock_create_servers,
+                                                       mock_find_datacenter,
+                                                       mock_find_group,
+                                                       mock_validate_params,
                                                        mock_clc_common):
         # Setup Fixture
         self.module.params = {
@@ -365,52 +232,24 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Define Mock Objects
         mock_server = mock.MagicMock()
-        mock_requests = mock.MagicMock()
-        mock_single_request = mock.MagicMock()
-        mock_group = mock.MagicMock()
-        mock_template = mock.MagicMock()
-        mock_network = mock.MagicMock()
-
-        # Set Mock Server Return Values
         mock_server.id = 'TEST_SERVER'
-        mock_server.data = {'name': 'TEST_SERVER'}
-        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
+        mock_server.data = {'id': 'TEST_SERVER',
+                            'name': 'TEST_SERVER',
+                            'details': {
+                                'ipAddresses': [{'internal': '1.2.3.4'}]
+                                },
+                            'ipaddress': '1.2.3.4',
+                            }
 
-        # Set Mock Request Return Values
-        mock_single_request.Server.return_value = mock_server
-        mock_requests.WaitUntilComplete.return_value = 0
-        mock_requests.requests = [mock_single_request]
+        mock_group = mock.MagicMock()
+        mock_group.data = {'id': '1111111'}
 
-        # Set Mock Template / Network Values
-        mock_template.id = 'TEST_TEMPLATE'
-        mock_network.id = '12345'
-
-        # Set Mock Group Values
-        mock_group.Defaults.return_value = 1
-        mock_group.id = '12345'
-
-        # Set Mock Group Return values
-        mock_existing_server = mock.MagicMock()
-        mock_existing_server.id = "EXISTING_SERVER"
-        mock_result_group = mock.MagicMock()
-        mock_result_group.data = { "id":"1111111" }
-        mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
-
-        # Setup Mock API Responses
-        def _api_call_return_values(*args, **kwargs):
-            if kwargs.get('method') == 'GET':
-                return {'id': '12345','name': 'test'}
-            if kwargs.get('method') == 'POST':
-                return {'links': [{'rel': 'self', 'id': '12345'}]}
-
-        mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = [ mock_group, mock_result_group ]
-        mock_clc_sdk.v2.Group.return_value = mock_group
-        mock_clc_sdk.v2.Server.return_value = mock_server
-        mock_clc_sdk.v2.Account.GetAlias.return_value = 'TST'
-        mock_clc_sdk.v2.Datacenter().Templates().Search().__getitem__.return_value = mock_template
-        mock_clc_sdk.v2.Datacenter().Networks().networks.__getitem__.return_value = mock_network
-        mock_clc_sdk.v2.Requests.return_value = mock_requests
-        mock_clc_sdk.v2.API.Call.side_effect = _api_call_return_values
+        mock_validate_params.return_value = self.module.params
+        mock_create_servers.return_value = ([mock_server.data], ['TEST_SERVER'],
+                                           [], True)
+        mock_find_datacenter.return_value = 'mock_dc'
+        mock_find_group.return_value = mock_group
+        mock_clc_common.servers_in_group.return_value = [mock_server]
 
         self.module.check_mode = False
 
@@ -419,22 +258,25 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test.process_request()
 
         #Assert
-        #self.assertFalse(self.module.fail_json.called)
-        self.assertTrue(self.module.exit_json.called)
-        self.module.exit_json.assert_called_once_with(changed=True,
-                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER", "TEST_SERVER" ]},
-                                                      servers=[{'ipaddress': '1.2.3.4',
-                                                                'name': 'TEST_SERVER'}],
-                                                      server_ids=['TEST_SERVER'],
-                                                      partially_created_server_ids=[])
+        self.assertTrue(mock_create_servers.called)
+        self.module.exit_json.assert_called_once_with(
+            changed=True,
+            group={'id': '1111111', 'servers': ['TEST_SERVER']},
+            servers=[mock_server.data],
+            server_ids=['TEST_SERVER'],
+            partially_created_server_ids=[])
+        self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_server, 'clc_common')
+    @patch.object(ClcServer, '_validate_module_params')
+    @patch.object(ClcServer, '_find_group')
+    @patch.object(ClcServer, '_find_datacenter')
     @patch.object(ClcServer, '_enforce_count')
-    @patch.object(ClcServer, '_set_clc_credentials_from_env')
-    @patch.object(clc_server, 'clc_sdk')
     def test_process_request_exact_count_delete_1_server(self,
-                                                         mock_clc_sdk,
                                                          mock_enforce_count,
+                                                         mock_find_datacenter,
+                                                         mock_find_group,
+                                                         mock_validate_params,
                                                          mock_clc_common):
         # Setup Fixture
         self.module.params = {
@@ -451,87 +293,97 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Define Mock Objects
         mock_server = mock.MagicMock()
-
-        # Set Mock Server Return Values
         mock_server.id = 'TEST_SERVER'
         mock_server.status = 'active'
         mock_server.powerState = 'started'
+        mock_server.data = {'id': 'TEST_SERVER',
+                            'name': 'TEST_SERVER',
+                            'details': {
+                                'ipAddresses': [{'internal': '1.2.3.4'}]
+                                },
+                            'ipaddress': '1.2.3.4',
+                            'status': 'active',
+                            'powerState': 'started'
+                            }
 
-        # Set Mock Group Return values
-        mock_existing_server = mock.MagicMock()
-        mock_existing_server.id = "EXISTING_SERVER"
-        mock_result_group = mock.MagicMock()
-        mock_result_group.data = { "id":"1111111" }
-        mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
+        mock_group = mock.MagicMock()
+        mock_group.data = {'id': '1111111'}
 
-        mock_clc_sdk.v2.Datacenter().Groups().Get.return_value = mock_result_group
+        mock_validate_params.return_value = self.module.params
         mock_enforce_count.return_value = ([], [mock_server.id], [], True)
+        mock_find_datacenter.return_value = 'mock_dc'
+        mock_find_group.return_value = mock_group
+        mock_clc_common.servers_in_group.return_value = []
 
         # Test
         under_test = ClcServer(self.module)
         under_test.process_request()
 
         # Assert
-        self.module.exit_json.assert_called_once_with(changed=True,
-                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER", "TEST_SERVER" ]},
-                                                      servers=[],
-                                                      server_ids=['TEST_SERVER'],
-                                                      partially_created_server_ids=[])
+        self.module.exit_json.assert_called_once_with(
+            changed=True,
+            group={'id': '1111111', 'servers': []},
+            servers=[],
+            server_ids=['TEST_SERVER'],
+            partially_created_server_ids=[])
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_server, 'clc_common')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_process_request_start_server(self, mock_clc_sdk, mock_clc_common):
+    @patch.object(ClcServer, '_validate_module_params')
+    @patch.object(ClcServer, '_find_group')
+    @patch.object(ClcServer, '_find_datacenter')
+    @patch.object(ClcServer, '_start_stop_servers')
+    def test_process_request_start_server(self,
+                                          mock_start_stop,
+                                          mock_find_datacenter,
+                                          mock_find_group,
+                                          mock_validate_params,
+                                          mock_clc_common):
         # Setup Fixture
         self.module.params = {
             'state': 'started',
-            'server_ids': ['UC1TESTSVR01'],
+            'server_ids': ['TEST_SERVER'],
             'wait': True
         }
 
         # Define Mock Objects
         mock_server = mock.MagicMock()
-        mock_request = mock.MagicMock()
-
-        # Set Mock Server Return Values
         mock_server.id = 'TEST_SERVER'
-        mock_server.data = {'name': 'TEST_SERVER'}
-        mock_server.powerState = 'stopped'
-        mock_server.PowerOn.return_value = mock_request
-        mock_server.PublicIPs().public_ips.__getitem__.return_value = "5.6.7.8"
-        mock_server.details['ipAddresses'][0].__getitem__.return_value = "1.2.3.4"
+        mock_server.status = 'active'
+        mock_server.powerState = 'started'
+        mock_server.data = {'id': 'TEST_SERVER',
+                            'name': 'TEST_SERVER',
+                            'details': {
+                                'ipAddresses': [{'internal': '1.2.3.4'}]
+                                },
+                            'ipaddress': '1.2.3.4',
+                            'status': 'active',
+                            'powerState': 'started'
+                            }
 
-        # Set Mock Group Values
         mock_group = mock.MagicMock()
-        mock_group.Defaults.return_value = 1
-        mock_group.id = '12345'
+        mock_group.data = {'id': '1111111'}
 
-        # Set Mock Group Return values
-        mock_existing_server = mock.MagicMock()
-        mock_existing_server.id = "EXISTING_SERVER"
-        mock_result_group = mock.MagicMock()
-        mock_result_group.data = { "id":"1111111" }
-        mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
-
-        mock_request.WaitUntilComplete.return_value = 0
-
-        mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = [ mock_group, mock_result_group ]
-        mock_clc_sdk.v2.Servers().Servers.return_value = [mock_server]
+        mock_validate_params.return_value = self.module.params
+        mock_start_stop.return_value = (True, [mock_server.data],
+                                        [mock_server.id])
+        mock_find_datacenter.return_value = 'mock_dc'
+        mock_find_group.return_value = mock_group
+        mock_clc_common.servers_in_group.return_value = [mock_server]
 
         # Test
         under_test = ClcServer(self.module)
         under_test.process_request()
 
         # Assert
-        self.module.exit_json.assert_called_once_with(server_ids=['TEST_SERVER'],
-                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER", "TEST_SERVER" ]},
-                                                      changed=True,
-                                                      servers=[{'name': 'TEST_SERVER',
-                                                                'publicip': '5.6.7.8',
-                                                                'ipaddress': '1.2.3.4'}],
-                                                      partially_created_server_ids=[])
+        mock_start_stop.assert_called_once_with(['TEST_SERVER'])
+        self.module.exit_json.assert_called_once_with(
+            changed=True,
+            group={'id': '1111111', 'servers': ['TEST_SERVER']},
+            servers=[mock_server.data],
+            server_ids=['TEST_SERVER'],
+            partially_created_server_ids=[])
         self.assertFalse(self.module.fail_json.called)
-
 
     @patch.object(clc_common, 'Server')
     @patch.object(clc_common, 'call_clc_api')
@@ -1026,18 +878,20 @@ class TestClcServerFunctions(unittest.TestCase):
             msg='Unable to fetch anti affinity policies for '
                 'account: mock_alias. Mock failure message')
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_create_clc_server_exception(self, mock_clc_sdk):
-        error = APIFailedResponse()
-        error.response_text = 'Mock failure message'
-        mock_clc_sdk.v2.API.Call.side_effect = error
+    @patch.object(clc_common, 'call_clc_api')
+    def test_create_clc_server_exception(self, mock_call_api):
+        error = ClcApiException()
+        error.message = 'Mock failure message'
+        mock_call_api.side_effect = error
         under_test = ClcServer(self.module)
         server_params = {
             'alias': 'mock',
             'name': 'test server'
         }
-        under_test._create_clc_server(mock_clc_sdk, self.module, server_params)
-        self.module.fail_json.assert_called_with(msg='Unable to create the server: test server. Mock failure message')
+        under_test._create_clc_server(server_params)
+        self.module.fail_json.assert_called_with(
+            msg='Unable to create the server: test server. '
+                'Mock failure message')
 
     @patch.object(clc_common, 'call_clc_api')
     def test_find_datacenter_no_location(self, mock_call_api):
@@ -1328,23 +1182,26 @@ class TestClcServerFunctions(unittest.TestCase):
     @patch.object(ClcServer, '_create_clc_server')
     @patch.object(ClcServer, '_add_alert_policy_to_servers')
     @patch.object(ClcServer, '_add_public_ip_to_servers')
-    @patch.object(clc_server, 'AnsibleModule')
-    @patch.object(clc_server, 'clc_sdk')
-    def test_create_servers_w_partial_servers(self, mock_clc_sdk, mock_ansible_module,
-                                              mock_public_ip, mock_alert_pol, mock_create_server,
+    @patch.object(clc_common, 'find_server')
+    @patch.object(clc_common, 'call_clc_api')
+    def test_create_servers_w_partial_servers(self, mock_call_api,
+                                              mock_find_server,
+                                              mock_public_ip, mock_alert_pol,
+                                              mock_create_server,
                                               mock_wait_for_requests):
-        mock_ansible_module.check_mode = False
+        self.module.check_mode = False
         mock_alert_pol.return_value = ['server2']
         mock_wait_for_requests.return_value = 'success'
         mock_request = mock.MagicMock()
         mock_server = mock.MagicMock()
         mock_server.id = 'server1'
-        mock_request.requests[0].Server.side_effect = [mock_server]
+        mock_find_server.side_effect = [mock_server]
         mock_public_ip.return_value = [mock_server]
-        mock_create_server.return_value = mock_request
-        under_test = ClcServer(mock_ansible_module)
+        mock_create_server.return_value = (mock_request, mock_server)
+        under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'mock_alias'
         server_dict_array, created_server_ids, partial_created_servers_ids, changed = \
-            under_test._create_servers(mock_ansible_module, mock_clc_sdk)
+            under_test._create_servers()
         self.assertEqual(changed, True)
         self.assertEqual(partial_created_servers_ids, ['server1'])
 
@@ -1356,7 +1213,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = params
         under_test = ClcServer(self.module)
         server_dict_array, created_server_ids, partial_created_servers_ids, changed = \
-            under_test._create_servers(self.module, self.clc)
+            under_test._create_servers()
         self.assertEqual(changed, False)
         self.assertEqual(server_dict_array, [])
         self.assertEqual(created_server_ids, [])
@@ -1370,7 +1227,7 @@ class TestClcServerFunctions(unittest.TestCase):
         }
         self.module.params = params
         under_test = ClcServer(self.module)
-        under_test._enforce_count(self.module, self.clc)
+        under_test._enforce_count()
         self.module.fail_json.assert_called_with(msg="you must use the 'count_group' option with exact_count")
 
     @patch.object(ClcServer, '_find_datacenter')
@@ -1387,7 +1244,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = params
         under_test = ClcServer(self.module)
         server_dict_array, changed_server_ids, partial_servers_ids, changed = \
-            under_test._enforce_count(self.module, self.clc)
+            under_test._enforce_count()
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, False)
         self.assertEqual(server_dict_array, [])
@@ -1399,7 +1256,6 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_server = mock.MagicMock()
         mock_server.id = 'server1'
         mock_call_api.side_effect = ClcApiException()
-        mock_server.PublicIPs().Add.side_effect = APIFailedResponse()
         servers = [mock_server]
         self.module.check_mode = False
         under_test = ClcServer(self.module)
@@ -1427,7 +1283,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = params
         under_test = ClcServer(self.module)
         server_dict_array, changed_server_ids, partial_servers_ids, changed = \
-            under_test._enforce_count(self.module, self.clc)
+            under_test._enforce_count()
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, True)
         self.assertEqual(server_dict_array, 'test_server')
@@ -1450,7 +1306,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = params
         under_test = ClcServer(self.module)
         server_dict_array, changed_server_ids, partial_servers_ids, changed = \
-            under_test._enforce_count(self.module, self.clc)
+            under_test._enforce_count()
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, True)
 

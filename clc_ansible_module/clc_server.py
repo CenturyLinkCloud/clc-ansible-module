@@ -517,45 +517,16 @@ __version__ = '${version}'
 import clc_ansible_utils.clc as clc_common
 from clc_ansible_utils.clc import ClcApiException
 
-#
-#  Requires the clc-python-sdk.
-#  sudo pip install clc-sdk
-#
-try:
-    import clc as clc_sdk
-    from clc import CLCException
-    from clc import APIFailedResponse
-except ImportError:
-    CLC_FOUND = False
-    clc_sdk = None
-else:
-    CLC_FOUND = True
-
 
 class ClcServer(object):
-    clc = clc_sdk
 
     def __init__(self, module):
         """
         Construct module
         """
         self.clc_auth = {}
-        self.clc = clc_sdk
         self.module = module
         self.root_group = None
-
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-        if not REQUESTS_FOUND:
-            self.module.fail_json(
-                msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(
-                requests.__version__) < LooseVersion('2.5.0'):
-            self.module.fail_json(
-                msg='requests library  version should be >= 2.5.0')
-
-        self._set_user_agent(self.clc)
 
     def process_request(self):
         """
@@ -584,9 +555,7 @@ class ClcServer(object):
 
             (changed,
              server_dict_array,
-             new_server_ids) = self._delete_servers(module=self.module,
-                                                    clc=self.clc,
-                                                    server_ids=server_ids)
+             new_server_ids) = self._delete_servers(server_ids=server_ids)
 
         elif state in ('started', 'stopped'):
             server_ids = p.get('server_ids')
@@ -597,9 +566,7 @@ class ClcServer(object):
 
             (changed,
              server_dict_array,
-             new_server_ids) = self._start_stop_servers(self.module,
-                                                        self.clc,
-                                                        server_ids)
+             new_server_ids) = self._start_stop_servers(server_ids)
 
         elif state == 'present':
             # Changed is always set to true when provisioning new instances
@@ -611,14 +578,12 @@ class ClcServer(object):
                 (server_dict_array,
                  new_server_ids,
                  partial_servers_ids,
-                 changed) = self._create_servers(self.module,
-                                                 self.clc)
+                 changed) = self._create_servers()
             else:
                 (server_dict_array,
                  new_server_ids,
                  partial_servers_ids,
-                 changed) = self._enforce_count(self.module,
-                                                self.clc)
+                 changed) = self._enforce_count()
 
         group = None
         wait = self.module.params.get('wait')
@@ -730,7 +695,6 @@ class ClcServer(object):
         :param module: module to validate
         :return: dictionary of validated params
         """
-        clc = self.clc
         module = self.module
         params = module.params
 
@@ -1072,14 +1036,12 @@ class ClcServer(object):
                     msg='No alert policy exist with name : %s' % alert_policy_name)
         return alert_policy_id
 
-    def _create_servers(self, module, clc, override_count=None):
+    def _create_servers(self, override_count=None):
         """
         Create New Servers in CLC cloud
-        :param module: the AnsibleModule object
-        :param clc: the clc-sdk instance to use
         :return: a list of dictionaries with server information about the servers that were created
         """
-        p = module.params
+        p = self.module.params
         request_list = []
         servers = []
         server_dict_array = []
@@ -1124,53 +1086,50 @@ class ClcServer(object):
         if not changed:
             return server_dict_array, created_server_ids, partial_created_servers_ids, changed
         for i in range(0, count):
-            if not module.check_mode:
-                req = self._create_clc_server(clc=clc,
-                                              module=module,
-                                              server_params=params)
-                server = req.requests[0].Server()
-                request_list.append(req)
+            if not self.module.check_mode:
+                result, server = self._create_clc_server(server_params=params)
+                request_list.append(result)
                 servers.append(server)
 
         self._wait_for_requests(request_list)
         servers = self._refresh_servers(servers)
 
         ip_failed_servers = self._add_public_ip_to_servers(
-            module=module,
             should_add_public_ip=add_public_ip,
             servers=servers,
             public_ip_protocol=public_ip_protocol,
             public_ip_ports=public_ip_ports)
-        ap_failed_servers = self._add_alert_policy_to_servers(clc=clc,
-                                                              module=module,
-                                                              servers=servers)
+        ap_failed_servers = self._add_alert_policy_to_servers(servers)
 
         for server in servers:
             if server in ip_failed_servers or server in ap_failed_servers:
                 partial_created_servers_ids.append(server.id)
             else:
                 # reload server details
-                server = clc.v2.Server(server.id)
-                server.data['ipaddress'] = server.details[
-                    'ipAddresses'][0]['internal']
+                server = clc_common.find_server(self.module, self.clc_auth,
+                                                server.id)
 
-                if add_public_ip and len(server.PublicIPs().public_ips) > 0:
-                    server.data['publicip'] = str(
-                        server.PublicIPs().public_ips[0])
+                try:
+                    server.data['ipaddress'] = [
+                        ip['internal'] for ip in server.details['ipAddresses']
+                        if 'internal' in ip][0]
+                    server.data['publicip'] = [
+                        ip['public'] for ip in server.details['ipAddresses']
+                        if 'public' in ip][0]
+                except (KeyError, IndexError):
+                    pass
                 created_server_ids.append(server.id)
             server_dict_array.append(server.data)
 
         return server_dict_array, created_server_ids, partial_created_servers_ids, changed
 
-    def _enforce_count(self, module, clc):
+    def _enforce_count(self):
         """
         Enforce that there is the right number of servers in the provided group.
         Starts or stops servers as necessary.
-        :param module: the AnsibleModule object
-        :param clc: the clc-sdk instance to use
         :return: a list of dictionaries with server information about the servers that were created or deleted
         """
-        p = module.params
+        p = self.module.params
         changed = False
         count_group = p.get('count_group')
         datacenter = self._find_datacenter()
@@ -1184,15 +1143,15 @@ class ClcServer(object):
         # fail here if the exact count was specified without filtering
         # on a group, as this may lead to a undesired removal of instances
         if exact_count and count_group is None:
-            return module.fail_json(
+            return self.module.fail_json(
                 msg="you must use the 'count_group' option with exact_count")
 
         if min_count and count_group is None:
-            return module.fail_json(
+            return self.module.fail_json(
                 msg="you must use the 'count_group' option with min_count")
 
         if max_count and count_group is None:
-            return module.fail_json(
+            return self.module.fail_json(
                 msg="you must use the 'count_group option with max_count")
 
         servers, running_servers = self._find_running_servers_by_group(
@@ -1202,7 +1161,7 @@ class ClcServer(object):
             if len(running_servers) < exact_count:
                 to_create = exact_count - len(running_servers)
                 server_dict_array, changed_server_ids, partial_servers_ids, changed \
-                    = self._create_servers(module, clc, override_count=to_create)
+                    = self._create_servers(override_count=to_create)
 
                 for server in server_dict_array:
                     running_servers.append(server)
@@ -1213,13 +1172,13 @@ class ClcServer(object):
                 remove_ids = all_server_ids[0:to_remove]
 
                 (changed, server_dict_array, changed_server_ids) \
-                    = ClcServer._delete_servers(module, clc, remove_ids)
+                    = self._delete_servers(remove_ids)
 
         if min_count:
             if len(running_servers) < min_count:
                 to_create = min_count - len(running_servers)
                 server_dict_array, changed_server_ids, partial_servers_ids, changed \
-                    = self._create_servers(module, clc, override_count=to_create)
+                    = self._create_servers(override_count=to_create)
 
                 for server in server_dict_array:
                     running_servers.append(server)
@@ -1231,7 +1190,7 @@ class ClcServer(object):
                 remove_ids = all_server_ids[0:to_remove]
 
                 changed, server_dict_array, changed_server_ids \
-                    = self._delete_servers(module, clc, remove_ids)
+                    = self._delete_servers(remove_ids)
 
 
         return server_dict_array, changed_server_ids, partial_servers_ids, changed
@@ -1520,55 +1479,48 @@ class ClcServer(object):
 
         return group
 
-    @staticmethod
-    def _create_clc_server(
-            clc,
-            module,
-            server_params):
+    def _create_clc_server(self, server_params):
         """
         Call the CLC Rest API to Create a Server
-        :param clc: the clc-python-sdk instance to use
-        :param module: the AnsibleModule instance to use
         :param server_params: a dictionary of params to use to create the servers
         :return: clc-sdk.Request object linked to the queued server request
         """
 
         try:
-            res = clc.v2.API.Call(
-                method='POST',
-                url='servers/%s' %
-                (server_params.get('alias')),
-                payload=json.dumps(
-                    {
-                        'name': server_params.get('name'),
-                        'description': server_params.get('description'),
-                        'groupId': server_params.get('group_id'),
-                        'sourceServerId': server_params.get('template'),
-                        'isManagedOS': server_params.get('managed_os'),
-                        'primaryDNS': server_params.get('primary_dns'),
-                        'secondaryDNS': server_params.get('secondary_dns'),
-                        'networkId': server_params.get('network_id'),
-                        'ipAddress': server_params.get('ip_address'),
-                        'password': server_params.get('password'),
-                        'sourceServerPassword': server_params.get('source_server_password'),
-                        'cpu': server_params.get('cpu'),
-                        'cpuAutoscalePolicyId': server_params.get('cpu_autoscale_policy_id'),
-                        'memoryGB': server_params.get('memory'),
-                        'type': server_params.get('type'),
-                        'storageType': server_params.get('storage_type'),
-                        'antiAffinityPolicyId': server_params.get('anti_affinity_policy_id'),
-                        'customFields': server_params.get('custom_fields'),
-                        'additionalDisks': server_params.get('additional_disks'),
-                        'ttl': server_params.get('ttl'),
-                        'packages': server_params.get('packages'),
-                        'configurationId': server_params.get('configuration_id'),
-                        'osType': server_params.get('os_type')}))
+            res = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'POST', 'servers/{alias}'.format(
+                    alias=server_params.get('alias')),
+                data={
+                    'name': server_params.get('name'),
+                    'description': server_params.get('description'),
+                    'groupId': server_params.get('group_id'),
+                    'sourceServerId': server_params.get('template'),
+                    'isManagedOS': server_params.get('managed_os'),
+                    'primaryDNS': server_params.get('primary_dns'),
+                    'secondaryDNS': server_params.get('secondary_dns'),
+                    'networkId': server_params.get('network_id'),
+                    'ipAddress': server_params.get('ip_address'),
+                    'password': server_params.get('password'),
+                    'sourceServerPassword': server_params.get('source_server_password'),
+                    'cpu': server_params.get('cpu'),
+                    'cpuAutoscalePolicyId': server_params.get('cpu_autoscale_policy_id'),
+                    'memoryGB': server_params.get('memory'),
+                    'type': server_params.get('type'),
+                    'storageType': server_params.get('storage_type'),
+                    'antiAffinityPolicyId': server_params.get('anti_affinity_policy_id'),
+                    'customFields': server_params.get('custom_fields'),
+                    'additionalDisks': server_params.get('additional_disks'),
+                    'ttl': server_params.get('ttl'),
+                    'packages': server_params.get('packages'),
+                    'configurationId': server_params.get('configuration_id'),
+                    'osType': server_params.get('os_type'),
+                })
 
-            result = clc.v2.Requests(res)
-        except APIFailedResponse as ex:
-            return module.fail_json(
+        except ClcApiException as ex:
+            return self.module.fail_json(
                 msg='Unable to create the server: {name}. {msg}'.format(
-                    name=server_params.get('name'), msg=ex.response_text))
+                    name=server_params.get('name'), msg=ex.message))
 
         #
         # Patch the Request object so that it returns a valid server
@@ -1577,15 +1529,10 @@ class ClcServer(object):
         server_uuid = [obj['id']
                        for obj in res['links'] if obj['rel'] == 'self'][0]
 
-        # Change the request server method to a _find_server_by_uuid closure so
-        # that it will work
-        result.requests[0].Server = lambda: ClcServer._find_server_by_uuid_w_retry(
-            clc,
-            module,
-            server_uuid,
-            server_params.get('alias'))
+        server = self._find_server_by_uuid_w_retry(
+            server_uuid, alias=server_params.get('alias'))
 
-        return result
+        return res, server
 
     def _find_server_by_uuid_w_retry(self, svr_uuid, alias=None,
                                      retries=5, back_out=2):

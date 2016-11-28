@@ -387,7 +387,7 @@ def group_path(group, group_id=False, delimiter='/'):
     return delimiter.join(reversed(path_elements))
 
 
-def _find_server(module, clc_auth, server_id):
+def find_server(module, clc_auth, server_id):
     """
     Find server information based on server_id
     :param module: Ansible module being called
@@ -417,7 +417,7 @@ def servers_by_id(module, clc_auth, server_ids):
     """
     servers = []
     for server_id in server_ids:
-        servers.append(_find_server(module, clc_auth, server_id))
+        servers.append(find_server(module, clc_auth, server_id))
     return servers
 
 
