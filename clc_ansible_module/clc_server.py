@@ -1269,16 +1269,10 @@ class ClcServer(object):
                     msg=ex.message))
         return refreshed_ids
 
-    @staticmethod
-    def _add_public_ip_to_servers(
-            module,
-            should_add_public_ip,
-            servers,
-            public_ip_protocol,
-            public_ip_ports):
+    def _add_public_ip_to_servers(self, should_add_public_ip, servers,
+                                  public_ip_protocol, public_ip_ports):
         """
         Create a public IP for servers
-        :param module: the AnsibleModule object
         :param should_add_public_ip: boolean - whether or not to provision a public ip for servers.  Skipped if False
         :param servers: List of servers to add public ips to
         :param public_ip_protocol: a protocol to allow for the public ips
@@ -1296,14 +1290,21 @@ class ClcServer(object):
         for port in public_ip_ports:
             ports_lst.append(
                 {'protocol': public_ip_protocol, 'port': port})
-        try:
-            if not module.check_mode:
-                for server in servers:
-                    request = server.PublicIPs().Add(ports_lst)
+        if not self.module.check_mode:
+            for server in servers:
+                try:
+                    request = clc_common.call_clc_api(
+                        self.module, self.clc_auth,
+                        'POST',
+                        '/servers/{alias}/{id}/publicIPAddresses'.format(
+                            alias=self.clc_auth['clc_alias'], id=server.id),
+                        data={'ports': ports_lst})
                     request_list.append(request)
-        except APIFailedResponse:
-            failed_servers.append(server)
-        ClcServer._wait_for_requests(module, request_list)
+                except ClcApiException:
+                    failed_servers.append(server)
+        clc_common.wait_on_completed_operations(
+            self.module, self.clc_auth,
+            clc_common.operation_id_list(request_list))
         return failed_servers
 
     def _add_alert_policy_to_servers(self, servers):

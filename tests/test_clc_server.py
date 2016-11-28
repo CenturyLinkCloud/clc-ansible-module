@@ -1393,15 +1393,17 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(changed_server_ids, [])
         self.assertEqual(partial_servers_ids, [])
 
-    def test_add_public_ip_to_servers_w_failed_servers(self):
+    @patch.object(clc_common, 'call_clc_api')
+    def test_add_public_ip_to_servers_w_failed_servers(self, mock_call_api):
         mock_server = mock.MagicMock()
         mock_server.id = 'server1'
+        mock_call_api.side_effect = ClcApiException()
         mock_server.PublicIPs().Add.side_effect = APIFailedResponse()
         servers = [mock_server]
         self.module.check_mode = False
         under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'mock_alias'
         failed_servers = under_test._add_public_ip_to_servers(
-                                             self.module,
                                              True, servers,
                                              'TCP',
                                              [80])

@@ -180,7 +180,42 @@ def operation_status(module, clc_auth, operation_id):
     return response['status']
 
 
-def wait_until_complete(module, clc_auth, operation_id, poll_freq=2):
+def operation_id_list(response_data):
+    """
+    Extract list of operation IDs from CLC API response
+    :param response_data: JSON data from API response. A list of dicts.
+    :return: List of operation IDs.
+    """
+    operation_ids = []
+    for operation in response_data:
+        if 'links' in operation:
+            operation_ids.extend([o['id'] for o in operation['links']
+                                  if o['rel'] == 'status'])
+    return operation_ids
+
+
+def wait_on_completed_operations(module, clc_auth, operation_ids):
+    """
+    Wait for list of operations to complete
+    :param module:
+    :param clc_auth:
+    :param operation_ids:
+    :return:
+    """
+    if not module.params.get('wait'):
+        return 0
+    ops_succeeded = []
+    ops_failed = []
+    for operation_id in operation_ids:
+        try:
+            _wait_until_complete(module, clc_auth, operation_id)
+            ops_succeeded.append(operation_id)
+        except ClcApiException:
+            ops_failed.append(operation_id)
+    return len(ops_failed)
+
+
+def _wait_until_complete(module, clc_auth, operation_id, poll_freq=2):
     """
     Wail until CLC API operation is complete
     :param module: Ansible module being called
