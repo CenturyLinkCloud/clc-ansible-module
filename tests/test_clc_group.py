@@ -69,8 +69,14 @@ class TestClcGroupFunctions(unittest.TestCase):
             changed=True,
             group=mock_group.data)
 
-    @patch.object(clc_group, 'clc_common')
-    def test_process_request_state_absent(self, mock_clc_common):
+    @patch.object(clc_common, 'authenticate')
+    @patch.object(clc_common, 'group_tree')
+    @patch.object(clc_common, 'operation_id_list')
+    @patch.object(clc_common, 'wait_on_completed_operations')
+    def test_process_request_state_absent(self, mock_wait_for,
+                                          mock_operation_ids,
+                                          mock_group_tree,
+                                          mock_authenticate):
         self.module.params = {
             'location': 'UC1',
             'name': 'MyCoolGroup',
@@ -80,22 +86,22 @@ class TestClcGroupFunctions(unittest.TestCase):
             'wait': 'True'
         }
         mock_group = mock.MagicMock()
-        mock_group = {"name": "MyCoolGroup"}
+        mock_group.name = 'MyCoolGroup'
+        mock_group.data = mock.MagicMock()
         mock_response = mock.MagicMock()
+
+        mock_wait_for.return_value = 0
 
         under_test = ClcGroup(self.module)
         under_test._ensure_group_is_absent = mock.MagicMock(
-            return_value=(
-                True,
-                mock_group,
-                mock_response))
+            return_value=(True, mock_group, mock_response))
 
         under_test.process_request()
 
         self.assertFalse(self.module.fail_json.called)
         self.module.exit_json.assert_called_once_with(
             changed=True,
-            group='MyCoolGroup')
+            group=mock_group.data)
 
     @patch.object(ClcGroup, '_create_group')
     def test_ensure_group_is_present_group_not_exist(self, mock_create_group):
@@ -158,9 +164,9 @@ class TestClcGroupFunctions(unittest.TestCase):
         # Assert Expected Result
         self.assertFalse(under_test._create_group.called)
         self.module.fail_json.assert_called_once_with(
-            msg="parent group: " +
+            msg="parent group: \"" +
             mock_parent.name +
-            " does not exist")
+            "\" does not exist")
 
     @patch.object(ClcGroup, '_create_group')
     def test_ensure_group_is_present_parent_and_group_exist(self,
@@ -313,10 +319,12 @@ class TestClcGroupFunctions(unittest.TestCase):
         under_test(mock_request_list)
         self.assertFalse(self.module.fail_json.called)
 
-    def test_wait_for_requests_to_complete_req_failed(self):
-        mock_request_list = self.build_mock_request_list(status_code=404)
-        under_test = ClcGroup(self.module)._wait_for_requests_to_complete
-        under_test(mock_request_list)
+    @patch.object(clc_common, 'wait_on_completed_operations')
+    def test_wait_for_requests_to_complete_req_failed(self, mock_wait_for):
+        mock_wait_for.return_value = 1
+        mock_request_list = [mock.MagicMock()]
+        under_test = ClcGroup(self.module)
+        under_test._wait_for_requests_to_complete(mock_request_list)
         self.module.fail_json.assert_called_once_with(msg='Unable to process group request')
 
     def test_wait_for_requests_to_complete_no_wait(self):

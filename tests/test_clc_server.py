@@ -1151,7 +1151,8 @@ class TestClcServerFunctions(unittest.TestCase):
             msg='server_ids should be a list of servers, aborting')
 
     def test_delete_servers_invalid_list(self):
-        ClcServer._delete_servers(self.module, self.clc, {'id': 'value'})
+        under_test = ClcServer(self.module)
+        under_test._delete_servers({'id': 'value'})
         self.module.fail_json.assert_called_with(msg='server_ids should be a list of servers, aborting')
 
     @patch.object(clc_server, 'clc_common')
@@ -1453,22 +1454,21 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, True)
 
-    @patch.object(clc_server, 'clc_sdk')
-    def test_delete_servers(self, mock_clc_sdk):
+    @patch.object(clc_common, 'servers_by_id')
+    @patch.object(clc_common, 'call_clc_api')
+    def test_delete_servers(self, mock_call_api, mock_servers_by_id):
         params = {
             'wait': False
         }
         self.module.params = params
         mock_server = mock.MagicMock()
         mock_server.id = 'mockid1'
-        mock_servers = mock.MagicMock()
-        mock_servers.id = 'temp1'
-        mock_servers.Servers.return_value = [mock_server]
-        mock_clc_sdk.v2.Servers.return_value = mock_servers
+        mock_servers_by_id.return_value = [mock_server]
         self.module.check_mode = False
         under_test = ClcServer(self.module)
+        under_test.clc_auth['clc_alias'] = 'mock_alias'
         changed, server_dict_array, terminated_server_ids = \
-            under_test._delete_servers(self.module, mock_clc_sdk, ['server1', 'server2'])
+            under_test._delete_servers(['mockid1', 'server2'])
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, True)
         self.assertEqual(terminated_server_ids, ['mockid1'])
@@ -1491,17 +1491,20 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test.clc_auth['clc_alias'] = 'mock_alias'
         under_test._refresh_servers.return_value = mock_servers
         changed, server_dict_array, result_server_ids = \
-            under_test._start_stop_servers(['server1', 'server2'])
+            under_test._start_stop_servers(['mockid1', 'server2'])
         self.assertFalse(self.module.fail_json.called)
         self.assertEqual(changed, True)
         self.assertEqual(result_server_ids, ['mockid1'])
 
-    def test_wait_for_requests_fail(self):
+    @patch.object(clc_common, 'operation_id_list')
+    @patch.object(clc_common, 'wait_on_completed_operations')
+    def test_wait_for_requests_fail(self, mock_wait_for, mock_operation_ids):
+        mock_wait_for.return_value = 1
         under_test = ClcServer(self.module)
         mock_request = mock.MagicMock()
-        mock_request.WaitUntilComplete.return_value = 1
-        under_test._wait_for_requests(self.module, [mock_request])
-        self.module.fail_json.assert_called_with(msg='Unable to process server request')
+        under_test._wait_for_requests([mock_request])
+        self.module.fail_json.assert_called_with(
+            msg='Unable to process server request')
 
     @patch.object(clc_common, 'servers_by_id')
     def test_refresh_servers_fail(self, mock_servers_by_id):

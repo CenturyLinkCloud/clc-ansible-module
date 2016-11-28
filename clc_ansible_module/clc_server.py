@@ -1132,7 +1132,7 @@ class ClcServer(object):
                 request_list.append(req)
                 servers.append(server)
 
-        self._wait_for_requests(module, request_list)
+        self._wait_for_requests(request_list)
         servers = self._refresh_servers(servers)
 
         ip_failed_servers = self._add_public_ip_to_servers(
@@ -1236,22 +1236,20 @@ class ClcServer(object):
 
         return server_dict_array, changed_server_ids, partial_servers_ids, changed
 
-    @staticmethod
-    def _wait_for_requests(module, request_list):
+    def _wait_for_requests(self, request_list):
         """
         Block until server provisioning requests are completed.
-        :param module: the AnsibleModule object
-        :param request_list: a list of clc-sdk.Request instances
+        :param request_list: a list of CLC API JSON responses
         :return: none
         """
-        wait = module.params.get('wait')
+        wait = self.module.params.get('wait')
         if wait:
-            # Requests.WaitUntilComplete() returns the count of failed requests
-            failed_requests_count = sum(
-                [request.WaitUntilComplete() for request in request_list])
+            failed_requests_count = clc_common.wait_on_completed_operations(
+                self.module, self.clc_auth,
+                clc_common.operation_id_list(request_list))
 
             if failed_requests_count > 0:
-                module.fail_json(
+                self.module.fail_json(
                     msg='Unable to process server request')
 
     def _refresh_servers(self, servers):
@@ -1262,12 +1260,14 @@ class ClcServer(object):
         """
         server_ids = [s.id for s in servers]
         try:
-            refreshed_ids = clc_common.servers_by_id(self.module, self.clc_auth, server_ids)
+            refreshed_servers = clc_common.servers_by_id(self.module,
+                                                         self.clc_auth,
+                                                         server_ids)
         except ClcApiException as ex:
             return self.module.fail_json(
                 msg='Unable to refresh servers. {msg}'.format(
                     msg=ex.message))
-        return refreshed_ids
+        return refreshed_servers
 
     def _add_public_ip_to_servers(self, should_add_public_ip, servers,
                                   public_ip_protocol, public_ip_ports):
@@ -1302,16 +1302,12 @@ class ClcServer(object):
                     request_list.append(request)
                 except ClcApiException:
                     failed_servers.append(server)
-        clc_common.wait_on_completed_operations(
-            self.module, self.clc_auth,
-            clc_common.operation_id_list(request_list))
+        self._wait_for_requests(request_list)
         return failed_servers
 
     def _add_alert_policy_to_servers(self, servers):
         """
         Associate the alert policy to servers
-        :param clc: the clc-sdk instance to use
-        :param module: the AnsibleModule object
         :param servers: List of servers to add alert policy to
         :return: failed_servers: the list of servers which failed while associating alert policy
         """
@@ -1375,12 +1371,9 @@ class ClcServer(object):
                             alias=self.clc_auth['clc_alias'], msg=ex.message))
         return alert_policy_id
 
-    @staticmethod
-    def _delete_servers(module, clc, server_ids):
+    def _delete_servers(self, server_ids):
         """
         Delete the servers on the provided list
-        :param module: the AnsibleModule object
-        :param clc: the clc-sdk instance to use
         :param server_ids: list of servers to delete
         :return: a list of dictionaries with server information about the servers that were deleted
         """
@@ -1389,14 +1382,18 @@ class ClcServer(object):
         request_list = []
 
         if not isinstance(server_ids, list) or len(server_ids) < 1:
-            return module.fail_json(
+            return self.module.fail_json(
                 msg='server_ids should be a list of servers, aborting')
 
-        servers = clc.v2.Servers(server_ids).Servers()
+        servers = clc_common.servers_by_id(self.module, self.clc_auth,
+                                           server_ids)
         for server in servers:
-            if not module.check_mode:
-                request_list.append(server.Delete())
-        ClcServer._wait_for_requests(module, request_list)
+            if not self.module.check_mode:
+                request_list.append(clc_common.call_clc_api(
+                    self.module, self.clc_auth,
+                    'DELETE', '/servers/{alias}/{id}'.format(
+                        alias=self.clc_auth['clc_alias'], id=server.id)))
+        self._wait_for_requests(request_list)
 
         for server in servers:
             terminated_server_ids.append(server.id)
@@ -1433,15 +1430,17 @@ class ClcServer(object):
                             state))
                 changed = True
 
-        ClcServer._wait_for_requests(self.module, request_list)
+        self._wait_for_requests(request_list)
         changed_servers = self._refresh_servers(changed_servers)
 
         for server in set(changed_servers + servers):
             try:
-                server.data['ipaddress'] = server.details[
-                    'ipAddresses'][0]['internal']
-                server.data['publicip'] = str(
-                    server.PublicIPs().public_ips[0])
+                server.data['ipaddress'] = [
+                    ip['internal'] for ip in server.details['ipAddresses']
+                    if 'internal' in ip][0]
+                server.data['publicip'] = [
+                    ip['public'] for ip in server.details['ipAddresses']
+                    if 'public' in ip][0]
             except (KeyError, IndexError):
                 pass
 

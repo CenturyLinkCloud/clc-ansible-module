@@ -300,7 +300,6 @@ class ClcGroup(object):
             parent_name = self.root_group.name
         if self._group_exists(group_name=group_name, parent_name=parent_name):
             if not self.module.check_mode:
-                # TODO: Update self.root_group removing group if successful
                 group.append(group_name)
                 result = self._delete_group(group_name, parent_name)
                 results.append(result)
@@ -421,18 +420,20 @@ class ClcGroup(object):
             result = True
         return result
 
-    def _wait_for_requests_to_complete(self, requests_lst):
+    def _wait_for_requests_to_complete(self, request_list):
         """
-        Waits until the CLC requests are complete if the wait argument is True
-        :param requests_lst: The list of CLC request objects
+        Block until group provisioning requests are completed.
+        :param request_list: a list of CLC API JSON responses
         :return: none
         """
-        if not self.module.params['wait']:
-            return
-        for request in requests_lst:
-            request.read()
-            if request.code < 200 or request.code >= 300:
-                self.module.fail_json(msg='Unable to process group request')
+        wait = self.module.params.get('wait')
+        if wait:
+            failed_requests_count = clc_common.wait_on_completed_operations(
+                self.module, self.clc_auth,
+                clc_common.operation_id_list(request_list))
+            if failed_requests_count > 0:
+                self.module.fail_json(
+                    msg='Unable to process group request')
 
 
 def main():

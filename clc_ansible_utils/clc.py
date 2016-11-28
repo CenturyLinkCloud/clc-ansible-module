@@ -202,8 +202,6 @@ def wait_on_completed_operations(module, clc_auth, operation_ids):
     :param operation_ids:
     :return:
     """
-    if not module.params.get('wait'):
-        return 0
     ops_succeeded = []
     ops_failed = []
     for operation_id in operation_ids:
