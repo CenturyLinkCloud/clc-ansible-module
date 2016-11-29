@@ -140,3 +140,92 @@ class TestClcCommonFunctions(unittest.TestCase):
         self.assertIsNone(
             clc_common.find_group(
                 self.module, mock_rootgroup, 'MockGroup', 'MissingParent'))
+
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_network_default(self, mock_call_api):
+        # Setup
+        mock_network = mock.MagicMock()
+        mock_network['name'] = 'TestReturnVlan'
+        mock_network['id'] = '12345678123456781234567812345678'
+        datacenter = 'mock_dc'
+
+        mock_call_api.return_value = [mock_network]
+
+        clc_auth = {'v2_api_url': 'mock_url',
+                    'v2_api_token': 'mock_token',
+                    'clc_location': 'mock_location',
+                    'clc_alias': 'mock_alias'}
+
+        # Function Under Test
+        result = clc_common.find_network(self.module, clc_auth, datacenter)
+
+        # Assert Result
+        self.assertEqual(result, mock_network)
+        self.assertEqual(self.module.fail_json.called, False)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_network_by_id(self, mock_call_api):
+        # Setup
+        mock_network = mock.MagicMock()
+        mock_network['name'] = 'TestReturnVlan'
+        mock_network['id'] = '12345678123456781234567812345678'
+        datacenter = 'mock_dc'
+
+        mock_call_api.return_value = [mock_network]
+
+        network_id_search = mock_network['id']
+        clc_auth = {'v2_api_url': 'mock_url',
+                    'v2_api_token': 'mock_token',
+                    'clc_location': 'mock_location',
+                    'clc_alias': 'mock_alias'}
+
+        # Function Under Test
+        result = clc_common.find_network(self.module, clc_auth, datacenter,
+                                         network_id_search)
+
+        # Assert Result
+        self.assertEqual(result, mock_network)
+        self.assertEqual(self.module.fail_json.called, False)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_network_invalid_id(self, mock_call_api):
+        # Setup
+        mock_network = mock.MagicMock()
+        mock_network['name'] = 'TestReturnVlan'
+        mock_network['id'] = '12345678123456781234567812345678'
+        datacenter = 'mock_dc'
+
+        mock_call_api.return_value = [mock_network]
+
+        network_id_search = 'mock_network_id'
+        clc_auth = {'v2_api_url': 'mock_url',
+                    'v2_api_token': 'mock_token',
+                    'clc_location': 'mock_location',
+                    'clc_alias': 'mock_alias'}
+
+        # Function Under Test
+        result = clc_common.find_network(self.module, clc_auth, datacenter,
+                                         network_id_search)
+
+        # Assert Result
+        self.module.fail_json.assert_called_once_with(
+            msg='No matching network: mock_network_id '
+                'found in location: mock_dc')
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_find_network_not_found(self, mock_call_api):
+        # Setup
+        datacenter = 'mock_dc'
+        mock_call_api.side_effect = ClcApiException()
+
+        clc_auth = {'v2_api_url': 'mock_url',
+                    'v2_api_token': 'mock_token',
+                    'clc_location': 'mock_location',
+                    'clc_alias': 'mock_alias'}
+
+        # Function Under Test
+        clc_common.find_network(self.module, clc_auth, datacenter)
+
+        # Assert Result
+        self.assertEqual(self.module.fail_json.called, True)

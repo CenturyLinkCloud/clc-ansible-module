@@ -685,15 +685,15 @@ class TestClcServerFunctions(unittest.TestCase):
             '/datacenters/mock_alias/mock_datacenter/deploymentCapabilities')
         self.assertIsNone(result_template)
 
-    @patch.object(clc_common, 'call_clc_api')
-    def test_find_network_id_default(self, mock_call_api):
+    @patch.object(clc_common, 'find_network')
+    def test_find_network_id_default(self, mock_find_network):
         # Setup
         mock_network = mock.MagicMock()
         mock_network['name'] = 'TestReturnVlan'
         mock_network['id'] = '12345678123456781234567812345678'
         datacenter = 'mock_dc'
 
-        mock_call_api.return_value = [mock_network]
+        mock_find_network.return_value = mock_network
         self.module.params = {}
 
         # Function Under Test
@@ -705,15 +705,15 @@ class TestClcServerFunctions(unittest.TestCase):
         self.assertEqual(result, mock_network['id'])
         self.assertEqual(self.module.fail_json.called, False)
 
-    @patch.object(clc_common, 'call_clc_api')
-    def test_find_network_id_by_id(self, mock_call_api):
+    @patch.object(clc_common, 'find_network')
+    def test_find_network_id_by_id(self, mock_find_network):
         # Setup
         mock_network = mock.MagicMock()
         mock_network['name'] = 'TestReturnVlan'
         mock_network['id'] = '12345678123456781234567812345678'
         datacenter = 'mock_dc'
 
-        mock_call_api.return_value = [mock_network]
+        mock_find_network.return_value = mock_network
         self.module.params = {'network_id': mock_network['id']}
 
         # Function Under Test
@@ -724,42 +724,6 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert Result
         self.assertEqual(result, mock_network['id'])
         self.assertEqual(self.module.fail_json.called, False)
-
-    @patch.object(clc_common, 'call_clc_api')
-    def test_find_network_id_invalid_id(self, mock_call_api):
-        # Setup
-        mock_network = mock.MagicMock()
-        mock_network['name'] = 'TestReturnVlan'
-        mock_network['id'] = '12345678123456781234567812345678'
-        datacenter = 'mock_dc'
-
-        mock_call_api.return_value = [mock_network]
-        self.module.params = {'network_id': 'mock_network_id'}
-
-        # Function Under Test
-        under_test = ClcServer(self.module)
-        under_test.clc_auth['clc_alias'] = 'mock_alias'
-        result = under_test._find_network_id(datacenter)
-
-        # Assert Result
-        self.module.fail_json.assert_called_once_with(
-            msg='No matching network: mock_network_id '
-                'found in location: mock_dc')
-
-    @patch.object(clc_common, 'call_clc_api')
-    def test_find_network_id_not_found(self, mock_call_api):
-        # Setup
-        datacenter = 'mock_dc'
-        mock_call_api.side_effect = ClcApiException()
-        self.module.params = {}
-
-        # Function Under Test
-        under_test = ClcServer(self.module)
-        under_test.clc_auth['clc_alias'] = 'mock_alias'
-        result = under_test._find_network_id(datacenter)
-
-        # Assert Result
-        self.assertEqual(self.module.fail_json.called, True)
 
     def test_validate_name(self):
         # Setup

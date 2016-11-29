@@ -945,38 +945,11 @@ class ClcServer(object):
         :param datacenter: the datacenter to search for a network id
         :return: a valid network id
         """
-        network_id = None
         network_id_search = self.module.params.get('network_id')
-        # Validates provided network id
-        # Allows lookup of network by id, name, or cidr notation
 
-        try:
-            temp_auth = self.clc_auth.copy()
-            temp_auth['v2_api_url'] = 'https://api.ctl.io/v2-experimental/'
-            networks = clc_common.call_clc_api(
-                self.module, temp_auth,
-                'GET', '/networks/{alias}/{location}'.format(
-                    alias=temp_auth['clc_alias'], location=datacenter))
-            if network_id_search:
-                for network in networks:
-                    if network_id_search.lower() in [network['id'].lower(),
-                                                     network['name'].lower(),
-                                                     network['cidr'].lower()]:
-                        network_id = network['id']
-                        break
-                if not network_id:
-                    return self.module.fail_json(
-                        msg='No matching network: {network} '
-                            'found in location: {location}'.format(
-                                network=network_id_search, location=datacenter))
-            else:
-                network_id = networks[0]['id']
-            return network_id
-        except ClcApiException:
-            return self.module.fail_json(
-                msg=str(
-                    "Unable to find a network in location: " +
-                    datacenter))
+        network = clc_common.find_network(
+            self.module, self.clc_auth, datacenter, network_id_search)
+        return network['id']
 
     def _find_aa_policy_id(self):
         """
@@ -1535,7 +1508,7 @@ class ClcServer(object):
         return res, server
 
     def _find_server_by_uuid_w_retry(self, svr_uuid, alias=None,
-                                     retries=5, back_out=2):
+                                     retries=25, back_out=2):
         """
         Find the clc server by the UUID returned from the provisioning request.
         Retry the request if a 404 is returned.
@@ -1575,6 +1548,14 @@ class ClcServer(object):
                         msg='Unable to reach the CLC API '
                             'after {num} attempts'.format(
                                 num=retries))
+                time.sleep(back_out)
+                back_out *= 2
+            except ssl.SSLError as e:
+                if retry_count == 0:
+                    return self.module.fail_json(
+                        msg='Unable to connect to the CLC API after '
+                            '{num} attempts. {msg}'.format(
+                                num=retries, msg=e.message))
                 time.sleep(back_out)
                 back_out *= 2
 

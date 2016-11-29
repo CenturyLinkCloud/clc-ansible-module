@@ -317,7 +317,6 @@ class ClcGroup(object):
             parent_name = self.root_group.name
         group = clc_common.find_group(self.module, self.root_group,
                                       group_name, parent_info=parent_name)
-        # TODO: Check for proper HTTP response code
         try:
             response = clc_common.call_clc_api(
                 self.module, self.clc_auth,

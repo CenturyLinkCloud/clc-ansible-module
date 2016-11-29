@@ -72,10 +72,13 @@ class Server(object):
         self.description = None
         if server_data is not None:
             self.data = server_data
-            for attr in ['id', 'name', 'description', 'status', 'powerState'
+            for attr in ['id', 'name', 'description', 'status', 'powerState',
                          'locationId', 'groupId']:
                 if attr in server_data:
                     setattr(self, attr, server_data[attr])
+                elif ('details' in server_data and
+                        attr in server_data['details']):
+                    setattr(self, attr, server_data['details'][attr])
             try:
                 self.data['details']['memoryGB'] = int(
                     math.floor(self.data['details']['memoryMB']/1024))
@@ -154,9 +157,11 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None):
     except urllib2.HTTPError as ex:
         api_ex = ClcApiException(
             message='Error calling CenturyLink Cloud API: {msg}'.format(
-                msg=ex.message),
+                msg=ex.reason),
             code=ex.code)
         raise api_ex
+    except ssl.SSLError as ex:
+        raise ex
     try:
         return json.loads(response.read())
     except:
@@ -188,9 +193,14 @@ def operation_id_list(response_data):
     """
     operation_ids = []
     for operation in response_data:
-        if 'links' in operation:
+        if isinstance(operation, list):
+            # Call recursively if response is a list of operations
+            operation_ids.extend(operation_id_list(operation))
+        elif 'links' in operation:
             operation_ids.extend([o['id'] for o in operation['links']
                                   if o['rel'] == 'status'])
+        elif 'rel' in operation and operation['rel'] == 'status':
+            operation_ids.extend([operation['id']])
     return operation_ids
 
 
@@ -334,8 +344,8 @@ def _find_group_recursive(search_group, group_info, parent_info=None):
         if parent_info is None:
             groups.append(search_group)
         elif (search_group.parent is not None and
-                parent_info in [search_group.parent.id,
-                                search_group.parent.name]):
+                parent_info.lower() in [search_group.parent.id.lower(),
+                                        search_group.parent.name.lower()]):
             groups.append(search_group)
     for child_group in search_group.children:
         groups += _find_group_recursive(child_group, group_info,
@@ -385,6 +395,48 @@ def group_path(group, group_id=False, delimiter='/'):
             path_elements.append(group.name)
         group = group.parent
     return delimiter.join(reversed(path_elements))
+
+
+def find_network(module, clc_auth, datacenter, network_id_search=None):
+    """
+    Validate the provided network id or return a default.
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param datacenter: the datacenter to search for a network id
+    :param network_id_search: Network id for which to search for
+    :return: A valid Network object
+    """
+    network_found = None
+    # Validates provided network id
+    # Allows lookup of network by id, name, or cidr notation
+
+    try:
+        temp_auth = clc_auth.copy()
+        temp_auth['v2_api_url'] = 'https://api.ctl.io/v2-experimental/'
+        networks = call_clc_api(
+            module, temp_auth,
+            'GET', '/networks/{alias}/{location}'.format(
+                alias=temp_auth['clc_alias'], location=datacenter))
+        if network_id_search:
+            for network in networks:
+                if network_id_search.lower() in [network['id'].lower(),
+                                                 network['name'].lower(),
+                                                 network['cidr'].lower()]:
+                    network_found = network
+                    break
+            if not network_found:
+                return module.fail_json(
+                    msg='No matching network: {network} '
+                        'found in location: {location}'.format(
+                            network=network_id_search, location=datacenter))
+        else:
+            network_found = networks[0]
+        return network_found
+    except ClcApiException:
+        return module.fail_json(
+            msg=str(
+                "Unable to find a network in location: " +
+                datacenter))
 
 
 def find_server(module, clc_auth, server_id):
