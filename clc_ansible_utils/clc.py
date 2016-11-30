@@ -237,12 +237,13 @@ def _wait_until_complete(module, clc_auth, operation_id, poll_freq=2):
         status = operation_status(module, clc_auth, operation_id)
         if status == 'succeeded':
             time_completed = time.time()
-        elif status in ('failed', 'resumed', 'unknown'):
+        elif status == 'failed':
             time_completed = time.time()
             raise ClcApiException(
                 'Execution of operation {id} {status}'.format(
                     id=operation_id, status=status))
-        time.sleep(poll_freq)
+        else:
+            time.sleep(poll_freq)
 
 
 def authenticate(module):

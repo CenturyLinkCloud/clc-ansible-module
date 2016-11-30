@@ -246,7 +246,6 @@ options:
     choices: [True, False]
 requirements:
     - python = 2.7
-    - requests >= 2.5.0
     - clc-sdk
 author: "CLC Runner (@clc-runner)"
 notes:
@@ -872,15 +871,26 @@ class ClcServer(object):
     @staticmethod
     def _validate_counts(module):
         """
-        Validate that min_count and max_count are valid, fail if it's not
+        Validate that count parameters are valid, fail if it's not
         :param module: the module to validate
         :return: none
         """
+        exact_count = module.params.get('exact_count')
+        count = module.params.get('count')
         min_count = module.params.get('min_count')
         max_count = module.params.get('max_count')
 
-        if min_count and max_count and min_count > max_count:
-            module.fail_json(msg=str("min_count can't be greater than max_count"))
+        if count is not None and count < 0:
+            module.fail_json(msg='count must be 0 or greater')
+        if exact_count is not None and exact_count < 0:
+            module.fail_json(msg='exact_count must be 0 or greater')
+        if min_count is not None and min_count < 0:
+            module.fail_json(msg='min_count must be 0 or greater')
+        if max_count is not None and max_count < 0:
+            module.fail_json(msg='max_count must be 0 or greater')
+        if (min_count is not None and max_count is not None and
+                min_count > max_count):
+            module.fail_json(msg='min_count cannot be greater than max_count')
 
     @staticmethod
     def _find_ttl(module):
@@ -1084,10 +1094,12 @@ class ClcServer(object):
 
                 try:
                     server.data['ipaddress'] = [
-                        ip['internal'] for ip in server.details['ipAddresses']
+                        ip['internal'] for ip
+                        in server.data['details']['ipAddresses']
                         if 'internal' in ip][0]
                     server.data['publicip'] = [
-                        ip['public'] for ip in server.details['ipAddresses']
+                        ip['public'] for ip
+                        in server.data['details']['ipAddresses']
                         if 'public' in ip][0]
                 except (KeyError, IndexError):
                     pass
@@ -1115,22 +1127,22 @@ class ClcServer(object):
 
         # fail here if the exact count was specified without filtering
         # on a group, as this may lead to a undesired removal of instances
-        if exact_count and count_group is None:
+        if exact_count is not None and count_group is None:
             return self.module.fail_json(
                 msg="you must use the 'count_group' option with exact_count")
 
-        if min_count and count_group is None:
+        if min_count is not None and count_group is None:
             return self.module.fail_json(
                 msg="you must use the 'count_group' option with min_count")
 
-        if max_count and count_group is None:
+        if max_count is not None and count_group is None:
             return self.module.fail_json(
                 msg="you must use the 'count_group option with max_count")
 
         servers, running_servers = self._find_running_servers_by_group(
             datacenter, count_group)
 
-        if exact_count:
+        if exact_count is not None:
             if len(running_servers) < exact_count:
                 to_create = exact_count - len(running_servers)
                 server_dict_array, changed_server_ids, partial_servers_ids, changed \
@@ -1147,7 +1159,7 @@ class ClcServer(object):
                 (changed, server_dict_array, changed_server_ids) \
                     = self._delete_servers(remove_ids)
 
-        if min_count:
+        if min_count is not None:
             if len(running_servers) < min_count:
                 to_create = min_count - len(running_servers)
                 server_dict_array, changed_server_ids, partial_servers_ids, changed \
@@ -1156,7 +1168,7 @@ class ClcServer(object):
                 for server in server_dict_array:
                     running_servers.append(server)
 
-        if max_count:
+        if max_count is not None:
             if len(running_servers) > max_count:
                 to_remove = len(running_servers) - max_count
                 all_server_ids = sorted([x.id for x in running_servers])
@@ -1164,7 +1176,6 @@ class ClcServer(object):
 
                 changed, server_dict_array, changed_server_ids \
                     = self._delete_servers(remove_ids)
-
 
         return server_dict_array, changed_server_ids, partial_servers_ids, changed
 
@@ -1342,6 +1353,7 @@ class ClcServer(object):
         state = p.get('state')
         changed = False
         changed_servers = []
+        unchanged_servers = []
         server_dict_array = []
         result_server_ids = []
         request_list = []
@@ -1361,17 +1373,21 @@ class ClcServer(object):
                             server,
                             state))
                 changed = True
+            else:
+                unchanged_servers.append(server)
 
         self._wait_for_requests(request_list)
         changed_servers = self._refresh_servers(changed_servers)
 
-        for server in set(changed_servers + servers):
+        for server in set(changed_servers + unchanged_servers):
             try:
                 server.data['ipaddress'] = [
-                    ip['internal'] for ip in server.details['ipAddresses']
+                    ip['internal'] for ip
+                    in server.data['details']['ipAddresses']
                     if 'internal' in ip][0]
                 server.data['publicip'] = [
-                    ip['public'] for ip in server.details['ipAddresses']
+                    ip['public'] for ip
+                    in server.data['details']['ipAddresses']
                     if 'public' in ip][0]
             except (KeyError, IndexError):
                 pass
@@ -1436,9 +1452,8 @@ class ClcServer(object):
         if not lookup_group:
             lookup_group = self.module.params.get('group')
         try:
-            if not self.root_group:
-                self.root_group = clc_common.group_tree(
-                    self.module, self.clc_auth, datacenter=datacenter)
+            self.root_group = clc_common.group_tree(
+                self.module, self.clc_auth, datacenter=datacenter)
             group = clc_common.find_group(self.module, self.root_group,
                                           lookup_group)
         except ClcApiException:
@@ -1558,15 +1573,6 @@ class ClcServer(object):
                                 num=retries, msg=e.message))
                 time.sleep(back_out)
                 back_out *= 2
-
-    @staticmethod
-    def _set_user_agent(clc):
-        if hasattr(clc, 'SetRequestsSession'):
-            agent_string = "ClcAnsibleModule/" + __version__
-            ses = requests.Session()
-            ses.headers.update({"Api-Client": agent_string})
-            ses.headers['User-Agent'] += " " + agent_string
-            clc.SetRequestsSession(ses)
 
 
 def main():

@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import unittest
-import requests
 from uuid import UUID
 import os
 import mock
@@ -490,46 +489,6 @@ class TestClcServerFunctions(unittest.TestCase):
             msg='A failure response was received from CLC API when'
                 ' attempting to get details for a server:  '
                 'UUID=12345, Code=500, Message=ERROR_MESSAGE')
-
-    def test_clc_set_credentials_w_creds(self):
-        with patch.dict('os.environ', {'CLC_V2_API_USERNAME': 'hansolo', 'CLC_V2_API_PASSWD': 'falcon'}):
-            with patch.object(clc_server, 'clc_sdk') as mock_clc_sdk:
-                under_test = ClcServer(self.module)
-                under_test._set_clc_credentials_from_env()
-
-        mock_clc_sdk.v2.SetCredentials.assert_called_once_with(api_username='hansolo', api_passwd='falcon')
-
-    def test_set_clc_credentials_w_token(self):
-        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'Token12345',
-                                       'CLC_ACCT_ALIAS': 'TEST' }):
-            mock_clc_sdk = mock.MagicMock()
-            under_test = ClcServer(self.module)
-            under_test.clc = mock_clc_sdk
-            under_test._set_clc_credentials_from_env()
-            self.assertEqual(mock_clc_sdk._LOGIN_TOKEN_V2, 'Token12345')
-            self.assertFalse(mock_clc_sdk.v2.SetCredentials.called)
-            self.assertEqual(self.module.fail_json.called, False)
-
-    def test_clc_set_credentials_w_no_creds(self):
-        with patch.dict('os.environ', {}, clear=True):
-            under_test = ClcServer(self.module)
-            under_test._set_clc_credentials_from_env()
-
-        self.assertEqual(self.module.fail_json.called, True)
-
-    def test_override_v2_api_url_from_environment(self):
-        original_url = clc_sdk.defaults.ENDPOINT_URL_V2
-        under_test = ClcServer(self.module)
-
-        under_test._set_clc_credentials_from_env()
-        self.assertEqual(clc_sdk.defaults.ENDPOINT_URL_V2, original_url)
-
-        with patch.dict('os.environ', {'CLC_V2_API_URL': 'http://unittest.example.com/'}):
-            under_test._set_clc_credentials_from_env()
-
-        self.assertEqual(clc_sdk.defaults.ENDPOINT_URL_V2, 'http://unittest.example.com/')
-
-        clc_sdk.defaults.ENDPOINT_URL_V2 = original_url
 
     def test_define_argument_spec(self):
         result = ClcServer._define_module_argument_spec()
