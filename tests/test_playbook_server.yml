@@ -1,0 +1,142 @@
+# Copyright 2016 CenturyLink
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#    http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+- name: Test clc_group.py Ansible Module
+  hosts: localhost
+  vars:
+    location: 'CA3'
+    server_template: 'CENTOS-7-64-TEMPLATE'
+    server_group: 'Ansible Module Test'
+    server_name: 'AnsTst'
+  gather_facts: False
+  connection: local
+  tasks:
+    - name: Setup - Verify group present
+      clc_group:
+        location: "{{ location }}"
+        name: "{{ server_group }}"
+        state: present
+        wait: True
+      register: group_present
+
+    - name: Setup - Ensure group is empty
+      clc_server:
+        location: "{{ location }}"
+        name: "{{ server_name }}"
+        template: "{{ server_template }}"
+        exact_count: 0
+        count_group: "{{ server_group }}"
+        group: "{{ server_group }}"
+        wait: True
+      register: group_empty
+    - name: Assert - Group empty
+      assert:
+        that:
+          - "group_empty.servers|length == 0"
+
+    - name: Test - Create server
+      clc_server:
+        location: "{{ location }}"
+        name: "{{ server_name }}"
+        type: 'standard'
+        template: "{{ server_template }}"
+        count: 1
+        group: "{{ server_group }}"
+        cpu: 2
+        memory: 2
+        add_public_ip: True
+        public_ip_protocol: TCP
+        public_ip_ports: 443
+        storage_type: 'standard'
+        network_id: 'test'
+        ttl: 5400
+        wait: True
+      register: server_create
+    - name: Assert - Server created
+      assert:
+        that:
+          - "server_create.changed == True"
+          - "server_create.servers|length == 1"
+
+    - name: Test - Start server
+      clc_server:
+        location: "{{ location }}"
+        server_ids: "{{ server_create.server_ids }}"
+        state: started
+        wait: True
+      register: server_start
+    - name: Assert - Server started
+      assert:
+        that:
+          - "server_start.servers[0]['details']['powerState'] == 'started'"
+          - "server_start.changed == False"
+
+    - name: Test - Stop server
+      clc_server:
+        location: "{{ location }}"
+        server_ids: "{{ server_create.server_ids }}"
+        state: stopped
+        wait: True
+      register: server_stop
+    - name: Assert - Server stopped
+      assert:
+        that:
+          - "server_stop.servers[0]['details']['powerState'] == 'stopped'"
+          - "server_stop.changed == True"
+
+    - name: Test - Stop server
+      clc_server:
+        location: "{{ location }}"
+        server_ids: "{{ server_create.server_ids }}"
+        state: stopped
+        wait: True
+      register: server_stop
+    - name: Assert - Server stopped
+      assert:
+        that:
+          - "server_stop.servers[0]['details']['powerState'] == 'stopped'"
+          - "server_stop.changed == False"
+
+    - name: Test - Start server
+      clc_server:
+        location: "{{ location }}"
+        server_ids: "{{ server_create.server_ids }}"
+        state: started
+        wait: True
+      register: server_start
+    - name: Assert - Server started
+      assert:
+        that:
+          - "server_start.servers[0]['details']['powerState'] == 'started'"
+          - "server_start.changed == True"
+
+    - name: Test - Delete server
+      clc_server:
+        location: "{{ location }}"
+        server_ids: "{{ server_create.server_ids }}"
+        state: absent
+        wait: True
+      register: server_delete
+    - name: Assert - Server deleted
+      assert:
+        that:
+          - "server_delete.servers|length == 0"
+
+    - name: Teardown - Remove group
+      clc_group:
+        location: "{{ location }}"
+        name: "{{ server_group }}"
+        state: absent
+        wait: True
+      register: remove_group
