@@ -221,6 +221,9 @@ class ClcNetwork(object):
         p = self.module.params
 
         self.clc_auth = clc_common.authenticate(self.module)
+        # Network operations use v2-experimental, so over-ride default
+        self.clc_auth['v2_api_url'] = 'https://api.ctl.io/v2-experimental/'
+
         self.networks = self._populate_networks(p.get('location'))
 
         if p.get('state') == 'absent':
@@ -256,7 +259,8 @@ class ClcNetwork(object):
         location = params.get('location')
 
         network = clc_common.find_network(self.module, self.clc_auth,
-                                          network_search_id=search_key,
+                                          self.clc_auth['clc_location'],
+                                          network_id_search=search_key,
                                           networks=self.networks)
 
         if network is not None:
@@ -272,7 +276,8 @@ class ClcNetwork(object):
             return self.module.fail_json(
                 msg='Must specify either a network name or id')
         network = clc_common.find_network(self.module, self.clc_auth,
-                                          network_search_id=search_key,
+                                          self.clc_auth['clc_location'],
+                                          network_id_search=search_key,
                                           networks=self.networks)
 
         if network is None:
@@ -287,25 +292,48 @@ class ClcNetwork(object):
     def _create_network(self, params):
         name = params.get('name', None)
         desc = params.get('description', None)
-        request = self.clc.v2.Network.Create(location=params.get('location'))
+        location = params.get('location')
+        if not location:
+            location = self.clc_auth['clc_location']
 
-        if params.get('wait', True):
-            uri = request.requests[0].uri
-            if request.WaitUntilComplete() > 0:
-                self.module.fail_json(msg="Unable to create network")
-            network_payload = self.clc.v2.API.Call('GET',
-                                                   self.clc.v2.API.Call('GET', uri)['summary']['links'][0]['href'])
-            request = self.clc.v2.Network(
-                network_payload['id'], network_obj=network_payload)
+        response = self._claim_network(location)
 
+        if params.get('wait'):
+            self._wait_for_requests(response)
+            operation_id = response['operationId']
+            try:
+                response = clc_common.call_clc_api(
+                    self.module, self.clc_auth,
+                    'GET', '/operations/{alias}/status/{id}'.format(
+                        alias=self.clc_auth['clc_alias'], id=operation_id))
+                network_id = [r['id'] for r in response['summary']['links']
+                              if r['rel'] == 'network'][0]
+                network = clc_common.find_network(
+                    self.module, self.clc_auth, location,
+                    network_id_search=network_id)
+            except ClcApiException as e:
+                return self.module.fail_json(
+                    msg='Unable to claim network in location: {location}.'
+                        ' {message}'.format(
+                            location=location, message=e.message))
             if name is not None or desc is not None:
-                ignored, request = self._update_network(request, params)
+                try:
+                    changed, network = self._update_network(network, params)
+                except ClcApiException as e:
+                    return self.module.fail_json(
+                        msg='Unable to update network: {id}. {message}'.format(
+                            id=network.id, message=e.message))
+            return network
 
-        return request
+        # TODO: Resolve what will be returned by _create_network,
+        #       Especially if _update_network will be called
+
+        else:
+            return response
 
     def _update_network(self, network, params):
         changed = False
-        location = params.get('location')
+        location = params.get('location', self.clc_auth['clc_location'])
         name = params.get('name', None)
         desc = params.get('description', None)
 
@@ -313,16 +341,39 @@ class ClcNetwork(object):
                 desc is not None and network.description != desc):
             changed = True
             if not self.module.check_mode:
+
                 update_name = name if name is not None else network.name
-                if desc is not None:
-                    network.Update(
-                        update_name,
-                        description=desc,
-                        location=location)
-                else:
-                    network.Update(update_name, location=location)
+                update_desc = desc if desc is not None else network.description
+                response = clc_common.call_clc_api(
+                    self.module, self.clc_auth,
+                    'PUT', '/networks/{alias}/{location}/{id}'.format(
+                        alias=self.clc_auth['clc_alias'],
+                        location=location, id=network.id),
+                    data={'name': update_name, 'description': update_desc})
+                network = clc_common.Network(response)
 
         return changed, network
+
+    def _claim_network(self, location):
+        try:
+            response = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'POST', '/networks/{alias}/{location}/claim'.format(
+                    alias=self.clc_auth['clc_alias'], location=location))
+            return response
+        except ClcApiException as e:
+            return self.module.fail_json(
+                msg='Unable to claim network in location: {location}. '
+                    '{msg}'.format(location=location, msg=e.message))
+
+    def _wait_for_requests(self, request_list):
+        if self.module.params.get('wait'):
+            failed_requests_count = clc_common.wait_on_completed_operations(
+                self.module, self.clc_auth,
+                clc_common.operation_id_list(request_list))
+
+            if failed_requests_count > 0:
+                self.module.fail_json(msg='Unable to process network request')
 
 
 def main():
