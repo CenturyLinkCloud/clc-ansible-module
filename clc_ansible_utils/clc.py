@@ -194,8 +194,8 @@ def operation_id_list(response_data):
     :return: List of operation IDs.
     """
     operation_ids = []
-    # Operation ID format returned as part server operations
     for operation in response_data:
+        # Operation ID format returned as part server operations
         if isinstance(operation, list):
             # Call recursively if response is a list of operations
             operation_ids.extend(operation_id_list(operation))
@@ -204,9 +204,9 @@ def operation_id_list(response_data):
                                   if o['rel'] == 'status'])
         elif 'rel' in operation and operation['rel'] == 'status':
             operation_ids.extend([operation['id']])
-    # Operation ID format returned as part of network operations
-    if 'operationId' in response_data:
-        operation_ids.extend([response_data['operationId']])
+        # Operation ID format returned as part of network operations
+        elif 'operationId' in operation:
+            operation_ids.extend([operation['operationId']])
     return operation_ids
 
 

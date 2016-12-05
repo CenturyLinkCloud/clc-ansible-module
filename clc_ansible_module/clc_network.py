@@ -164,23 +164,8 @@ __version__ = '${version}'
 import clc_ansible_utils.clc as clc_common
 from clc_ansible_utils.clc import ClcApiException
 
-#
-#  Requires the clc-python-sdk.
-#  sudo pip install clc-sdk
-#
-try:
-    import clc as clc_sdk
-    from clc import CLCException
-except ImportError:
-    CLC_FOUND = False
-    clc_sdk = None
-else:
-    CLC_FOUND = True
-
-
 class ClcNetwork(object):
 
-    clc = clc_sdk
     module = None
 
     def __init__(self, module):
@@ -190,10 +175,6 @@ class ClcNetwork(object):
         self.clc_auth = {}
         self.module = module
         self.networks = None
-
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
 
     @staticmethod
     def _define_module_argument_spec():
@@ -224,84 +205,108 @@ class ClcNetwork(object):
         # Network operations use v2-experimental, so over-ride default
         self.clc_auth['v2_api_url'] = 'https://api.ctl.io/v2-experimental/'
 
-        self.networks = self._populate_networks(p.get('location'))
+        location = p.get('location')
+        if location:
+            # Over-ride location in clc_auth
+            self.clc_auth['clc_location'] = location
+        else:
+            location = self.clc_auth['clc_location']
+        search_key = p.get('id', None) or p.get('name', None)
+
+        self.networks = clc_common.networks_in_datacenter(
+            self.module, self.clc_auth, location)
 
         if p.get('state') == 'absent':
-            changed = self._ensure_network_absent(p)
+            changed = self._ensure_network_absent(location, search_key)
         else:
-            changed, network = self._ensure_network_present(p)
+            changed, network = self._ensure_network_present(location,
+                                                            search_key)
 
         if hasattr(network, 'data'):
             network = network.data
-        elif hasattr(network, 'requests'):
+        elif isinstance(network, dict) and network.get('operationId'):
             network = {
-                "id": network.requests[0].id,
-                "uri": network.requests[0].uri
+                "id": network['operationId'],
+                "uri": network['uri'],
             }
 
         self.module.exit_json(changed=changed, network=network)
 
-    def _populate_networks(self, location):
-        if 'clc_location' not in self.clc_auth:
-            self.clc_auth = clc_common.authenticate(self.module)
-        if not location:
-            location = self.clc_auth['clc_location']
-        else:
-            # Override authentication with user-provided location
-            self.clc_auth['clc_location'] = location
+    # TODO: Complete method docstrings
 
-        return clc_common.networks_in_datacenter(self.module, self.clc_auth,
-                                                 location)
-
-    def _ensure_network_absent(self, params):
+    def _ensure_network_absent(self, location, search_key):
+        """
+        Check to make sure network matching 'search_key' does not exist
+        :param location: Datacenter in which to search
+        :param search_key: Value to search for in networks
+        :return: Boolean indicating whether a change took place
+        """
+        if not search_key:
+            return self.module.fail_json(
+                msg='Must specify either a network name or id')
         changed = False
-        search_key = params.get('id', None) or params.get('name', None)
-        location = params.get('location')
 
         network = clc_common.find_network(self.module, self.clc_auth,
-                                          self.clc_auth['clc_location'],
+                                          location,
                                           network_id_search=search_key,
                                           networks=self.networks)
 
         if network is not None:
             if not self.module.check_mode:
-                network.Delete(location=location)
+                self._delete_network(location, network.id)
             changed = True
 
         return changed
 
-    def _ensure_network_present(self, params):
-        search_key = params.get('id', None) or params.get('name', None)
+    def _ensure_network_present(self, location, search_key):
+        """
+        Check to make sure network matching 'search_key' exists
+        :param location:  Datacenter in which to search
+        :param search_key: Value to search for in networks
+        :return: Boolean indicating change, and network object
+        """
         if not search_key:
             return self.module.fail_json(
                 msg='Must specify either a network name or id')
         network = clc_common.find_network(self.module, self.clc_auth,
-                                          self.clc_auth['clc_location'],
+                                          location,
                                           network_id_search=search_key,
                                           networks=self.networks)
 
         if network is None:
             changed = True
             if not self.module.check_mode:
-                network = self._create_network(params)
+                network = self._create_network(location)
         else:
-            changed, network = self._update_network(network, params)
+            changed, network = self._update_network(location, network)
 
         return changed, network
 
-    def _create_network(self, params):
+    def _create_network(self, location):
+        """
+        Create a new network
+        :param location: Datacenter in which to create network
+        :return: Network object for newly created network, or response object
+                 if wait parameter is false
+        """
+        params = self.module.params
         name = params.get('name', None)
         desc = params.get('description', None)
-        location = params.get('location')
-        if not location:
-            location = self.clc_auth['clc_location']
 
-        response = self._claim_network(location)
+        try:
+            response = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'POST', '/networks/{alias}/{location}/claim'.format(
+                    alias=self.clc_auth['clc_alias'], location=location))
+        except ClcApiException as e:
+            return self.module.fail_json(
+                msg='Unable to claim network in location: {location}. '
+                    '{msg}'.format(location=location, msg=e.message))
+        self._wait_for_requests([response])
 
         if params.get('wait'):
-            self._wait_for_requests(response)
-            operation_id = response['operationId']
             try:
+                operation_id = clc_common.operation_id_list([response])[0]
                 response = clc_common.call_clc_api(
                     self.module, self.clc_auth,
                     'GET', '/operations/{alias}/status/{id}'.format(
@@ -313,27 +318,30 @@ class ClcNetwork(object):
                     network_id_search=network_id)
             except ClcApiException as e:
                 return self.module.fail_json(
-                    msg='Unable to claim network in location: {location}.'
-                        ' {message}'.format(
-                            location=location, message=e.message))
+                    msg='Unable to get network operation status for operation: '
+                        '{id}. {message}'.format(
+                            id=operation_id, message=e.message))
             if name is not None or desc is not None:
                 try:
-                    changed, network = self._update_network(network, params)
+                    changed, network = self._update_network(location, network)
                 except ClcApiException as e:
                     return self.module.fail_json(
                         msg='Unable to update network: {id}. {message}'.format(
                             id=network.id, message=e.message))
             return network
-
-        # TODO: Resolve what will be returned by _create_network,
-        #       Especially if _update_network will be called
-
         else:
             return response
 
-    def _update_network(self, network, params):
+    def _update_network(self, location, network):
+        """
+        Update Network within a datacenter
+        :param location: Datacenter in which to update network
+        :param network: Network object to update
+        :return: Boolean indicating change, and network object
+        """
+        params = self.module.params
+
         changed = False
-        location = params.get('location', self.clc_auth['clc_location'])
         name = params.get('name', None)
         desc = params.get('description', None)
 
@@ -354,19 +362,32 @@ class ClcNetwork(object):
 
         return changed, network
 
-    def _claim_network(self, location):
+    def _delete_network(self, location, network):
+        """
+        Delete network within a datacenter
+        :param location: Datacenter in which to update network
+        :param network: Network object to deleted
+        :return: none
+        """
         try:
             response = clc_common.call_clc_api(
                 self.module, self.clc_auth,
-                'POST', '/networks/{alias}/{location}/claim'.format(
-                    alias=self.clc_auth['clc_alias'], location=location))
-            return response
+                'POST', '/networks/{alias}/{location}/{id}/release'.format(
+                    alias=self.clc_auth['clc_alias'], location=location,
+                    id=network.id))
         except ClcApiException as e:
             return self.module.fail_json(
-                msg='Unable to claim network in location: {location}. '
-                    '{msg}'.format(location=location, msg=e.message))
+                msg='Unable to release network: {id} in location: {location}. '
+                    '{msg}'.format(id=network.id, location=location,
+                                   msg=e.message))
+        self._wait_for_requests([response])
 
     def _wait_for_requests(self, request_list):
+        """
+        Block until server provisioning requests are completed.
+        :param request_list: a list of CLC API JSON responses
+        :return: none
+        """
         if self.module.params.get('wait'):
             failed_requests_count = clc_common.wait_on_completed_operations(
                 self.module, self.clc_auth,

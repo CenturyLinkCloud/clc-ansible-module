@@ -59,7 +59,6 @@
         public_ip_protocol: TCP
         public_ip_ports: 443
         storage_type: 'standard'
-        network_id: 'test'
         ttl: 5400
         wait: True
       register: server_create
