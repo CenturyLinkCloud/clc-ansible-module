@@ -1,14 +1,23 @@
 #!/usr/bin/python
 
-import requests
+try:
+    import requests
+except ImportError:
+    REQUESTS_FOUND = False
+else:
+    REQUESTS_FOUND = True
 
 class ClcMetaFact:
 
     def __init__(self, module):
+
+        if not REQUESTS_FOUND:
+            self.module.fail_json(
+                msg='requests library is required for this module')
+
         self.module = module
         self.api_url = ''
         self.headers = {}
-
         self._set_clc_credentials_from_env()
 
     def _set_clc_credentials_from_env(self):
@@ -18,47 +27,83 @@ class ClcMetaFact:
         """
         env = os.environ
         v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        self.api_url = env.get('RUNNER_META_API_URL', '')
-        self.headers = {
-            "Authorization": "Bearer " + v2_api_token
+        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
+        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
+        clc_alias = env.get('CLC_ACCT_ALIAS', False)
+        self.api_url = env.get('CLC_V2_API_URL', 'https://api.ctl.io')
+        self.meta_api_url = env.get('META_API_URL', 'https://api.runner.io')
+
+        if v2_api_token and clc_alias:
+
+            self.v2_api_token = v2_api_token
+            self.clc_alias = clc_alias
+
+        elif v2_api_username and v2_api_passwd:
+
+            r = requests.post(self.api_url + '/v2/authentication/login', json={
+                'username': v2_api_username,
+                'password': v2_api_passwd
+            })
+
+            if r.status_code not in [200]:
+                self.module.fail_json(
+                    msg='Failed to authenticate with clc V2 api.')
+
+            r = r.json()
+            self.v2_api_token = r['bearerToken']
+            self.clc_alias = r['accountAlias']
+
+        else:
+            return self.module.fail_json(
+                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
+                    "environment variables")
+
+
+    def create_meta(self, params):
+
+        model = {
+            'accountAlias' :  self.clc_alias,
+            'jobId' : params.get('jobId'),
+            'executionId' : params.get('executionId'),
+            'referenceId' : params.get('referenceId'),
+            'name' : params.get('name'),
+            'description' : params.get('description'),
+            'data' : params.get('data')
         }
 
+        state = 'created'
+        r = requests.post(self.meta_api_url + '/meta/' + self.clc_alias + '/references/' + params.get('referenceId'),
+            json=model, headers={ 'Authorization': 'Bearer ' + self.v2_api_token }, verify=False)
 
-    def create_meta(self, accountAlias, refId, attributes):
-        # requests.post(self.api_url, payload, header)
-        changed = False
-        url = self.api_url + "/" + accountAlias
-        json = {'referenceId': refId,
-                'attributes': attributes}
-        result = requests.post(url, json=json, headers=self.headers)
-        if result.status_code == 200:
-            changed = True
-        return changed, result.json()
+        if r.status_code in [409]:
+            state = 'updated'
+            r = requests.put(self.meta_api_url + '/meta/' + self.clc_alias + '/references/' + params.get('referenceId') + '/values/' + params.get('name'),
+                json=model, headers={ 'Authorization': 'Bearer ' + self.v2_api_token }, verify=False)
 
-    def find_meta(self, accountAlias, refId):
-        url = self.api_url + "/" + accountAlias + "?referenceId=" + refId
-        return False, requests.get(url, headers=self.headers).json()
+        if r.status_code not in [200]:
+            self.module.fail_json(msg='Failed to create or update metadata. name:[%s]' % params.get('name'))
 
-    def delete_meta(self, accountAlias, id):
-        changed = False
-        url = self.api_url + "/" + accountAlias + "/" + id
-        result = requests.delete(url, headers=self.headers)
-        if result.status_code == 204:
-            changed = True
-            return changed, {}
-        else:
-            self.module.fail_json("Unable to delete the meta data " + result.content)
+        self.module.exit_json(changed=True, content={ 'state' : state, 'payload' : model })
+
+    def delete_meta(self, params):
+
+        state = 'deleted'
+        r = requests.delete(self.meta_api_url + '/meta/' + self.clc_alias + '/references/' + params.get('referenceId') + '/values/' + params.get('name'),
+            headers={ 'Authorization': 'Bearer ' + self.v2_api_token }, verify=False)
+
+        if r.status_code not in [200, 404]:
+            self.module.fail_json(msg='Failed to delete metadata. name:[%s]' % params.get('name'))
+
+        self.module.exit_json(changed=True, content={ 'state' : state })
 
 
     def process_request(self):
         params = self.module.params
-        action = params.get('action')
-        if action == 'create':
-            return self.create_meta(params.get('accountAlias'), params.get('referenceId'), params.get('attributes'))
-        elif action == 'fetch':
-            return self.find_meta(params.get('accountAlias'), params.get('referenceId'))
-        elif action == 'delete':
-            return self.delete_meta(params.get('accountAlias'), params.get('id'))
+        state = params.get('state')
+        if state == 'present':
+            return self.create_meta(params)
+        elif state == 'absent':
+            return self.delete_meta(params)
 
 
     @staticmethod
@@ -68,11 +113,13 @@ class ClcMetaFact:
         :return: argument spec dictionary
         """
         argument_spec = dict(
-            accountAlias=dict(type='str'),
-            referenceId=dict(type='str'),
-            attributes=dict(type='dict'),
-            id=dict(type='str'),
-            action=dict(type='str'))
+            jobId=dict(required=True),
+            executionId=dict(required=True),
+            referenceId=dict(required=True),
+            name=dict(required=True),
+            description=dict(required=True),
+            data=dict(required=True),
+            state=dict(choices=['present', 'absent']))
 
 
         return {"argument_spec": argument_spec}
