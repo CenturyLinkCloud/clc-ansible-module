@@ -7,7 +7,7 @@ except ImportError:
 else:
     REQUESTS_FOUND = True
 
-class ClcMeta:
+class ClcMetaFact:
 
     def __init__(self, module):
 
@@ -58,52 +58,26 @@ class ClcMeta:
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
 
-
-    def create_meta(self, params):
-
-        model = {
-            'accountAlias' :  self.clc_alias,
-            'jobId' : params.get('jobId'),
-            'executionId' : params.get('executionId'),
-            'referenceId' : params.get('referenceId'),
-            'name' : params.get('name'),
-            'description' : params.get('description'),
-            'data' : params.get('data')
-        }
-
-        state = 'created'
-        r = requests.post(self.meta_api_url + '/meta/' + self.clc_alias + '/references/' + params.get('referenceId'),
-            json=model, headers={ 'Authorization': 'Bearer ' + self.v2_api_token }, verify=False)
-
-        if r.status_code in [409]:
-            state = 'updated'
-            r = requests.put(self.meta_api_url + '/meta/' + self.clc_alias + '/references/' + params.get('referenceId') + '/values/' + params.get('name'),
-                json=model, headers={ 'Authorization': 'Bearer ' + self.v2_api_token }, verify=False)
-
-        if r.status_code not in [200]:
-            self.module.fail_json(msg='Failed to create or update metadata. name:[%s]' % params.get('name'))
-
-        self.module.exit_json(changed=True, content={ 'state' : state, 'payload' : model })
-
-    def delete_meta(self, params):
-
-        state = 'deleted'
-        r = requests.delete(self.meta_api_url + '/meta/' + self.clc_alias + '/references/' + params.get('referenceId') + '/values/' + params.get('name'),
-            headers={ 'Authorization': 'Bearer ' + self.v2_api_token }, verify=False)
-
-        if r.status_code not in [200, 404]:
-            self.module.fail_json(msg='Failed to delete metadata. name:[%s]' % params.get('name'))
-
-        self.module.exit_json(changed=True, content={ 'state' : state })
-
-
     def process_request(self):
         params = self.module.params
-        state = params.get('state')
-        if state == 'present':
-            return self.create_meta(params)
-        elif state == 'absent':
-            return self.delete_meta(params)
+        criteria = ' referenceId: "' + params.get('referenceId') + '" '
+        if params.get('jobId'):
+            criteria += ' jobId: "' + params.get('jobId') + '" '
+        if params.get('executionId'):
+            criteria += ' jobId: "' + params.get('jobId') + '" '
+        if params.get('name'):
+            criteria += ' name: "' + params.get('name') + '" '
+
+        gq = '{ metadata(' + criteria + ') { id referenceId jobId executionId name description data { ... on Config { type key value } ... on Instance { type value } } } }'
+
+        r = requests.post(self.meta_api_url + '/meta/' + self.clc_alias,
+            data=gq, headers={ 'Authorization': 'Bearer ' + self.v2_api_token, 'Content-Type' : 'text/plain' }, verify=False)
+
+        if r.status_code not in [200]:
+            # self.module.fail_json(msg='Failed to fetch metadata facts.')
+            self.module.exit_json(changed=True, content={ 'data' : r.text })
+
+        self.module.exit_json(changed=True, content={ 'data' : r.json() })
 
 
     @staticmethod
@@ -113,14 +87,10 @@ class ClcMeta:
         :return: argument spec dictionary
         """
         argument_spec = dict(
-            jobId=dict(required=True),
-            executionId=dict(required=True),
+            jobId=dict(required=False, default=False),
+            executionId=dict(required=False, default=False),
             referenceId=dict(required=True),
-            name=dict(required=True),
-            description=dict(required=True),
-            data=dict(required=True),
-            state=dict(choices=['present', 'absent']))
-
+            name=dict(required=False, default=False))
 
         return {"argument_spec": argument_spec}
 
@@ -130,12 +100,9 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    argument_dict = ClcMeta._define_module_argument_spec()
+    argument_dict = ClcMetaFact._define_module_argument_spec()
     module = AnsibleModule(supports_check_mode=True, **argument_dict)
-    clc_meta_fact = ClcMeta(module)
-
-    changed, response = clc_meta_fact.process_request()
-    module.exit_json(changed=changed, meta=response)
+    ClcMetaFact(module).process_request()
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
 

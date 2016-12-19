@@ -1,0 +1,47 @@
+---
+- name: Meta Test
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+
+  - name: Set CLC Metadata Config
+    clc_meta:
+      state: present
+      referenceId: demo
+      jobId: "{{ jobId }}"
+      executionId: "{{ executionId }}"
+      name: configuration_value
+      description: Configuration value description.
+      data:
+        type: CONFIG
+        key: asdf
+        value: fdsamodified
+    register: result
+
+  - debug: msg={{result}}
+
+  - name: Set CLC Metadata Instance
+    clc_meta:
+      state: present
+      referenceId: demo
+      jobId: "{{ jobId }}"
+      executionId: "{{ executionId }}"
+      name: instance_value
+      description: Instance value description.
+      data:
+        type: INSTANCE
+        value: UC1WFTCTEST02
+    register: result
+
+  - debug: msg={{result}}
+
+  - name: Get CLC Metadata Instance
+    clc_meta_fact:
+      referenceId: demo
+      name: configuration_value
+      jobId: "{{ jobId }}"
+      executionId: "{{ executionId }}"
+    register: result
+
+  - debug: msg={{result}}
