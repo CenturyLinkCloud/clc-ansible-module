@@ -64,7 +64,7 @@ class ClcMetaFact:
         if params.get('jobId'):
             criteria += ' jobId: "' + params.get('jobId') + '" '
         if params.get('executionId'):
-            criteria += ' jobId: "' + params.get('jobId') + '" '
+            criteria += ' executionId: "' + params.get('executionId') + '" '
         if params.get('name'):
             criteria += ' name: "' + params.get('name') + '" '
 
