@@ -31,7 +31,7 @@ class ClcMeta:
         v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
         clc_alias = env.get('CLC_ACCT_ALIAS', False)
         self.api_url = env.get('CLC_V2_API_URL', 'https://api.ctl.io')
-        self.meta_api_url = env.get('META_API_URL', 'https://api.runner.io')
+        self.meta_api_url = env.get('META_API_URL', 'https://api.runner.ctl.io')
 
         if v2_api_token and clc_alias:
 
