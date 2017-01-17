@@ -60,7 +60,9 @@ class ClcMetaFact:
 
     def process_request(self):
         params = self.module.params
-        criteria = ' referenceId: "' + params.get('referenceId') + '" '
+        criteria = ''
+        if params.get('referenceId'):
+            criteria += ' referenceId: "' + params.get('referenceId') + '" '
         if params.get('jobId'):
             criteria += ' jobId: "' + params.get('jobId') + '" '
         if params.get('executionId'):
@@ -89,7 +91,7 @@ class ClcMetaFact:
         argument_spec = dict(
             jobId=dict(required=False, default=False),
             executionId=dict(required=False, default=False),
-            referenceId=dict(required=True),
+            referenceId=dict(required=False, default=False),
             name=dict(required=False, default=False))
 
         return {"argument_spec": argument_spec}
