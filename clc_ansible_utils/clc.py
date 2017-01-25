@@ -33,6 +33,7 @@ import os
 import json
 import math
 import urllib
+import urllib2
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
 from ansible.module_utils.urls import *  # pylint: disable=W0614

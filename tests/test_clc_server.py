@@ -580,7 +580,8 @@ class TestClcServerFunctions(unittest.TestCase):
             self.module, mock_rootgroup,
             'DefaultGroupFromModuleParamsLookup')
 
-    def test_find_group_w_recursive_lookup(self):
+    @patch.object(clc_common, 'group_tree')
+    def test_find_group_w_recursive_lookup(self, mock_group_tree):
         # Setup
         mock_group_to_find = mock.MagicMock()
         mock_group_to_find.name = "TEST_RECURSIVE_GRP"
@@ -588,6 +589,8 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_rootgroup = mock.MagicMock()
         mock_rootgroup.name = 'rootgroup'
         mock_rootgroup.parent = None
+
+        mock_group_tree.return_value = mock_rootgroup
 
         mock_subgroup = mock.MagicMock()
         mock_subgroup.name = 'subgroup'
@@ -842,13 +845,17 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.fail_json.assert_called_with(
             msg='Unable to find location: testdc')
 
+    @patch.object(clc_common, 'group_tree')
     @patch.object(clc_common, 'find_group')
-    def test_find_group_no_result(self, mock_find_group):
+    def test_find_group_no_result(self, mock_find_group, mock_group_tree):
         datacenter = 'testdc'
         mock_find_group.side_effect = ClcApiException()
 
+        mock_root_group = mock.MagicMock()
+        mock_group_tree.return_value = mock_root_group
+
         under_test = ClcServer(self.module)
-        under_test.root_group = mock.MagicMock()
+        under_test.root_group = mock_root_group
         ret = under_test._find_group(datacenter, 'lookup_group')
         self.module.fail_json.assert_called_with(
             msg='Unable to find group: lookup_group in location: testdc')
@@ -1161,7 +1168,7 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_running_servers.return_value = (mock_server_list, mock_server_list)
         params = {
             'state': 'present',
-            'exact_count': 0,
+            'exact_count': 1,
             'count_group': 'test'
         }
         self.module.params = params
