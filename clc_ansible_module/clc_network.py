@@ -253,7 +253,7 @@ class ClcNetwork(object):
 
         if network is not None:
             if not self.module.check_mode:
-                self._delete_network(location, network.id)
+                self._delete_network(location, network)
             changed = True
 
         return changed
@@ -322,12 +322,7 @@ class ClcNetwork(object):
                         '{id}. {message}'.format(
                             id=operation_id, message=e.message))
             if name is not None or desc is not None:
-                try:
-                    changed, network = self._update_network(location, network)
-                except ClcApiException as e:
-                    return self.module.fail_json(
-                        msg='Unable to update network: {id}. {message}'.format(
-                            id=network.id, message=e.message))
+                changed, network = self._update_network(location, network)
             return network
         else:
             return response
@@ -352,13 +347,22 @@ class ClcNetwork(object):
 
                 update_name = name if name is not None else network.name
                 update_desc = desc if desc is not None else network.description
-                response = clc_common.call_clc_api(
-                    self.module, self.clc_auth,
-                    'PUT', '/networks/{alias}/{location}/{id}'.format(
-                        alias=self.clc_auth['clc_alias'],
-                        location=location, id=network.id),
-                    data={'name': update_name, 'description': update_desc})
-                network = clc_common.Network(response)
+                try:
+                    # Returns 204 No Content
+                    response = clc_common.call_clc_api(
+                        self.module, self.clc_auth,
+                        'PUT', '/networks/{alias}/{location}/{id}'.format(
+                            alias=self.clc_auth['clc_alias'],
+                            location=location, id=network.id),
+                        data={'name': update_name, 'description': update_desc})
+                except ClcApiException as e:
+                    return self.module.fail_json(
+                        msg='Unable to update network: {id} in location: '
+                            '{location}. {msg}'.format(id=network.id,
+                                                       location=location,
+                                                       msg=e.message))
+                network.name = network.data['name'] = update_name
+                network.description = network.data['description'] = update_desc
 
         return changed, network
 
@@ -370,6 +374,7 @@ class ClcNetwork(object):
         :return: none
         """
         try:
+            # Returns 204 No Content
             response = clc_common.call_clc_api(
                 self.module, self.clc_auth,
                 'POST', '/networks/{alias}/{location}/{id}/release'.format(
@@ -380,7 +385,6 @@ class ClcNetwork(object):
                 msg='Unable to release network: {id} in location: {location}. '
                     '{msg}'.format(id=network.id, location=location,
                                    msg=e.message))
-        self._wait_for_requests([response])
 
     def _wait_for_requests(self, request_list):
         """

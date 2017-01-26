@@ -164,6 +164,8 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None):
         raise api_ex
     except ssl.SSLError as ex:
         raise ex
+    if response.getcode() == 204:
+        return None
     try:
         return json.loads(response.read())
     except:
