@@ -164,6 +164,7 @@ __version__ = '${version}'
 import clc_ansible_utils.clc as clc_common
 from clc_ansible_utils.clc import ClcApiException
 
+
 class ClcNetwork(object):
 
     module = None
@@ -231,8 +232,6 @@ class ClcNetwork(object):
             }
 
         self.module.exit_json(changed=changed, network=network)
-
-    # TODO: Complete method docstrings
 
     def _ensure_network_absent(self, location, search_key):
         """
