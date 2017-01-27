@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # CenturyLink Cloud Ansible Modules.
 #
@@ -54,8 +55,6 @@ options:
     choices: [True, False]
 requirements:
     - python = 2.7
-    - requests >= 2.5.0
-    - clc-sdk
 author: "CLC Runner (@clc-runner)"
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
@@ -142,52 +141,21 @@ policy:
 
 __version__ = '${version}'
 
-from distutils.version import LooseVersion
-
-try:
-    import requests
-except ImportError:
-    REQUESTS_FOUND = False
-else:
-    REQUESTS_FOUND = True
-
-#
-#  Requires the clc-python-sdk.
-#  sudo pip install clc-sdk
-#
-try:
-    import clc as clc_sdk
-    from clc import CLCException
-except ImportError:
-    CLC_FOUND = False
-    clc_sdk = None
-else:
-    CLC_FOUND = True
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
 
 
 class ClcAntiAffinityPolicy(object):
 
-    clc = clc_sdk
     module = None
 
     def __init__(self, module):
         """
         Construct module
         """
+        self.clc_auth = {}
         self.module = module
         self.policy_dict = {}
-
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-        if not REQUESTS_FOUND:
-            self.module.fail_json(
-                msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
-            self.module.fail_json(
-                msg='requests library  version should be >= 2.5.0')
-
-        self._set_user_agent(self.clc)
 
     @staticmethod
     def _define_module_argument_spec():
@@ -211,139 +179,82 @@ class ClcAntiAffinityPolicy(object):
         """
         p = self.module.params
 
-        self._set_clc_credentials_from_env()
-        self.policy_dict = self._get_policies_for_datacenter(p)
+        self.clc_auth = clc_common.authenticate(self.module)
 
         if p['state'] == "absent":
-            changed, policy = self._ensure_policy_is_absent(p)
+            changed, policy = self._ensure_policy_is_absent()
         else:
-            changed, policy = self._ensure_policy_is_present(p)
-
-        if hasattr(policy, 'data'):
-            policy = policy.data
-        elif hasattr(policy, '__dict__'):
-            policy = policy.__dict__
+            changed, policy = self._ensure_policy_is_present()
 
         self.module.exit_json(changed=changed, policy=policy)
 
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials on the sdk by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        api_url = env.get('CLC_V2_API_URL', False)
-
-        if api_url:
-            self.clc.defaults.ENDPOINT_URL_V2 = api_url
-
-        if v2_api_token and clc_alias:
-            self.clc._LOGIN_TOKEN_V2 = v2_api_token
-            self.clc._V2_ENABLED = True
-            self.clc.ALIAS = clc_alias
-        elif v2_api_username and v2_api_passwd:
-            self.clc.v2.SetCredentials(
-                api_username=v2_api_username,
-                api_passwd=v2_api_passwd)
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
-
-    def _get_policies_for_datacenter(self, p):
-        """
-        Get the Policies for a datacenter by calling the CLC API.
-        :param p: datacenter to get policies from
-        :return: policies in the datacenter
-        """
-        response = {}
-
-        policies = self.clc.v2.AntiAffinity.GetAll(location=p['location'])
-
-        for policy in policies:
-            response[policy.name] = policy
-        return response
-
-    def _create_policy(self, p):
+    def _create_policy(self):
         """
         Create an Anti Affinity Policy using the CLC API.
-        :param p: datacenter to create policy in
         :return: response dictionary from the CLC API.
         """
         try:
-            return self.clc.v2.AntiAffinity.Create(
-                name=p['name'],
-                location=p['location'])
-        except CLCException as ex:
-            self.module.fail_json(msg='Failed to create anti affinity policy : {0}. {1}'.format(
-                p['name'], ex.response_text
-            ))
+            policy = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'POST', '/antiAffinityPolicies/{alias}'.format(
+                    alias=self.clc_auth['clc_alias']),
+                data={'name': self.module.params['name'],
+                      'location': self.module.params['location']})
+        except ClcApiException as e:
+            return self.module.fail_json(
+                msg='Failed to create anti affinity policy: {name}. '
+                    '{msg}'.format(name=policy['name'], msg=e.message))
+        policy['servers'] = []
+        return policy
 
-    def _delete_policy(self, p):
+    def _delete_policy(self, policy):
         """
         Delete an Anti Affinity Policy using the CLC API.
-        :param p: datacenter to delete a policy from
+        :param policy: Policy to delete datacenter to delete a policy from
         :return: none
         """
+
         try:
-            policy = self.policy_dict[p['name']]
-            policy.Delete()
-        except CLCException as ex:
-            self.module.fail_json(msg='Failed to delete anti affinity policy : {0}. {1}'.format(
-                p['name'], ex.response_text
-            ))
+            # Returns 204 No Content
+            response = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'DELETE', '/antiAffinityPolicies/{alias}/{id}'.format(
+                    alias=self.clc_auth['clc_alias'], id=policy['id']))
+        except ClcApiException as e:
+            return self.module.fail_json(
+                msg='Failed to delete anti affinity policy: {name}. '
+                    '{msg}'.format(name=policy['name'], msg=e.message))
 
-    def _policy_exists(self, policy_name):
-        """
-        Check to see if an Anti Affinity Policy exists
-        :param policy_name: name of the policy
-        :return: boolean of if the policy exists
-        """
-        if policy_name in self.policy_dict:
-            return self.policy_dict.get(policy_name)
-
-        return False
-
-    def _ensure_policy_is_absent(self, p):
+    def _ensure_policy_is_absent(self):
         """
         Makes sure that a policy is absent
-        :param p: dictionary of policy name
         :return: tuple of if a deletion occurred and the name of the policy that was deleted
         """
+        p = self.module.params
         changed = False
-        if self._policy_exists(policy_name=p['name']):
+        policy = clc_common.find_anti_affinity_policy(
+            self.module, self.clc_auth, p['name'], location=p['location'])
+        if policy:
             changed = True
             if not self.module.check_mode:
-                self._delete_policy(p)
+                self._delete_policy(policy)
         return changed, None
 
-    def _ensure_policy_is_present(self, p):
+    def _ensure_policy_is_present(self):
         """
         Ensures that a policy is present
-        :param p: dictionary of a policy name
         :return: tuple of if an addition occurred and the name of the policy that was added
         """
+        p = self.module.params
         changed = False
-        policy = self._policy_exists(policy_name=p['name'])
+        policy = clc_common.find_anti_affinity_policy(
+            self.module, self.clc_auth, p['name'], location=p['location'])
         if not policy:
             changed = True
             policy = None
             if not self.module.check_mode:
-                policy = self._create_policy(p)
+                policy = self._create_policy()
         return changed, policy
-
-    @staticmethod
-    def _set_user_agent(clc):
-        if hasattr(clc, 'SetRequestsSession'):
-            agent_string = "ClcAnsibleModule/" + __version__
-            ses = requests.Session()
-            ses.headers.update({"Api-Client": agent_string})
-            ses.headers['User-Agent'] += " " + agent_string
-            clc.SetRequestsSession(ses)
 
 
 def main():

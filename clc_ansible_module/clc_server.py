@@ -971,41 +971,22 @@ class ClcServer(object):
         Validate if the anti affinity policy exist for the given name and throw error if not
         :return: aa_policy_id: the anti affinity policy id of the given name.
         """
-        aa_policy_id = self.module.params.get('anti_affinity_policy_id')
-        aa_policy_name = self.module.params.get('anti_affinity_policy_name')
 
-        aa_policy_ids = []
-        if aa_policy_id or aa_policy_name:
-            try:
-                aa_policies = clc_common.call_clc_api(
-                    self.module, self.clc_auth,
-                    'GET', '/antiAffinityPolicies/{alias}'.format(
-                        alias=self.clc_auth['clc_alias']))
-                for policy in aa_policies['items']:
-                    if (aa_policy_id and
-                            policy['id'].lower() == aa_policy_id.lower()):
-                        aa_policy_ids.append(policy['id'])
-                    elif (aa_policy_name and
-                            policy['name'].lower() == aa_policy_name.lower()):
-                        aa_policy_ids.append(policy['id'])
-            except ClcApiException as ex:
+        params = self.module.params
+        search_key = (params.get('anti_affinity_policy_id') or
+                      params.get('anti_affinity_policy_name'))
+
+        aa_policy_id = None
+
+        if search_key is not None:
+            aa_policy = clc_common.find_anti_affinity_policy(
+                self.module, self.clc_auth, search_key)
+            if aa_policy is not None:
+                aa_policy_id = aa_policy['id']
+            else:
                 return self.module.fail_json(
-                    msg='Unable to fetch anti affinity policies for '
-                        'account: {alias}. {msg}'.format(
-                            alias=self.clc_auth['clc_alias'], msg=ex.message))
-
-            if len(aa_policy_ids) != 1:
-                if aa_policy_id:
-                    policy_str = 'id: {id}'.format(id=aa_policy_id)
-                else:
-                    policy_str = 'name: {name}'.format(name=aa_policy_name)
-                if len(aa_policy_ids) == 0:
-                    err_msg = 'No anti affinity policy was found with policy '
-                else:
-                    err_msg = 'Multiple anti affinity policies found for '
-                return self.module.fail_json(msg=(err_msg+policy_str))
-
-            aa_policy_id = aa_policy_ids[0]
+                    msg='No anti affinity policy matching: {search}.'.format(
+                        search=search_key))
 
         return aa_policy_id
 

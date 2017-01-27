@@ -123,7 +123,7 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None):
     :param url: URL string to be appended to root api_url
     :param headers: Headers to be added to request
     :param data: Data to be sent with request
-    :return response: HTTP response from urllib2.urlopen
+    :return response: JSON from HTTP response, or None if no content
     """
     if not isinstance(url, str) or not isinstance(url, basestring):
         raise TypeError('URL for API request must be a string')
@@ -508,3 +508,39 @@ def servers_in_group(module, clc_auth, group):
     server_lst = [obj['id'] for obj in group.data['links'] if
                   obj['rel'] == 'server']
     return servers_by_id(module, clc_auth, server_lst)
+
+
+def anti_affinity_policies(module, clc_auth, location=None):
+    try:
+        policies = call_clc_api(
+            module, clc_auth,
+            'GET', '/antiAffinityPolicies/{alias}'.format(
+                alias=clc_auth['clc_alias']))
+    except ClcApiException as ex:
+        return module.fail_json(
+            msg='Unable to fetch anti affinity policies for '
+                'account: {alias}. {msg}'.format(
+                    alias=clc_auth['clc_alias'], msg=ex.message))
+
+    policies = policies['items']
+    if location is not None:
+        policies = [p for p in policies if p['location'] == location]
+
+    return policies
+
+
+def find_anti_affinity_policy(module, clc_auth, search_key, location=None,
+                              policies=None):
+    if policies is None:
+        policies = anti_affinity_policies(module, clc_auth, location=location)
+
+    policies = [p for p in policies if search_key.lower()
+                in (p['id'].lower, p['name'].lower())]
+    num_policies = len(policies)
+    if num_policies > 1:
+        return module.fail_json(
+            msg='Multiple anti affinity policies matching: {search}. '
+                'Policy ids: {ids}'.format(
+                      search=search_key,
+                      ids=', '.join([p['id'] for p in policies])))
+    return policies[0] if num_policies > 0 else None
