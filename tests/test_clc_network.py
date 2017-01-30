@@ -451,18 +451,16 @@ class TestClcNetwork(unittest.TestCase):
     @patch.object(clc_common, 'call_clc_api')
     @patch.object(clc_common, 'find_network')
     @patch.object(ClcNetwork, '_wait_for_requests')
-    @patch.object(ClcNetwork, '_update_network')
     def test_create_network_status_exception(self,
-                                                mock_update_network,
                                                 mock_wait_for_req,
                                                 mock_find_network,
                                                 mock_call_api):
 
         error = ClcApiException(message='FAIL')
         mock_call_api.side_effect = [self.response_operation_uri,
-                                     self.response_operation_succeeded]
+                                     self.response_operation_succeeded,
+                                     error]
         mock_find_network.return_value = self.new_net
-        mock_update_network.side_effect = [error]
 
         params = {
             'wait': True,
@@ -474,11 +472,10 @@ class TestClcNetwork(unittest.TestCase):
         under_test.clc_auth['clc_alias'] = 'mock_alias'
         under_test._create_network('mock_loc')
 
-        self.assertEqual(2, mock_call_api.call_count)
-        mock_update_network.assert_called()
+        self.assertEqual(3, mock_call_api.call_count)
         self.module.fail_json.assert_called_with(
-            msg='Unable to update network: {id}. FAIL'.format(
-                id=self.new_net.id))
+            msg='Unable to update network: {id} in location: {location}. '
+                'FAIL'.format(location='mock_loc', id=self.new_net.id))
 
     @patch.object(clc_common, 'find_network')
     @patch.object(ClcNetwork, '_update_network')
@@ -510,20 +507,30 @@ class TestClcNetwork(unittest.TestCase):
         search_key = 'mock_id'
 
         under_test = ClcNetwork(self.module)
+        under_test.module.params = {
+            'wait': True,
+            'name': 'new_name'
+        }
+
         under_test._ensure_network_present(location, search_key)
 
         mock_create_network.assert_not_called()
         mock_update_network.assert_called_once_with(location, self.existing_net)
 
+    @patch.object(clc_common, 'find_network')
     @patch.object(clc_common, 'call_clc_api')
     @patch.object(clc_common, 'Network')
-    def test_update_network_exists_no_change(self,
-                                             mock_network,
-                                             mock_call_api):
+    def test_ensure_network_present_no_change(self,
+                                              mock_network,
+                                              mock_call_api,
+                                              mock_find_network):
         location = 'mock_loc'
+        search_key = 'mock_id'
         network = mock.MagicMock()
         network.description = 'mock_desc'
         network.name = 'mock_name'
+
+        mock_find_network.return_value = network
 
         under_test = ClcNetwork(self.module)
         under_test.clc_auth['clc_alias'] = 'mock_alias'
@@ -532,7 +539,8 @@ class TestClcNetwork(unittest.TestCase):
             'description': network.description,
             'name': network.name,
         }
-        changed, updated_network = under_test._update_network(location, network)
+        changed, updated_network = under_test._ensure_network_present(
+            location, search_key)
 
         self.assertFalse(changed)
         mock_call_api.assert_not_called()
@@ -554,9 +562,8 @@ class TestClcNetwork(unittest.TestCase):
             'description': 'new_desc',
             'name': network.name,
         }
-        changed, updated_network = under_test._update_network(location, network)
+        updated_network = under_test._update_network(location, network)
 
-        self.assertTrue(changed)
         mock_call_api.assert_called()
 
     @patch.object(clc_common, 'call_clc_api')
@@ -576,9 +583,8 @@ class TestClcNetwork(unittest.TestCase):
             'description': network.description,
             'name': 'new_name',
         }
-        changed, updated_network = under_test._update_network(location, network)
+        updated_network = under_test._update_network(location, network)
 
-        self.assertTrue(changed)
         mock_call_api.assert_called()
 
     @patch.object(clc_common, 'call_clc_api')

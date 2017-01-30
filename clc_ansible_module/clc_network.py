@@ -272,12 +272,19 @@ class ClcNetwork(object):
                                           network_id_search=search_key,
                                           networks=self.networks)
 
+        changed = False
         if network is None:
             changed = True
             if not self.module.check_mode:
                 network = self._create_network(location)
         else:
-            changed, network = self._update_network(location, network)
+            name = self.module.params.get('name')
+            desc = self.module.params.get('description')
+            if (name is not None and network.name != name) or (
+                            desc is not None and network.description != desc):
+                changed = True
+                if not self.module.check_mode:
+                    network = self._update_network(location, network)
 
         return changed, network
 
@@ -321,7 +328,7 @@ class ClcNetwork(object):
                         '{id}. {message}'.format(
                             id=operation_id, message=e.message))
             if name is not None or desc is not None:
-                changed, network = self._update_network(location, network)
+                network = self._update_network(location, network)
             return network
         else:
             return response
@@ -335,35 +342,29 @@ class ClcNetwork(object):
         """
         params = self.module.params
 
-        changed = False
         name = params.get('name', None)
         desc = params.get('description', None)
 
-        if (name is not None and network.name != name) or (
-                desc is not None and network.description != desc):
-            changed = True
-            if not self.module.check_mode:
+        update_name = name if name is not None else network.name
+        update_desc = desc if desc is not None else network.description
+        try:
+            # Returns 204 No Content
+            response = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'PUT', '/networks/{alias}/{location}/{id}'.format(
+                    alias=self.clc_auth['clc_alias'],
+                    location=location, id=network.id),
+                data={'name': update_name, 'description': update_desc})
+        except ClcApiException as e:
+            return self.module.fail_json(
+                msg='Unable to update network: {id} in location: '
+                    '{location}. {msg}'.format(id=network.id,
+                                               location=location,
+                                               msg=e.message))
+        network.name = network.data['name'] = update_name
+        network.description = network.data['description'] = update_desc
 
-                update_name = name if name is not None else network.name
-                update_desc = desc if desc is not None else network.description
-                try:
-                    # Returns 204 No Content
-                    response = clc_common.call_clc_api(
-                        self.module, self.clc_auth,
-                        'PUT', '/networks/{alias}/{location}/{id}'.format(
-                            alias=self.clc_auth['clc_alias'],
-                            location=location, id=network.id),
-                        data={'name': update_name, 'description': update_desc})
-                except ClcApiException as e:
-                    return self.module.fail_json(
-                        msg='Unable to update network: {id} in location: '
-                            '{location}. {msg}'.format(id=network.id,
-                                                       location=location,
-                                                       msg=e.message))
-                network.name = network.data['name'] = update_name
-                network.description = network.data['description'] = update_desc
-
-        return changed, network
+        return network
 
     def _delete_network(self, location, network):
         """

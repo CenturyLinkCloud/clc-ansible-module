@@ -651,8 +651,8 @@ class TestClcServerFunctions(unittest.TestCase):
     def test_find_network_id_default(self, mock_find_network):
         # Setup
         mock_network = mock.MagicMock()
-        mock_network['name'] = 'TestReturnVlan'
-        mock_network['id'] = '12345678123456781234567812345678'
+        mock_network.name = 'TestReturnVlan'
+        mock_network.id = '12345678123456781234567812345678'
         datacenter = 'mock_dc'
 
         mock_find_network.return_value = mock_network
@@ -664,19 +664,19 @@ class TestClcServerFunctions(unittest.TestCase):
         result = under_test._find_network_id(datacenter)
 
         # Assert Result
-        self.assertEqual(result, mock_network['id'])
+        self.assertEqual(result, mock_network.id)
         self.assertEqual(self.module.fail_json.called, False)
 
     @patch.object(clc_common, 'find_network')
     def test_find_network_id_by_id(self, mock_find_network):
         # Setup
         mock_network = mock.MagicMock()
-        mock_network['name'] = 'TestReturnVlan'
-        mock_network['id'] = '12345678123456781234567812345678'
+        mock_network.name = 'TestReturnVlan'
+        mock_network.id = '12345678123456781234567812345678'
         datacenter = 'mock_dc'
 
         mock_find_network.return_value = mock_network
-        self.module.params = {'network_id': mock_network['id']}
+        self.module.params = {'network_id': mock_network.id}
 
         # Function Under Test
         under_test = ClcServer(self.module)
@@ -684,7 +684,7 @@ class TestClcServerFunctions(unittest.TestCase):
         result = under_test._find_network_id(datacenter)
 
         # Assert Result
-        self.assertEqual(result, mock_network['id'])
+        self.assertEqual(result, mock_network.id)
         self.assertEqual(self.module.fail_json.called, False)
 
     def test_validate_name(self):
