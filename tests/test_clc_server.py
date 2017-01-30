@@ -774,7 +774,7 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test.module.params = params
         under_test._find_aa_policy_id()
         under_test.module.fail_json.assert_called_with(
-            msg='No anti affinity policy was found with policy name: nothing')
+            msg='No anti affinity policy matching: nothing.')
 
     @patch.object(clc_common, 'call_clc_api')
     def test_find_aa_policy_id_duplicate_match(self, mock_call_api):
@@ -789,7 +789,8 @@ class TestClcServerFunctions(unittest.TestCase):
 
         policy_id = under_test._find_aa_policy_id()
         under_test.module.fail_json.assert_called_with(
-            msg='Multiple anti affinity policies found for name: test1')
+            msg='Multiple anti affinity policies matching: test1. '
+                'Policy ids: 111, 111')
 
     @patch.object(clc_common, 'call_clc_api')
     def test_find_aa_policy_id_get_fail(self, mock_call_api):
@@ -801,8 +802,7 @@ class TestClcServerFunctions(unittest.TestCase):
         under_test.module.params = {'anti_affinity_policy_id': 'mock_id'}
         under_test._find_aa_policy_id()
         self.module.fail_json.assert_called_with(
-            msg='Unable to fetch anti affinity policies for '
-                'account: mock_alias. Mock failure message')
+            msg='No anti affinity policy matching: mock_id.')
 
     @patch.object(clc_common, 'call_clc_api')
     def test_create_clc_server_exception(self, mock_call_api):

@@ -202,8 +202,11 @@ class ClcAntiAffinityPolicy(object):
                       'location': self.module.params['location']})
         except ClcApiException as e:
             return self.module.fail_json(
-                msg='Failed to create anti affinity policy: {name}. '
-                    '{msg}'.format(name=policy['name'], msg=e.message))
+                msg='Failed to create anti affinity policy: {name} '
+                    'in location: {location}. '
+                    '{msg}'.format(name=self.module.params['name'],
+                                   location=self.module.params['location'],
+                                   msg=e.message))
         policy['servers'] = []
         return policy
 
