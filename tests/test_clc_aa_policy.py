@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import mock
-from mock import patch, create_autospec
+from mock import patch
 import os
 import unittest
 

@@ -80,8 +80,6 @@ options:
     choices: ['present','absent']
 requirements:
     - python = 2.7
-    - requests >= 2.5.0
-    - clc-sdk
 author: "CLC Runner (@clc-runner)"
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
@@ -185,52 +183,20 @@ policy:
 
 __version__ = '${version}'
 
-from distutils.version import LooseVersion
-
-try:
-    import requests
-except ImportError:
-    REQUESTS_FOUND = False
-else:
-    REQUESTS_FOUND = True
-
-#
-#  Requires the clc-python-sdk.
-#  sudo pip install clc-sdk
-#
-try:
-    import clc as clc_sdk
-    from clc import APIFailedResponse
-except ImportError:
-    CLC_FOUND = False
-    clc_sdk = None
-else:
-    CLC_FOUND = True
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
 
 
 class ClcAlertPolicy(object):
 
-    clc = clc_sdk
     module = None
 
     def __init__(self, module):
         """
         Construct module
         """
+        self.clc_auth = {}
         self.module = module
-        self.policy_dict = {}
-
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-        if not REQUESTS_FOUND:
-            self.module.fail_json(
-                msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
-            self.module.fail_json(
-                msg='requests library  version should be >= 2.5.0')
-
-        self._set_user_agent(self.clc)
 
     @staticmethod
     def _define_module_argument_spec():
@@ -267,8 +233,7 @@ class ClcAlertPolicy(object):
         """
         p = self.module.params
 
-        self._set_clc_credentials_from_env()
-        self.policy_dict = self._get_alert_policies(p['alias'])
+        self.clc_auth = clc_common.authenticate(self.module)
 
         if p['state'] == 'present':
             changed, policy = self._ensure_alert_policy_is_present()
@@ -276,34 +241,6 @@ class ClcAlertPolicy(object):
             changed, policy = self._ensure_alert_policy_is_absent()
 
         self.module.exit_json(changed=changed, policy=policy)
-
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials on the sdk by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        api_url = env.get('CLC_V2_API_URL', False)
-
-        if api_url:
-            self.clc.defaults.ENDPOINT_URL_V2 = api_url
-
-        if v2_api_token and clc_alias:
-            self.clc._LOGIN_TOKEN_V2 = v2_api_token
-            self.clc._V2_ENABLED = True
-            self.clc.ALIAS = clc_alias
-        elif v2_api_username and v2_api_passwd:
-            self.clc.v2.SetCredentials(
-                api_username=v2_api_username,
-                api_passwd=v2_api_passwd)
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
 
     def _ensure_alert_policy_is_present(self):
         """
@@ -318,16 +255,14 @@ class ClcAlertPolicy(object):
 
         if not policy_name:
             self.module.fail_json(msg='Policy name is a required')
-        policy = self._alert_policy_exists(policy_name)
-        if not policy:
+        policy = clc_common.find_policy(self.module, self.clc_auth, policy_name,
+                                        policy_type='alert')
+        if policy is None:
             changed = True
-            policy = None
             if not self.module.check_mode:
                 policy = self._create_alert_policy()
         else:
-            changed_u, policy = self._ensure_alert_policy_is_updated(policy)
-            if changed_u:
-                changed = True
+            changed, policy = self._ensure_alert_policy_is_updated(policy)
         return changed, policy
 
     def _ensure_alert_policy_is_absent(self):
@@ -338,20 +273,16 @@ class ClcAlertPolicy(object):
         """
         changed = False
         p = self.module.params
-        alert_policy_id = p.get('id')
-        alert_policy_name = p.get('name')
-        alias = p.get('alias')
-        if not alert_policy_id and not alert_policy_name:
+        search_key = (p.get('id') or p.get('name'))
+        if not search_key:
             self.module.fail_json(
                 msg='Either alert policy id or policy name is required')
-        if not alert_policy_id and alert_policy_name:
-            alert_policy_id = self._get_alert_policy_id(
-                self.module,
-                alert_policy_name)
-        if alert_policy_id and alert_policy_id in self.policy_dict:
+        policy = clc_common.find_policy(self.module, self.clc_auth,
+                                        search_key, policy_type='alert')
+        if policy is not None:
             changed = True
             if not self.module.check_mode:
-                self._delete_alert_policy(alias, alert_policy_id)
+                self._delete_alert_policy(policy)
         return changed, None
 
     def _ensure_alert_policy_is_updated(self, alert_policy):
@@ -370,34 +301,29 @@ class ClcAlertPolicy(object):
         duration = p.get('duration')
         threshold = p.get('threshold')
         policy = alert_policy
-        if (metric and metric != str(alert_policy.get('triggers')[0].get('metric'))) or \
-                (duration and duration != str(alert_policy.get('triggers')[0].get('duration'))) or \
-                (threshold and float(threshold) != float(alert_policy.get('triggers')[0].get('threshold'))):
-            changed = True
-        elif email_list:
-            t_email_list = list(
-                alert_policy.get('actions')[0].get('settings').get('recipients'))
-            if set(email_list) != set(t_email_list):
+
+        if metric:
+            triggers = policy['triggers']
+            try:
+                i = [str(t['metric']) for t in triggers].index(metric)
+                trigger = triggers[i]
+                if duration and duration != str(trigger['duration']):
+                    changed = True
+                elif threshold and float(threshold) != float(
+                        trigger['threshold']):
+                    changed = True
+            except IndexError:
+                changed = True
+        if not changed and email_list:
+            email_current = []
+            for action in policy['actions']:
+                if action['action'] == 'email':
+                    email_current = action['settings']['recipients']
+            if set(email_list) != set(email_current):
                 changed = True
         if changed and not self.module.check_mode:
             policy = self._update_alert_policy(alert_policy_id)
         return changed, policy
-
-    def _get_alert_policies(self, alias):
-        """
-        Get the alert policies for account alias by calling the CLC API.
-        :param alias: the account alias
-        :return: the alert policies for the account alias
-        """
-        response = {}
-
-        policies = self.clc.v2.API.Call('GET',
-                                        '/v2/alertPolicies/%s'
-                                        % alias)
-
-        for policy in policies.get('items'):
-            response[policy.get('id')] = policy
-        return response
 
     def _create_alert_policy(self):
         """
@@ -411,8 +337,7 @@ class ClcAlertPolicy(object):
         duration = p['duration']
         threshold = p['threshold']
         policy_name = p['name']
-        arguments = json.dumps(
-            {
+        arguments = {
                 'name': policy_name,
                 'actions': [{
                     'action': 'email',
@@ -426,19 +351,18 @@ class ClcAlertPolicy(object):
                     'threshold': threshold
                 }]
             }
-        )
         try:
-            result = self.clc.v2.API.Call(
-                'POST',
-                '/v2/alertPolicies/%s' % alias,
-                arguments)
-        except APIFailedResponse as e:
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'POST', '/alertPolicies/{alias}'.format(alias=alias),
+                data=arguments)
+        except ClcApiException as e:
             return self.module.fail_json(
-                msg='Unable to create alert policy "{0}". {1}'.format(
-                    policy_name, str(e.response_text)))
+                msg='Unable to create alert policy: {name}. {msg}'.format(
+                    name=policy_name, msg=e.message))
         return result
 
-    def _update_alert_policy(self, alert_policy_id):
+    def _update_alert_policy(self, policy):
         """
         Update alert policy using the CLC API.
         :param alert_policy_id: The clc alert policy id
@@ -450,9 +374,8 @@ class ClcAlertPolicy(object):
         metric = p['metric']
         duration = p['duration']
         threshold = p['threshold']
-        policy_name = p['name']
-        arguments = json.dumps(
-            {
+        policy_name = policy['name']
+        arguments = {
                 'name': policy_name,
                 'actions': [{
                     'action': 'email',
@@ -466,71 +389,37 @@ class ClcAlertPolicy(object):
                     'threshold': threshold
                 }]
             }
-        )
         try:
-            result = self.clc.v2.API.Call(
-                'PUT', '/v2/alertPolicies/%s/%s' %
-                (alias, alert_policy_id), arguments)
-        except APIFailedResponse as e:
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'PUT', '/alertPolicies/{alias}/{id}'.format(
+                    alias=alias, id=policy['id']),
+                data=arguments)
+        except ClcApiException as e:
             return self.module.fail_json(
-                msg='Unable to update alert policy "{0}". {1}'.format(
-                    policy_name, str(e.response_text)))
+                msg='Unable to update alert policy: {name}. {msg}'.format(
+                    name=policy_name, msg=e.message))
         return result
 
-    def _delete_alert_policy(self, alias, policy_id):
+    def _delete_alert_policy(self, policy):
         """
         Delete an alert policy using the CLC API.
         :param alias : the account alias
-        :param policy_id: the alert policy id
+        :param policy: the alert policy
         :return: response dictionary from the CLC API.
         """
+        alias = self.module.params['alias']
         try:
-            result = self.clc.v2.API.Call(
-                'DELETE', '/v2/alertPolicies/%s/%s' %
-                (alias, policy_id), None)
-        except APIFailedResponse as e:
+            # Returns 200 No Content
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'DELETE', '/alertPolicies/{alias}/{id}'.format(
+                    alias=alias, id=policy['id']))
+        except ClcApiException as e:
             return self.module.fail_json(
-                msg='Unable to delete alert policy id "{0}". {1}'.format(
-                    policy_id, str(e.response_text)))
+                msg='Unable to delete alert policy id: {id}. {msg}'.format(
+                    id=policy['id'], msg=e.message))
         return result
-
-    def _alert_policy_exists(self, policy_name):
-        """
-        Check to see if an alert policy exists
-        :param policy_name: name of the alert policy
-        :return: boolean of if the policy exists
-        """
-        result = False
-        for policy_id in self.policy_dict:
-            if self.policy_dict.get(policy_id).get('name') == policy_name:
-                result = self.policy_dict.get(policy_id)
-        return result
-
-    def _get_alert_policy_id(self, module, alert_policy_name):
-        """
-        retrieves the alert policy id of the account based on the name of the policy
-        :param module: the AnsibleModule object
-        :param alert_policy_name: the alert policy name
-        :return: alert_policy_id: The alert policy id
-        """
-        alert_policy_id = None
-        for policy_id in self.policy_dict:
-            if self.policy_dict.get(policy_id).get('name') == alert_policy_name:
-                if not alert_policy_id:
-                    alert_policy_id = policy_id
-                else:
-                    return module.fail_json(
-                        msg='multiple alert policies were found with policy name : %s' % alert_policy_name)
-        return alert_policy_id
-
-    @staticmethod
-    def _set_user_agent(clc):
-        if hasattr(clc, 'SetRequestsSession'):
-            agent_string = "ClcAnsibleModule/" + __version__
-            ses = requests.Session()
-            ses.headers.update({"Api-Client": agent_string})
-            ses.headers['User-Agent'] += " " + agent_string
-            clc.SetRequestsSession(ses)
 
 
 def main():
