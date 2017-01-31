@@ -550,7 +550,7 @@ def find_policy(module, clc_auth, search_key,
                                  location=location)
 
     policies = [p for p in policies if search_key.lower()
-                in (p['id'].lower, p['name'].lower())]
+                in (p['id'].lower(), p['name'].lower())]
     num_policies = len(policies)
     if num_policies > 1:
         return module.fail_json(

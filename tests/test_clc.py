@@ -26,7 +26,6 @@ import json
 class TestClcCommonFunctions(unittest.TestCase):
 
     def setUp(self):
-        self.clc = mock.MagicMock()
         self.module = mock.MagicMock()
         self.datacenter = mock.MagicMock()
 
@@ -226,3 +225,116 @@ class TestClcCommonFunctions(unittest.TestCase):
 
         # Assert Result
         self.assertEqual(self.module.fail_json.called, True)
+
+    def test_check_policy_type(self):
+        policy_str = clc_common._check_policy_type(self.module, 'alert')
+        self.assertEqual(policy_str, 'alert')
+
+        policy_str = clc_common._check_policy_type(self.module, 'antiAffinity')
+        self.assertEqual(policy_str, 'anti affinity')
+
+        self.assertEqual(self.module.fail_json.called, False)
+
+    def test_check_policy_type_not_found(self):
+        clc_common._check_policy_type(self.module, 'fake_policy')
+        self.module.fail_json.assert_called_once_with(
+            msg='Policy type: fake_policy not supported')
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_get_policies(self, mock_call_api):
+        found_policies = {
+            'items': [
+                {'id': 'mock_id',
+                 'location': 'mock_dc'}
+            ]
+        }
+        mock_call_api.return_value = found_policies
+        clc_auth = {'clc_alias': 'mock_alias'}
+
+        policies = clc_common._get_policies(self.module, clc_auth,
+                                            policy_type='alert')
+        self.assertEqual(policies, found_policies['items'])
+
+        policies = clc_common._get_policies(self.module, clc_auth,
+                                            policy_type='alert',
+                                            location='fake_dc')
+        self.assertEqual(policies, [])
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_get_aa_policies_exception(self, mock_call_api):
+        error = ClcApiException(message='Failed')
+        mock_call_api.side_effect = error
+        clc_auth = {'clc_alias': 'mock_alias'}
+
+        clc_common._get_policies(self.module, clc_auth,
+                                 policy_type='antiAffinity')
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Unable to fetch anti affinity policies for account: '
+                'mock_alias. Failed')
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_get_alert_policies_exception(self, mock_call_api):
+        error = ClcApiException(message='Failed')
+        mock_call_api.side_effect = error
+        clc_auth = {'clc_alias': 'mock_alias'}
+
+        clc_common._get_policies(self.module, clc_auth, policy_type='alert')
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Unable to fetch alert policies for account: mock_alias. '
+                'Failed')
+
+    @patch.object(clc_common, '_get_policies')
+    def test_find_policy_found(self, mock_get_policies):
+        return_policies = [
+            {'id': 'mock_id1', 'name': 'mock_name1'},
+            {'id': 'mock_id2', 'name': 'mock_name2'}
+        ]
+        mock_get_policies.return_value = return_policies
+        clc_auth = {'clc_alias': 'mock_alias'}
+
+        policy = clc_common.find_policy(self.module, clc_auth, 'mock_name1',
+                                        policy_type='alert')
+        self.assertEqual(policy, return_policies[0])
+
+        policy = clc_common.find_policy(self.module, clc_auth, 'mock_name2',
+                                        policy_type='antiAffinity')
+        self.assertEqual(policy, return_policies[1])
+
+        policy = clc_common.find_policy(self.module, clc_auth, 'mock_id1',
+                                        policy_type='antiAffinity')
+        self.assertEqual(policy, return_policies[0])
+
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_common, '_get_policies')
+    def test_find_policy_duplicate(self, mock_get_policies):
+        return_policies = [
+            {'id': 'mock_id1', 'name': 'mock_name1'},
+            {'id': 'mock_id2', 'name': 'mock_name2'},
+            {'id': 'mock_id3', 'name': 'mock_name1'}
+        ]
+        mock_get_policies.return_value = return_policies
+        clc_auth = {'clc_alias': 'mock_alias'}
+
+        policy = clc_common.find_policy(self.module, clc_auth, 'mock_name1',
+                                        policy_type='alert')
+        self.module.fail_json.assert_called_once_with(
+            msg='Multiple alert policies matching: mock_name1. '
+                'Policy ids: mock_id1, mock_id3')
+
+    @patch.object(clc_common, '_get_policies')
+    def test_find_policy_not_found(self, mock_get_policies):
+        return_policies = [
+            {'id': 'mock_id1', 'name': 'mock_name1'},
+            {'id': 'mock_id2', 'name': 'mock_name2'}
+        ]
+        mock_get_policies.return_value = return_policies
+        clc_auth = {'clc_alias': 'mock_alias'}
+
+        policy = clc_common.find_policy(self.module, clc_auth, 'mock_name3',
+                                        policy_type='alert')
+
+        self.assertIsNone(policy)
+        self.assertFalse(self.module.fail_json.called)
