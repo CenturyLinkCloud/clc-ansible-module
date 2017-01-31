@@ -54,7 +54,7 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
         ))
 
     @patch.object(clc_common, 'call_clc_api')
-    @patch.object(clc_common, 'find_anti_affinity_policy')
+    @patch.object(clc_common, 'find_policy')
     def test_create_no_change(self, mock_find_policy, mock_call_api):
         policy = self.policy_existing
         mock_find_policy.return_value = policy
@@ -73,7 +73,7 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
 
     @patch.object(clc_common, 'call_clc_api')
     @patch.object(ClcAntiAffinityPolicy, '_create_policy')
-    @patch.object(clc_common, 'find_anti_affinity_policy')
+    @patch.object(clc_common, 'find_policy')
     def test_create_with_change(self, mock_find_policy, mock_create_policy,
                                 mock_call_api):
         policy = self.policy_existing
@@ -92,7 +92,7 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
             changed=True, policy=policy)
 
     @patch.object(clc_common, 'call_clc_api')
-    @patch.object(clc_common, 'find_anti_affinity_policy')
+    @patch.object(clc_common, 'find_policy')
     def test_delete_no_change(self, mock_find_policy, mock_call_api):
         policy = None
         mock_find_policy.return_value = None
@@ -111,7 +111,7 @@ class TestClcAntiAffinityPolicy(unittest.TestCase):
 
     @patch.object(clc_common, 'call_clc_api')
     @patch.object(ClcAntiAffinityPolicy, '_delete_policy')
-    @patch.object(clc_common, 'find_anti_affinity_policy')
+    @patch.object(clc_common, 'find_policy')
     def test_delete_with_change(self, mock_find_policy, mock_delete_policy,
                                 mock_call_api):
         policy = self.policy_existing

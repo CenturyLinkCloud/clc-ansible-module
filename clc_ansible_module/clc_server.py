@@ -979,8 +979,9 @@ class ClcServer(object):
         aa_policy_id = None
 
         if search_key is not None:
-            aa_policy = clc_common.find_anti_affinity_policy(
-                self.module, self.clc_auth, search_key)
+            aa_policy = clc_common.find_policy(
+                self.module, self.clc_auth, search_key,
+                policy_type='antiAffinity', location=params.get('location'))
             if aa_policy is not None:
                 aa_policy_id = aa_policy['id']
             else:
@@ -1061,6 +1062,7 @@ class ClcServer(object):
                 servers.append(server)
 
         self._wait_for_requests(request_list)
+        # TODO: Determine whether wait behavior is required here
         servers = self._refresh_servers(servers)
 
         ip_failed_servers = self._add_public_ip_to_servers(
@@ -1181,7 +1183,7 @@ class ClcServer(object):
                 self.module.fail_json(
                     msg='Unable to process server request')
 
-    def _refresh_servers(self, servers):
+    def _refresh_servers(self, servers, poll_freq=2):
         """
         Loop through a list of servers and refresh them.
         :param servers: list of Server objects to refresh

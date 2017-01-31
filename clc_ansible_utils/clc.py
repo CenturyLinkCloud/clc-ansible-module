@@ -510,17 +510,30 @@ def servers_in_group(module, clc_auth, group):
     return servers_by_id(module, clc_auth, server_lst)
 
 
-def anti_affinity_policies(module, clc_auth, location=None):
+def _check_policy_type(module, policy_type):
+    policy_types = {
+        'antiAffinity': 'anti affinity',
+        'alert': 'alert'
+    }
+    if policy_type not in policy_types:
+        return module.fail_json(msg='Policy type: {type} not supported'.format(
+            type=policy_type))
+    return policy_types[policy_type]
+
+
+def _get_policies(module, clc_auth, policy_type, location=None):
+    policy_str = _check_policy_type(module, policy_type)
     try:
         policies = call_clc_api(
             module, clc_auth,
-            'GET', '/antiAffinityPolicies/{alias}'.format(
-                alias=clc_auth['clc_alias']))
+            'GET', '/{type}Policies/{alias}'.format(
+                type=policy_type, alias=clc_auth['clc_alias']))
     except ClcApiException as ex:
         return module.fail_json(
-            msg='Unable to fetch anti affinity policies for '
+            msg='Unable to fetch {type} policies for '
                 'account: {alias}. {msg}'.format(
-                    alias=clc_auth['clc_alias'], msg=ex.message))
+                    type=policy_str, alias=clc_auth['clc_alias'],
+                    msg=ex.message))
 
     policies = policies['items']
     if location is not None:
@@ -529,18 +542,20 @@ def anti_affinity_policies(module, clc_auth, location=None):
     return policies
 
 
-def find_anti_affinity_policy(module, clc_auth, search_key, location=None,
-                              policies=None):
+def find_policy(module, clc_auth, search_key,
+                policy_type=None, location=None, policies=None):
+    policy_str = _check_policy_type(module, policy_type)
     if policies is None:
-        policies = anti_affinity_policies(module, clc_auth, location=location)
+        policies = _get_policies(module, clc_auth, policy_type,
+                                 location=location)
 
     policies = [p for p in policies if search_key.lower()
                 in (p['id'].lower, p['name'].lower())]
     num_policies = len(policies)
     if num_policies > 1:
         return module.fail_json(
-            msg='Multiple anti affinity policies matching: {search}. '
+            msg='Multiple {type} policies matching: {search}. '
                 'Policy ids: {ids}'.format(
-                      search=search_key,
-                      ids=', '.join([p['id'] for p in policies])))
+                    type=policy_str, search=search_key,
+                    ids=', '.join([p['id'] for p in policies])))
     return policies[0] if num_policies > 0 else None

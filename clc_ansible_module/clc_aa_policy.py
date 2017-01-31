@@ -155,7 +155,6 @@ class ClcAntiAffinityPolicy(object):
         """
         self.clc_auth = {}
         self.module = module
-        self.policy_dict = {}
 
     @staticmethod
     def _define_module_argument_spec():
@@ -235,8 +234,9 @@ class ClcAntiAffinityPolicy(object):
         """
         p = self.module.params
         changed = False
-        policy = clc_common.find_anti_affinity_policy(
-            self.module, self.clc_auth, p['name'], location=p['location'])
+        policy = clc_common.find_policy(
+            self.module, self.clc_auth, p['name'],
+            policy_type='antiAffinity', location=p['location'])
         if policy:
             changed = True
             if not self.module.check_mode:
@@ -250,8 +250,9 @@ class ClcAntiAffinityPolicy(object):
         """
         p = self.module.params
         changed = False
-        policy = clc_common.find_anti_affinity_policy(
-            self.module, self.clc_auth, p['name'], location=p['location'])
+        policy = clc_common.find_policy(
+            self.module, self.clc_auth, p['name'],
+            policy_type='antiAffinity', location=p['location'])
         if not policy:
             changed = True
             policy = None
