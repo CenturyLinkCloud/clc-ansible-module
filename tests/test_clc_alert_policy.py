@@ -507,7 +507,7 @@ class TestClcAlertPolicy(unittest.TestCase):
                                                 'choices': ['cpu', 'memory', 'disk']},
                                      'alert_recipients': {'default': None,
                                                           'type': 'list'},
-                                     'alias': {'default': None, 'required': True},
+                                     'alias': {'default': None},
                                      'state': {'default': 'present', 'choices': ['present', 'absent']},
                                      'threshold': {'default': None, 'type': 'int'},
                                      'duration': {'default': None, 'type': 'str'},

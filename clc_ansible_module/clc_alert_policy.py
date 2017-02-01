@@ -207,7 +207,7 @@ class ClcAlertPolicy(object):
         argument_spec = dict(
             name=dict(default=None),
             id=dict(default=None),
-            alias=dict(required=True, default=None),
+            alias=dict(default=None),
             alert_recipients=dict(type='list', default=None),
             metric=dict(
                 choices=[
@@ -234,6 +234,8 @@ class ClcAlertPolicy(object):
         p = self.module.params
 
         self.clc_auth = clc_common.authenticate(self.module)
+        if p.get('alias') is None:
+            p['alias'] = self.clc_auth['clc_alias']
 
         if p['state'] == 'present':
             changed, policy = self._ensure_alert_policy_is_present()
@@ -322,7 +324,7 @@ class ClcAlertPolicy(object):
             if set(email_list) != set(email_current):
                 changed = True
         if changed and not self.module.check_mode:
-            policy = self._update_alert_policy(alert_policy_id)
+            policy = self._update_alert_policy(alert_policy)
         return changed, policy
 
     def _create_alert_policy(self):
@@ -368,13 +370,23 @@ class ClcAlertPolicy(object):
         :param alert_policy_id: The clc alert policy id
         :return: response dictionary from the CLC API.
         """
+        email_action = [p for p in policy['actions']
+                        if p['action'] == 'email'][0]
+        email_current = email_action['settings']['recipients']
+
         p = self.module.params
         alias = p['alias']
-        email_list = p['alert_recipients']
+        policy_name = p['name'] or policy['name']
+        email_list = p['alert_recipients'] or email_current
         metric = p['metric']
-        duration = p['duration']
-        threshold = p['threshold']
-        policy_name = policy['name']
+        if metric:
+            triggers = [{
+                'metric': metric,
+                'duration': p['duration'],
+                'threshold': p['threshold']
+            }]
+        else:
+            triggers = policy['triggers']
         arguments = {
                 'name': policy_name,
                 'actions': [{
@@ -383,11 +395,7 @@ class ClcAlertPolicy(object):
                         'recipients': email_list
                     }
                 }],
-                'triggers': [{
-                    'metric': metric,
-                    'duration': duration,
-                    'threshold': threshold
-                }]
+                'triggers': triggers
             }
         try:
             result = clc_common.call_clc_api(
