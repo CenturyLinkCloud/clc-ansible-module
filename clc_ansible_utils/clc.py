@@ -287,6 +287,11 @@ def authenticate(module):
             'clc_alias': r['accountAlias'],
             'clc_location': r['locationAlias']
         })
+    elif v2_api_token:
+        return module.fail_json(
+            msg='In addition to the CLC_V2_API_TOKEN environment variable, '
+                'you must also set the CLC_ACCT_ALIAS and CLC_LOCATION '
+                'variables')
     else:
         return module.fail_json(
             msg='You set the CLC_V2_API_USERNAME and '
