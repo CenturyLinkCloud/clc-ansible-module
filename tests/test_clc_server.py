@@ -1270,6 +1270,9 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = params
         mock_server = mock.MagicMock()
         mock_server.id = 'mockid1'
+        mock_server.data = {
+            'details': {'ipAddresses': [{'internal': '1.2.3.4'}]}
+        }
         mock_servers = [mock_server]
         mock_servers_by_id.return_value = mock_servers
         self.module.check_mode = False

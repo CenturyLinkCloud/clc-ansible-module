@@ -1079,18 +1079,8 @@ class ClcServer(object):
                 # reload server details
                 server = clc_common.find_server(self.module, self.clc_auth,
                                                 server.id)
+                server = self._retrieve_ip_addresses(server)
 
-                try:
-                    server.data['ipaddress'] = [
-                        ip['internal'] for ip
-                        in server.data['details']['ipAddresses']
-                        if 'internal' in ip][0]
-                    server.data['publicip'] = [
-                        ip['public'] for ip
-                        in server.data['details']['ipAddresses']
-                        if 'public' in ip][0]
-                except (KeyError, IndexError):
-                    pass
                 created_server_ids.append(server.id)
             server_dict_array.append(server.data)
 
@@ -1368,17 +1358,7 @@ class ClcServer(object):
         changed_servers = self._refresh_servers(changed_servers)
 
         for server in set(changed_servers + unchanged_servers):
-            try:
-                server.data['ipaddress'] = [
-                    ip['internal'] for ip
-                    in server.data['details']['ipAddresses']
-                    if 'internal' in ip][0]
-                server.data['publicip'] = [
-                    ip['public'] for ip
-                    in server.data['details']['ipAddresses']
-                    if 'public' in ip][0]
-            except (KeyError, IndexError):
-                pass
+            server = self._retrieve_ip_addresses(server)
 
             server_dict_array.append(server.data)
             result_server_ids.append(server.id)
@@ -1454,6 +1434,38 @@ class ClcServer(object):
                         group=lookup_group, location=datacenter))
 
         return group
+
+    def _retrieve_ip_addresses(self, server, poll_freq=2, retries=5):
+        """
+        Retrieve IP addresses for a CLC server, retrying if needed
+        :param server: Server object for which to retrieve IP addresses
+        :param poll_freq: Poll frequency for retries
+        :param retries:  Number of retries
+        :return: Server object with IP addresses added to data dictionary
+        """
+        while 'ipAddresses' not in server.data['details']:
+            if retries < 1:
+                self.module.fail_json(
+                    msg='Unable to retrieve IP addresses for server: '
+                        '{name}.'.format(
+                            name=server.name))
+            time.sleep(poll_freq)
+            retries -= 1
+            server = clc_common.find_server(self.module, self.clc_auth,
+                                            server.id)
+
+        internal_ips = [ip['internal'] for ip
+                        in server.data['details']['ipAddresses']
+                        if 'internal' in ip]
+        public_ips = [ip['public'] for ip
+                      in server.data['details']['ipAddresses']
+                      if 'public' in ip]
+        if len(internal_ips) > 0:
+            server.data['ipaddress'] = internal_ips[0]
+        if len(public_ips) > 0:
+            server.data['publicip'] = public_ips[0]
+
+        return server
 
     def _create_clc_server(self, server_params):
         """
