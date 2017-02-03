@@ -311,7 +311,7 @@ class ClcFirewallPolicy(object):
         firewall_policy_id = p.get('firewall_policy_id')
 
         changed = False
-        response = []
+        response = None
         firewall_policy = self._get_firewall_policy(firewall_policy_id)
         if firewall_policy:
             changed = True
@@ -360,6 +360,7 @@ class ClcFirewallPolicy(object):
         location = p.get('location')
 
         try:
+            # Returns 204 No Content
             response = clc_common.call_clc_api(
                 self.module, self.clc_auth,
                 'DELETE', '/firewallPolicies/{alias}/{location}/{id}'.format(
@@ -470,7 +471,8 @@ class ClcFirewallPolicy(object):
 
         return policies[0] if len(policies) > 0 else None
 
-    def _wait_for_requests_to_complete(self, firewall_policy_id, wait_limit=50):
+    def _wait_for_requests_to_complete(self, firewall_policy_id,
+                                       wait_limit=50, poll_freq=2):
         """
         Waits until the CLC requests are complete if the wait argument is True
         :param firewall_policy_id: The firewall policy id
@@ -490,7 +492,7 @@ class ClcFirewallPolicy(object):
                 wait = False
             else:
                 # wait for 2 seconds
-                sleep(2)
+                sleep(poll_freq)
         return firewall_policy
 
 
