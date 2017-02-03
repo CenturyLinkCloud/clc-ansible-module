@@ -171,8 +171,8 @@ class TestClcServerFunctions(unittest.TestCase):
         # Set Mock Server Return Values
         mock_server.id = 'TEST_SERVER'
         mock_server.data = {'name': 'TEST_SERVER'}
-        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
-        mock_server.PublicIPs().public_ips = ['5.6.7.8']
+        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'},
+                                               {'public': '5.6.7.8'}]}
 
         # Set Mock Request Return Values
         mock_single_request.Server.return_value = mock_server
@@ -255,8 +255,8 @@ class TestClcServerFunctions(unittest.TestCase):
         # Set Mock Server Return Values
         mock_server.id = 'TEST_SERVER'
         mock_server.data = {'name': 'TEST_SERVER'}
-        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
-        mock_server.PublicIPs().public_ips = ['5.6.7.8']
+        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'},
+                                               {'public': '5.6.7.8'}]}
 
         # Set Mock Request Return Values
         mock_single_request.Server.return_value = mock_server
@@ -541,8 +541,8 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_server.data = {'name': 'TEST_SERVER'}
         mock_server.powerState = 'stopped'
         mock_server.PowerOn.return_value = mock_request
-        mock_server.PublicIPs().public_ips.__getitem__.return_value = "5.6.7.8"
-        mock_server.details['ipAddresses'][0].__getitem__.return_value = "1.2.3.4"
+        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'},
+                                               {'public': '5.6.7.8'}]}
 
         # Set Mock Group Values
         mock_group = mock.MagicMock()
@@ -1463,6 +1463,7 @@ class TestClcServerFunctions(unittest.TestCase):
         self.module.params = params
         mock_server = mock.MagicMock()
         mock_server.id = 'mockid1'
+        mock_server.details = {'ipAddresses': [{'internal': '1.2.3.4'}]}
         mock_servers = mock.MagicMock()
         mock_servers.id = 'temp1'
         mock_servers.Servers.return_value = [mock_server]

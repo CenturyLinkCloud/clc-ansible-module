@@ -1136,12 +1136,8 @@ class ClcServer(object):
             else:
                 # reload server details
                 server = clc.v2.Server(server.id)
-                server.data['ipaddress'] = server.details[
-                    'ipAddresses'][0]['internal']
+                server = ClcServer._retrieve_ip_addresses(module, server)
 
-                if add_public_ip and len(server.PublicIPs().public_ips) > 0:
-                    server.data['publicip'] = str(
-                        server.PublicIPs().public_ips[0])
                 created_server_ids.append(server.id)
             server_dict_array.append(server.data)
 
@@ -1430,13 +1426,7 @@ class ClcServer(object):
         ClcServer._refresh_servers(module, changed_servers)
 
         for server in set(changed_servers + servers):
-            try:
-                server.data['ipaddress'] = server.details[
-                    'ipAddresses'][0]['internal']
-                server.data['publicip'] = str(
-                    server.PublicIPs().public_ips[0])
-            except (KeyError, IndexError):
-                pass
+            server = ClcServer._retrieve_ip_addresses(module, server)
 
             server_dict_array.append(server.data)
             result_server_ids.append(server.id)
@@ -1544,6 +1534,39 @@ class ClcServer(object):
                 break
 
         return result
+
+    @staticmethod
+    def _retrieve_ip_addresses(module, server, poll_freq=2, retries=5):
+        """
+        Retrieve IP addresses for a CLC server, retrying if needed
+        :param module: the AnsibleModule instance to use
+        :param server: Server object for which to retrieve IP addresses
+        :param poll_freq: Poll frequency for retries
+        :param retries:  Number of retries
+        :return: Server object with IP addresses added to data dictionary
+        """
+        while 'ipAddresses' not in server.details:
+            if retries < 1:
+                module.fail_json(
+                    msg='Unable to retrieve IP addresses for server: '
+                        '{name}.'.format(
+                            name=server.name))
+            time.sleep(poll_freq)
+            retries -= 1
+            server.Refresh()
+
+        internal_ips = [ip['internal'] for ip
+                        in server.details['ipAddresses']
+                        if 'internal' in ip]
+        public_ips = [ip['public'] for ip
+                      in server.details['ipAddresses']
+                      if 'public' in ip]
+        if len(internal_ips) > 0:
+            server.data['ipaddress'] = internal_ips[0]
+        if len(public_ips) > 0:
+            server.data['publicip'] = public_ips[0]
+
+        return server
 
     @staticmethod
     def _create_clc_server(
