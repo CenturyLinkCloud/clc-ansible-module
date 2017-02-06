@@ -426,7 +426,7 @@ def networks_in_datacenter(module, clc_auth, datacenter):
     try:
         temp_auth = clc_auth.copy()
         temp_auth['v2_api_url'] = clc_auth['v2_api_url'].replace(
-            '/v2', '/v2-experimental')
+            '/v2/', '/v2-experimental/')
         response = call_clc_api(
             module, temp_auth,
             'GET', '/networks/{alias}/{location}'.format(

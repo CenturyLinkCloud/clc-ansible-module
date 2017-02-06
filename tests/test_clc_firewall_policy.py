@@ -107,7 +107,10 @@ class TestClcFirewallPolicy(unittest.TestCase):
     def test_create_firewall_policy_pass(self, mock_call_api):
         params = {
             'source_account_alias': 'mock_alias',
-            'location': 'mock_dc'
+            'location': 'mock_dc',
+            'source': ['mock_source'],
+            'destination': ['mock_destination'],
+            'destination_account_alias': 'mock_dest'
         }
         mock_firewall_response = {'name': 'test', 'id': 'test'}
         mock_call_api.return_value = mock_firewall_response
@@ -215,7 +218,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
 
     @patch.object(ClcFirewallPolicy, '_wait_for_requests_to_complete')
     @patch.object(ClcFirewallPolicy, '_get_firewall_policy')
-    @patch.object(ClcFirewallPolicy, '_policy_update_needed')
+    @patch.object(ClcFirewallPolicy, '_policy_matches_request')
     @patch.object(ClcFirewallPolicy, '_update_firewall_policy')
     @patch.object(ClcFirewallPolicy, '_create_firewall_policy')
     @patch.object(ClcFirewallPolicy, '_get_policy_id_from_response')
@@ -224,7 +227,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             mock_get_policy_id_from_response,
             mock_create_firewall_policy,
             mock_update_firewall_policy,
-            mock_update_needed,
+            mock_policy_matches,
             mock_get_firewall_policy,
             mock_wait):
         policy = self.policy_existing
@@ -237,7 +240,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
         mock_get_policy_id_from_response.return_value = policy['id']
         mock_update_firewall_policy.return_value = policy
         mock_get_firewall_policy.return_value = policy
-        mock_update_needed.return_value = True
+        mock_policy_matches.return_value = False
         mock_wait.return_value = policy
 
         under_test = ClcFirewallPolicy(self.module)
@@ -256,7 +259,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
 
     @patch.object(ClcFirewallPolicy, '_wait_for_requests_to_complete')
     @patch.object(ClcFirewallPolicy, '_get_firewall_policy')
-    @patch.object(ClcFirewallPolicy, '_policy_update_needed')
+    @patch.object(ClcFirewallPolicy, '_policy_matches_request')
     @patch.object(ClcFirewallPolicy, '_update_firewall_policy')
     @patch.object(ClcFirewallPolicy, '_create_firewall_policy')
     @patch.object(ClcFirewallPolicy, '_get_policy_id_from_response')
@@ -265,7 +268,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             mock_get_policy_id_from_response,
             mock_create_firewall_policy,
             mock_update_firewall_policy,
-            mock_update_needed,
+            mock_policy_matches,
             mock_get_firewall_policy,
             mock_wait):
         policy = self.policy_existing
@@ -278,7 +281,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
         mock_get_policy_id_from_response.return_value = policy['id']
         mock_update_firewall_policy.return_value = policy
         mock_get_firewall_policy.return_value = policy
-        mock_update_needed.return_value = False
+        mock_policy_matches.return_value = True
         mock_wait.return_value = policy
 
         under_test = ClcFirewallPolicy(self.module)
@@ -296,6 +299,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
         self.assertFalse(mock_update_firewall_policy.called)
 
     @patch.object(ClcFirewallPolicy, '_wait_for_requests_to_complete')
+    @patch.object(ClcFirewallPolicy, '_find_matching_policy')
     @patch.object(ClcFirewallPolicy, '_update_firewall_policy')
     @patch.object(ClcFirewallPolicy, '_create_firewall_policy')
     @patch.object(ClcFirewallPolicy, '_get_policy_id_from_response')
@@ -304,6 +308,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             mock_get_policy_id_from_response,
             mock_create_firewall_policy,
             mock_update_firewall_policy,
+            mock_find_matching_policy,
             mock_wait):
         policy = self.policy_existing
         params = {
@@ -313,6 +318,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
         }
         mock_create_firewall_policy.return_value = policy
         mock_get_policy_id_from_response.return_value = policy['id']
+        mock_find_matching_policy.return_value = None
         mock_wait.return_value = policy
 
         under_test = ClcFirewallPolicy(self.module)
@@ -327,6 +333,40 @@ class TestClcFirewallPolicy(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
         self.assertTrue(mock_create_firewall_policy.called)
         self.assertFalse(mock_update_firewall_policy.called)
+
+    @patch.object(ClcFirewallPolicy, '_update_firewall_policy')
+    @patch.object(ClcFirewallPolicy, '_find_matching_policy')
+    @patch.object(ClcFirewallPolicy, '_get_policy_id_from_response')
+    def test_ensure_firewall_policy_present_destination_not_supported(
+            self,
+            mock_get_policy_id_from_response,
+            mock_find_matching_policy,
+            mock_update_policy):
+        policy = self.policy_existing
+        params = {
+            'source_account_alias': 'mock_alias',
+            'location': 'mock_dc',
+            'enabled': policy['enabled'],
+            'source': policy['source'],
+            'destination': policy['destination'],
+            'destination_account_alias': 'new_destination',
+            'wait': True
+        }
+
+        mock_get_policy_id_from_response.return_value = policy['id']
+        mock_find_matching_policy.return_value = policy
+
+        under_test = ClcFirewallPolicy(self.module)
+        under_test.module.check_mode = False
+        under_test.module.params = params
+
+        under_test._ensure_firewall_policy_is_present()
+
+        self.module.fail_json.assert_called_with(
+            msg='Changing destination alias from: {orig} to: {new} '
+                'is not supported.'.format(
+                    orig=policy['destinationAccount'],
+                    new=params['destination_account_alias']))
 
     @patch.object(ClcFirewallPolicy, '_get_firewall_policy')
     def test_update_policy_w_no_policy_exist(self, mock_get):
@@ -474,7 +514,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             changed=True, firewall_policy_id='mock_id', firewall_policy=None)
         self.assertFalse(self.module.fail_json.called)
 
-    def test_policy_update_needed_false(self):
+    def test_policy_matches_request_true(self):
         policy = self.policy_existing
         params = {
             'destination_account_alias': policy['destinationAccount'],
@@ -488,29 +528,13 @@ class TestClcFirewallPolicy(unittest.TestCase):
         under_test = ClcFirewallPolicy(self.module)
         under_test.module.params = params
 
-        res = under_test._policy_update_needed(policy)
+        res = under_test._policy_matches_request(policy)
 
-        self.assertEqual(res, False)
+        self.assertTrue(res)
 
-    def test_policy_update_needed_destination_not_supported(self):
-        policy = self.policy_existing
-        params = {
-            'destination_account_alias': 'new_destination',
-            'wait': True
-        }
 
-        under_test = ClcFirewallPolicy(self.module)
-        under_test.module.params = params
 
-        res = under_test._policy_update_needed(policy)
-
-        self.module.fail_json.assert_called_with(
-            msg='Changing destination alias from: {orig} to: {new} '
-                'is not supported.'.format(
-                    orig=policy['destinationAccount'],
-                    new=params['destination_account_alias']))
-
-    def test_policy_update_needed_true_source(self):
+    def test_policy_matches_request_false_source(self):
         policy = self.policy_existing
         params = {
             'source': ['new_source'],
@@ -520,11 +544,11 @@ class TestClcFirewallPolicy(unittest.TestCase):
         under_test = ClcFirewallPolicy(self.module)
         under_test.module.params = params
 
-        res = under_test._policy_update_needed(policy)
+        res = under_test._policy_matches_request(policy)
 
-        self.assertTrue(res)
+        self.assertFalse(res)
 
-    def test_policy_update_needed_true_dest(self):
+    def test_policy_matches_request_false_dest(self):
         policy = self.policy_existing
         params = {
             'destination': ['new_destination'],
@@ -534,11 +558,11 @@ class TestClcFirewallPolicy(unittest.TestCase):
         under_test = ClcFirewallPolicy(self.module)
         under_test.module.params = params
 
-        res = under_test._policy_update_needed(policy)
+        res = under_test._policy_matches_request(policy)
 
-        self.assertTrue(res)
+        self.assertFalse(res)
 
-    def test_policy_update_needed_true_ports(self):
+    def test_policy_matches_request_false_ports(self):
         policy = self.policy_existing
         params = {
             'ports': ['new_ports'],
@@ -548,11 +572,11 @@ class TestClcFirewallPolicy(unittest.TestCase):
         under_test = ClcFirewallPolicy(self.module)
         under_test.module.params = params
 
-        res = under_test._policy_update_needed(policy)
+        res = under_test._policy_matches_request(policy)
 
-        self.assertTrue(res)
+        self.assertFalse(res)
 
-    def test_policy_update_needed_true_enabled(self):
+    def test_policy_matches_request_false_enabled(self):
         policy = self.policy_existing
         params = {
             'enabled': False,
@@ -562,9 +586,9 @@ class TestClcFirewallPolicy(unittest.TestCase):
         under_test = ClcFirewallPolicy(self.module)
         under_test.module.params = params
 
-        res = under_test._policy_update_needed(policy)
+        res = under_test._policy_matches_request(policy)
 
-        self.assertTrue(res)
+        self.assertFalse(res)
 
     @patch.object(ClcFirewallPolicy, '_get_firewall_policy')
     def test_wait_for_requests_to_complete_pending(self, mock_get):

@@ -183,9 +183,10 @@ firewall_policy:
 
 __version__ = '${version}'
 
-from future import standard_library
-standard_library.install_aliases()
-import urllib.parse
+try:  # python 3
+    from urllib.parse import urlparse
+except ImportError:
+    from urlparse import urlparse
 from time import sleep
 
 import clc_ansible_utils.clc as clc_common
@@ -229,7 +230,7 @@ class ClcFirewallPolicy(object):
         self.clc_auth = clc_common.authenticate(self.module)
         # Firewall operations use v2-experimental, so over-ride default
         self.clc_auth['v2_api_url'] = self.clc_auth['v2_api_url'].replace(
-            '/v2', '/v2-experimental', 1)
+            '/v2/', '/v2-experimental/', 1)
 
         changed = False
         firewall_policy = None
@@ -257,7 +258,7 @@ class ClcFirewallPolicy(object):
         :return: policy_id: firewall policy id from creation call
         """
         url = response.get('links')[0]['href']
-        path = urllib.parse.urlparse(url).path
+        path = urlparse(url).path
         path_list = os.path.split(path)
         policy_id = path_list[-1]
         return policy_id
@@ -283,16 +284,23 @@ class ClcFirewallPolicy(object):
                 return self.module.fail_json(
                     msg='Unable to find the firewall policy id: {id}'.format(
                         id=firewall_policy_id))
+        else:
+            firewall_policy = self._find_matching_policy()
         if firewall_policy is None:
             changed = True
             if not self.module.check_mode:
                 response = self._create_firewall_policy()
                 firewall_policy_id = self._get_policy_id_from_response(
                     response)
-        elif self._policy_update_needed(firewall_policy):
-            changed = True
-            if not self.module.check_mode:
-                self._update_firewall_policy(firewall_policy)
+        else:
+            try:
+                matches = self._policy_matches_request(firewall_policy)
+            except ClcApiException as e:
+                return self.module.fail_json(msg=e.message)
+            if not matches:
+                changed = True
+                if not self.module.check_mode:
+                    self._update_firewall_policy(firewall_policy)
 
         if changed and firewall_policy_id:
             firewall_policy = self._wait_for_requests_to_complete(
@@ -332,9 +340,13 @@ class ClcFirewallPolicy(object):
         payload = {
             'destinationAccount': p.get('destination_account_alias'),
             'source': p.get('source'),
-            'destination': p.get('destination'),
-            'ports': p.get('ports')
+            'destination': p.get('destination')
             }
+        if None in payload.values():
+            self.module.fail_json(
+                msg='Create firewall policy requires parameters: '
+                    '{required}.'.format(required=', '.join(payload.keys())))
+        payload['ports'] = p.get('ports')
         try:
             response = clc_common.call_clc_api(
                 self.module, self.clc_auth,
@@ -384,7 +396,8 @@ class ClcFirewallPolicy(object):
         source_account_alias = p.get('source_account_alias')
         location = p.get('location')
 
-        enabled = (p.get('enabled') or policy['enabled'])
+        enabled = (p.get('enabled') if p.get('enabled') is not None
+                   else policy['enabled'])
         source = (p.get('source') or policy['source'])
         destination = (p.get('destination') or policy['destination'])
         ports = (p.get('ports') or policy['ports'])
@@ -410,12 +423,12 @@ class ClcFirewallPolicy(object):
 
         return response
 
-    def _policy_update_needed(self, policy):
+    def _policy_matches_request(self, policy):
         """
         Helper method to determine whether an updated is required by comparing
         the policy returned from the CLC API and the module parameters
         :param policy: Policy to compare to module parameters
-        :return: changed: Boolean, True if a difference is found
+        :return: matches: Boolean, True if a policy and request are identical
         """
         p = self.module.params
 
@@ -425,20 +438,21 @@ class ClcFirewallPolicy(object):
         destination = p.get('destination')
         ports = p.get('ports')
 
-        changed = False
+        matches = True
 
-        if dest_alias and dest_alias != policy['destinationAccount']:
-            self.module.fail_json(
-                msg='Changing destination alias from: {orig} to: {new} '
-                    'is not supported.'.format(
-                      orig=policy['destinationAccount'], new=dest_alias))
-        if (enabled != policy['enabled']
+        if (enabled is not None and enabled != policy['enabled']
                 or source and source != policy['source']
                 or destination and destination != policy['destination']
                 or ports and ports != policy['ports']):
-            changed = True
+            matches = False
+        elif (dest_alias
+              and dest_alias.lower() != policy['destinationAccount'].lower()):
+            raise ClcApiException(
+                'Changing destination alias from: {orig} to: {new} '
+                'is not supported.'.format(
+                    orig=policy['destinationAccount'], new=dest_alias))
 
-        return changed
+        return matches
 
     def _firewall_policies(self, source_alias, location):
         try:
@@ -471,6 +485,27 @@ class ClcFirewallPolicy(object):
         policies = [p for p in policies if p['id'] == firewall_policy_id]
 
         return policies[0] if len(policies) > 0 else None
+
+    def _find_matching_policy(self, source_account_alias=None, location=None):
+        """
+        Find if a policy matches any existing policy
+        :param source_account_alias: source account alias for firewall policy
+        :param location: datacenter of the firewall policy
+        :return: response - The response from CLC API call
+        """
+        p = self.module.params
+        alias = (source_account_alias or p.get('source_account_alias'))
+        location = (location or p.get('location'))
+
+        policies = self._firewall_policies(alias, location)
+        for policy in policies:
+            try:
+                matches = self._policy_matches_request(policy)
+            except ClcApiException:
+                continue
+            if matches:
+                return policy
+        return None
 
     def _wait_for_requests_to_complete(self, firewall_policy_id,
                                        wait_limit=50, poll_freq=2):
