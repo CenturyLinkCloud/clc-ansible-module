@@ -228,7 +228,8 @@ class ClcFirewallPolicy(object):
         """
         self.clc_auth = clc_common.authenticate(self.module)
         # Firewall operations use v2-experimental, so over-ride default
-        self.clc_auth['v2_api_url'] = 'https://api.ctl.io/v2-experimental/'
+        self.clc_auth['v2_api_url'] = self.clc_auth['v2_api_url'].replace(
+            '/v2', '/v2-experimental', 1)
 
         changed = False
         firewall_policy = None

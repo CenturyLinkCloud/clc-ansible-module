@@ -44,9 +44,10 @@ class TestClcFirewallPolicy(unittest.TestCase):
                 ]
             }
 
-        self.clc = mock.MagicMock()
         self.module = mock.MagicMock()
         self.datacenter = mock.MagicMock()
+
+        self.clc_auth = {'v2_api_url': 'https://api.ctl.io/v2/'}
 
     @patch.object(ClcFirewallPolicy, '_firewall_policies')
     def test_get_firewall_policy_not_exists(self, mock_firewall_policies):
@@ -414,9 +415,11 @@ class TestClcFirewallPolicy(unittest.TestCase):
         assert mock_ClcFirewallPolicy_instance.process_request.call_count == 1
 
     @patch.object(ClcFirewallPolicy, '_ensure_firewall_policy_is_present')
+    @patch.object(clc_common, 'authenticate')
     @patch.object(clc_common, 'call_clc_api')
     def test_process_request_state_present(self,
                                            mock_call_api,
+                                           mock_authenticate,
                                            mock_ensure_present):
         params = {
             'state': 'present',
@@ -427,6 +430,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             'destination_account_alias': 'alias',
             'wait': True
         }
+        mock_authenticate.return_value = self.clc_auth
         mock_ensure_present.return_value = True, 'mock_id', {}
 
         under_test = ClcFirewallPolicy(self.module)
@@ -440,10 +444,12 @@ class TestClcFirewallPolicy(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(ClcFirewallPolicy, '_ensure_firewall_policy_is_absent')
+    @patch.object(clc_common, 'authenticate')
     @patch.object(clc_common, 'call_clc_api')
     def test_process_request_state_absent(self,
-                                           mock_call_api,
-                                           mock_ensure_absent):
+                                          mock_call_api,
+                                          mock_authenticate,
+                                          mock_ensure_absent):
         params = {
             'firewall_policy_id': 'mock_id',
             'state': 'absent',
@@ -454,6 +460,7 @@ class TestClcFirewallPolicy(unittest.TestCase):
             'destination_account_alias': 'alias',
             'wait': True
         }
+        mock_authenticate.return_value = self.clc_auth
         mock_ensure_absent.return_value = True, 'mock_id', None
 
         under_test = ClcFirewallPolicy(self.module)

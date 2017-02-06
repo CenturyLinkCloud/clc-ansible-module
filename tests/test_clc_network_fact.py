@@ -14,95 +14,93 @@
 # limitations under the License.
 
 import unittest
-import requests
-from uuid import UUID
-import clc as clc_sdk
-from clc import CLCException
-from clc import APIFailedResponse
 import mock
-from mock import patch, create_autospec
+from mock import patch
+
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
 
 import clc_ansible_module.clc_network_fact as clc_network_fact
 from clc_ansible_module.clc_network_fact import ClcNetworkFact
 
 
+def FakeAnsibleModule():
+    module = mock.MagicMock()
+    module.check_mode = False
+    module.params = {}
+    return module
+
+
 class TestClcNetworkFactFunctions(unittest.TestCase):
 
     def setUp(self):
-        self.clc = mock.MagicMock()
-        self.module = mock.MagicMock()
-        self.datacenter = mock.MagicMock()
+        self.module = FakeAnsibleModule()
 
-    def test_clc_module_not_found(self):
-        # Setup Mock Import Function
-        real_import = __import__
+        self.mock_net1 = mock.MagicMock()
+        self.mock_net1.id = 'mock_id1'
+        self.mock_net1.name = 'mock_name1'
+        self.mock_net1.data = {'id': 'mock_id1', 'name': 'mock_name1'}
+        self.mock_net2 = mock.MagicMock()
+        self.mock_net2.id = 'mock_id2'
+        self.mock_net2.name = 'mock_name2'
+        self.mock_net2.data = {'id': 'mock_id2', 'name': 'mock_name2'}
 
-        def mock_import(name, *args):
-            if name == 'clc':
-                raise ImportError
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_network_fact)
-            ClcNetworkFact(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(
-            msg='clc-python-sdk required for this module')
+        self.networks_existing = [self.mock_net1, self.mock_net2]
 
-        # Reset
-        reload(clc_network_fact)
+        self.clc_auth = {'v2_api_url': 'https://api.ctl.io/v2/',
+                         'clc_alias': 'mock_alias'}
 
-    def test_requests_invalid_version(self):
-        # Setup Mock Import Function
-        real_import = __import__
+    @patch.object(clc_common, 'networks_in_datacenter')
+    @patch.object(clc_common, 'authenticate')
+    def test_process_request_list_networks(self,
+                                           mock_authenticate,
+                                           mock_networks_datacenter):
+        params = {'location': 'mock_dc'}
+        mock_authenticate.return_value = self.clc_auth
+        mock_networks_datacenter.return_value = self.networks_existing
 
-        def mock_import(name, *args):
-            if name == 'requests':
-                args[0]['requests'].__version__ = '2.4.0'
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_network_fact)
-            ClcNetworkFact(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(
-            msg='requests library  version should be >= 2.5.0')
+        under_test = ClcNetworkFact(self.module)
+        under_test.module.params = params
 
-        # Reset
-        reload(clc_network_fact)
+        under_test.process_request()
 
-    def test_requests_module_not_found(self):
-        # Setup Mock Import Function
-        real_import = __import__
+        self.module.exit_json.assert_called_once_with(
+            networks=[self.mock_net1.data, self.mock_net2.data])
 
-        def mock_import(name, *args):
-            if name == 'requests':
-                args[0]['requests'].__version__ = '2.7.0'
-                raise ImportError
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_network_fact)
-            ClcNetworkFact(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(
-            msg='requests library is required for this module')
+    @patch.object(clc_common, 'networks_in_datacenter')
+    @patch.object(clc_common, 'authenticate')
+    def test_process_request_network_found(self,
+                                           mock_authenticate,
+                                           mock_networks_datacenter):
+        params = {'location': 'mock_dc', 'id': 'mock_id1'}
+        mock_authenticate.return_value = self.clc_auth
+        mock_networks_datacenter.return_value = self.networks_existing
 
-        # Reset
-        reload(clc_network_fact)
+        under_test = ClcNetworkFact(self.module)
+        under_test.module.params = params
 
-    @patch.object(clc_network_fact, 'clc_sdk')
-    def test_set_user_agent(self, mock_clc_sdk):
-        clc_network_fact.__version__ = "1"
-        ClcNetworkFact._set_user_agent(mock_clc_sdk)
+        under_test.process_request()
 
-        self.assertTrue(mock_clc_sdk.SetRequestsSession.called)
+        self.module.exit_json.assert_called_once_with(
+            network=self.mock_net1.data)
 
-    def test_process_request(self):
-        pass
+    @patch.object(clc_common, 'networks_in_datacenter')
+    @patch.object(clc_common, 'authenticate')
+    def test_process_request_network_not_found(self,
+                                           mock_authenticate,
+                                           mock_networks_datacenter):
+        params = {'location': 'mock_dc', 'id': 'fake_id'}
+        mock_authenticate.return_value = self.clc_auth
+        mock_networks_datacenter.return_value = self.networks_existing
 
-    def test_get_clc_networks(self):
-        pass
+        under_test = ClcNetworkFact(self.module)
+        under_test.module.params = params
+
+        under_test.process_request()
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Network: {id} does not exist in location: {location}.'.format(
+                id=params['id'], location=params['location']))
 
     def test_define_argument_spec(self):
         result = ClcNetworkFact._define_module_argument_spec()
@@ -113,35 +111,6 @@ class TestClcNetworkFactFunctions(unittest.TestCase):
             {'id': {'required': False},
              'location': {'required': True}})
 
-    def test_set_clc_credentials_from_env(self):
-        # Required combination of credentials not passed
-        with patch.dict(
-                'os.environ', {
-                    'CLC_V2_API_URL': 'http://unittest.example.com',
-                },
-                clear=True):
-            under_test = ClcNetworkFact(self.module)
-            under_test._set_clc_credentials_from_env()
-        self.assertEqual(under_test.clc.defaults.ENDPOINT_URL_V2,
-                         'http://unittest.example.com')
-        self.module.fail_json.assert_called_with(
-            msg='You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD '
-                'environment variables')
-        # Token and alias
-        with patch.dict(
-                'os.environ', {
-                    'CLC_V2_API_URL': 'http://unittest.example.com',
-                    'CLC_V2_API_TOKEN': 'dummy_token',
-                    'CLC_ACCT_ALIAS': 'dummy_alias',
-                },
-                clear=True):
-            under_test = ClcNetworkFact(self.module)
-            under_test._set_clc_credentials_from_env()
-        self.assertEqual(under_test.clc._LOGIN_TOKEN_V2, 'dummy_token')
-        self.assertTrue(under_test.clc._V2_ENABLED)
-        self.assertEqual(under_test.clc.ALIAS, 'dummy_alias')
-        # Username and password
-        # Mock requests response from endpoint
 
 if __name__ == '__main__':
     unittest.main()
