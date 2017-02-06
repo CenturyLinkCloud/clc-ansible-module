@@ -1,0 +1,115 @@
+# Copyright 2017 CenturyLink
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#    http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+- name: Test clc_firewall_policy.py Ansible Module
+  hosts: localhost
+  vars:
+    location: 'CA3'
+    source_alias: 'WFTC'
+  gather_facts: False
+  connection: local
+  tasks:
+
+    - name: Get network list
+      clc_network_fact:
+        location: "{{ location }}"
+      register: network_list
+
+    - name: Test - Create new policy
+      clc_firewall_policy:
+        source_account_alias: "{{ source_alias }}"
+        location: "{{ location }}"
+        state: present
+        source:
+          - "{{ network_list.networks[0].cidr }}"
+        destination:
+          - "{{ network_list.networks[0].cidr }}"
+        ports:
+          - any
+        destination_account_alias: "{{ source_alias }}"
+      register: policy_create
+    - name: Assert - Policy created
+      assert:
+        that:
+          - policy_create.changed == True
+
+    - name: Test - Verify new policy present
+      clc_firewall_policy:
+        source_account_alias: "{{ source_alias }}"
+        location: "{{ location }}"
+        firewall_policy_id: "{{ policy_create.firewall_policy.id }}"
+        state: present
+      register: policy_present
+    - name: Assert - Policy present
+      assert:
+        that:
+          - policy_present.changed == False
+
+    - name: Test - Ensure Create idempotent
+      clc_firewall_policy:
+        source_account_alias: "{{ source_alias }}"
+        location: "{{ location }}"
+        state: present
+        enabled: true
+        source:
+          - "{{ network_list.networks[0].cidr }}"
+        destination:
+          - "{{ network_list.networks[0].cidr }}"
+        ports:
+          - any
+        destination_account_alias: "{{ source_alias }}"
+      register: policy_idempotent
+    - name: Assert - Policy create idempotent
+      assert:
+        that:
+          - policy_idempotent.changed == False
+
+    - name: Test - Update policy
+      clc_firewall_policy:
+        source_account_alias: "{{ source_alias }}"
+        location: "{{ location }}"
+        firewall_policy_id: "{{ policy_create.firewall_policy.id }}"
+        ports:
+          - 'tcp/22'
+        state: present
+      register: policy_update
+    - name: Assert - Policy updated
+      assert:
+        that:
+          - policy_update.changed == True
+
+    - name: Test - Disable Policy
+      clc_firewall_policy:
+        source_account_alias: "{{ source_alias }}"
+        location: "{{ location }}"
+        firewall_policy_id: "{{ policy_create.firewall_policy.id }}"
+        enabled: false
+        state: present
+      register: policy_disable
+    - name: Assert - Policy present
+      assert:
+        that:
+          - policy_disable.changed == True
+
+    - name: Test - Remove updated policy
+      clc_firewall_policy:
+        source_account_alias: "{{ source_alias }}"
+        location: "{{ location }}"
+        firewall_policy_id: "{{ policy_create.firewall_policy.id }}"
+        state: absent
+      register: policy_remove
+    - name: Assert - Policy absent
+      assert:
+        that:
+          - policy_remove.changed == True

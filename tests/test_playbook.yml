@@ -14,3 +14,6 @@
 ---
 - include: test_playbook_group.yml
 - include: test_playbook_server.yml
+- include: test_playbook_aa_policy.yml
+- include: test_playbook_alert_policy.yml
+- include: test_playbook_firewall_policy.yml
