@@ -323,6 +323,7 @@ def group_tree(module, clc_auth, alias=None, datacenter=None):
     Walk the tree of groups for a datacenter
     :param module: Ansible module being called
     :param clc_auth: dict containing the needed parameters for authentication
+    :param alias: string - CLC account alias
     :param datacenter: string - the datacenter to walk (ex: 'UC1')
     :return: Group object for root group containing list of children
     """
@@ -517,6 +518,32 @@ def servers_in_group(module, clc_auth, group):
     server_lst = [obj['id'] for obj in group.data['links'] if
                   obj['rel'] == 'server']
     return servers_by_id(module, clc_auth, server_lst)
+
+
+def _server_ids_in_group_recursive(group):
+    server_ids = [obj['id'] for obj in group.data['links'] if
+                  obj['rel'] == 'server']
+    for child in group.children:
+        server_ids.extend(_server_ids_in_group_recursive(child))
+    return server_ids
+
+
+def server_ids_in_datacenter(module, clc_auth, datacenter,
+                             alias=None, root_group=None):
+    """
+    Return a list of servers ids in a provided datacenter
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param datacenter: the datacenter to search for a network id
+    :param alias: string - CLC account alias
+    :param root_group: Root group in datacenter, if present
+    :return: List of server ids present in a datacenter
+    """
+    if root_group is None:
+        root_group = group_tree(module, clc_auth,
+                                alias=alias, datacenter=datacenter)
+
+    return _server_ids_in_group_recursive(root_group)
 
 
 def _check_policy_type(module, policy_type):

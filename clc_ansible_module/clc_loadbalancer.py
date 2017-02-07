@@ -87,8 +87,6 @@ options:
     choices: ['present', 'absent', 'port_absent', 'nodes_present', 'nodes_absent']
 requirements:
     - python = 2.7
-    - requests >= 2.5.0
-    - clc-sdk
 author: "CLC Runner (@clc-runner)"
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
@@ -224,648 +222,453 @@ loadbalancer:
 
 __version__ = '${version}'
 
-from time import sleep
-from distutils.version import LooseVersion
-
-try:
-    import requests
-except ImportError:
-    REQUESTS_FOUND = False
-else:
-    REQUESTS_FOUND = True
-
-#
-#  Requires the clc-python-sdk.
-#  sudo pip install clc-sdk
-#
-try:
-    import clc as clc_sdk
-    from clc import APIFailedResponse
-except ImportError:
-    CLC_FOUND = False
-    clc_sdk = None
-else:
-    CLC_FOUND = True
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
 
 
 class ClcLoadBalancer(object):
-
-    clc = None
 
     def __init__(self, module):
         """
         Construct module
         """
-        self.clc = clc_sdk
+        self.clc_auth = {}
         self.module = module
-        self.lb_dict = {}
-
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-        if not REQUESTS_FOUND:
-            self.module.fail_json(
-                msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(
-                requests.__version__) < LooseVersion('2.5.0'):
-            self.module.fail_json(
-                msg='requests library  version should be >= 2.5.0')
-
-        self._set_user_agent(self.clc)
+        self.load_balancers = None
 
     def process_request(self):
         """
         Execute the main code path, and handle the request
         :return: none
         """
+        p = self.module.params
+
         changed = False
         result_lb = None
-        loadbalancer_name = self.module.params.get('name')
-        loadbalancer_alias = self.module.params.get('alias')
-        loadbalancer_location = self.module.params.get('location')
-        loadbalancer_description = self.module.params.get('description')
-        loadbalancer_port = self.module.params.get('port')
-        loadbalancer_method = self.module.params.get('method')
-        loadbalancer_persistence = self.module.params.get('persistence')
-        loadbalancer_nodes = self.module.params.get('nodes')
-        loadbalancer_status = self.module.params.get('status')
+
+        self.clc_auth = clc_common.authenticate(self.module)
+        if p.get('alias') is None:
+            p['alias'] = self.clc_auth['clc_alias']
+        if p.get('description') is None:
+            p['description'] = p.get('name')
+
         state = self.module.params.get('state')
 
-        if loadbalancer_description is None:
-            loadbalancer_description = loadbalancer_name
-
-        self._set_clc_credentials_from_env()
-
-        self.lb_dict = self._get_loadbalancer_list(
-            alias=loadbalancer_alias,
-            location=loadbalancer_location)
+        self.load_balancers = self._get_loadbalancer_list()
 
         if state == 'present':
-            changed, result_lb, lb_id = self.ensure_loadbalancer_present(
-                name=loadbalancer_name,
-                alias=loadbalancer_alias,
-                location=loadbalancer_location,
-                description=loadbalancer_description,
-                status=loadbalancer_status)
-            if loadbalancer_port:
-                changed, result_pool, pool_id = self.ensure_loadbalancerpool_present(
-                    lb_id=lb_id,
-                    alias=loadbalancer_alias,
-                    location=loadbalancer_location,
-                    method=loadbalancer_method,
-                    persistence=loadbalancer_persistence,
-                    port=loadbalancer_port)
-
-                if loadbalancer_nodes:
-                    changed, result_nodes = self.ensure_lbpool_nodes_set(
-                        alias=loadbalancer_alias,
-                        location=loadbalancer_location,
-                        name=loadbalancer_name,
-                        port=loadbalancer_port,
-                        nodes=loadbalancer_nodes)
+            changed, result_lb, lb_id = self.ensure_loadbalancer_present()
         elif state == 'absent':
-            changed, result_lb = self.ensure_loadbalancer_absent(
-                name=loadbalancer_name,
-                alias=loadbalancer_alias,
-                location=loadbalancer_location)
+            changed, result_lb = self.ensure_loadbalancer_absent()
 
         elif state == 'port_absent':
-            changed, result_lb = self.ensure_loadbalancerpool_absent(
-                alias=loadbalancer_alias,
-                location=loadbalancer_location,
-                name=loadbalancer_name,
-                port=loadbalancer_port)
+            changed, result_lb = self.ensure_pool_absent()
 
         elif state == 'nodes_present':
-            changed, result_lb = self.ensure_lbpool_nodes_present(
-                alias=loadbalancer_alias,
-                location=loadbalancer_location,
-                name=loadbalancer_name,
-                port=loadbalancer_port,
-                nodes=loadbalancer_nodes)
-
+            changed, result_lb = self.ensure_pool_nodes_present()
         elif state == 'nodes_absent':
-            changed, result_lb = self.ensure_lbpool_nodes_absent(
-                alias=loadbalancer_alias,
-                location=loadbalancer_location,
-                name=loadbalancer_name,
-                port=loadbalancer_port,
-                nodes=loadbalancer_nodes)
+            changed, result_lb = self.ensure_pool_nodes_absent()
 
         self.module.exit_json(changed=changed, loadbalancer=result_lb)
 
-    def ensure_loadbalancer_present(
-            self, name, alias, location, description, status):
+    def ensure_loadbalancer_present(self):
         """
         Checks to see if a load balancer exists and creates one if it does not.
-        :param name: Name of loadbalancer
-        :param alias: Alias of account
-        :param location: Datacenter
-        :param description: Description of loadbalancer
-        :param status: Enabled / Disabled
         :return: (changed, result, lb_id)
             changed: Boolean whether a change was made
-            result: The result object from the CLC load balancer request
+            loadbalancer: The result object from the CLC load balancer request
             lb_id: The load balancer id
         """
+        p = self.module.params
+        name = p.get('name')
+        description = p.get('description')
+
         changed = False
-        result = name
-        lb_id = self._loadbalancer_exists(name=name)
-        if not lb_id:
+        loadbalancer = self._find_loadbalancer(search_key=name)
+
+        if not loadbalancer:
             if not self.module.check_mode:
-                result = self.create_loadbalancer(name=name,
-                                                  alias=alias,
-                                                  location=location,
-                                                  description=description,
-                                                  status=status)
-                lb_id = result.get('id')
+                loadbalancer = self.create_loadbalancer()
+            changed = True
+        elif loadbalancer['description'] != description:
+            if not self.module.check_mode:
+                loadbalancer = self.update_loadbalancer(loadbalancer)
             changed = True
 
-        return changed, result, lb_id
+        if p.get('port'):
+            changed, result_pool, pool_id = self.ensure_pool_present(
+                loadbalancer)
+            if p.get('nodes'):
+                changed, result_nodes = self.ensure_pool_nodes_present(
+                    loadbalancer)
+            loadbalancer = self._find_loadbalancer(search_key=name,
+                                                   refresh=True)
 
-    def ensure_loadbalancerpool_present(
-            self, lb_id, alias, location, method, persistence, port):
+        return changed, loadbalancer, loadbalancer['id']
+
+    def ensure_loadbalancer_absent(self):
         """
-        Checks to see if a load balancer pool exists and creates one if it does not.
-        :param lb_id: The loadbalancer id
-        :param alias: The account alias
-        :param location: the datacenter the load balancer resides in
-        :param method: the load balancing method
-        :param persistence: the load balancing persistence type
-        :param port: the port that the load balancer will listen on
+        Checks to see if a load balancer exists and deletes it if it does
+        :return: (changed, result)
+            changed: Boolean whether a change was made
+            result: The result from the CLC API Call
+        """
+        p = self.module.params
+        name = p.get('name')
+
+        changed = False
+        result = None
+        loadbalancer = self._find_loadbalancer(search_key=name)
+        if loadbalancer:
+            if not self.module.check_mode:
+                result = self.delete_loadbalancer(loadbalancer)
+            changed = True
+        return changed, result
+
+    def ensure_pool_present(self, loadbalancer):
+        """
+        Checks if a load balancer pool exists and creates one if it does not.
+        :param loadbalancer: Loadbalancer object to check for pool existence
         :return: (changed, group, pool_id) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
             pool_id: The string id of the load balancer pool
         """
+        p = self.module.params
+
         changed = False
-        result = port
-        if not lb_id:
-            return changed, None, None
-        pool_id = self._loadbalancerpool_exists(
-            alias=alias,
-            location=location,
-            port=port,
-            lb_id=lb_id)
-        if not pool_id:
+        pool_id = None
+        result = p.get('port')
+
+        pool = self._find_pool(loadbalancer)
+        if not pool:
             if not self.module.check_mode:
-                result = self.create_loadbalancerpool(
-                    alias=alias,
-                    location=location,
-                    lb_id=lb_id,
-                    method=method,
-                    persistence=persistence,
-                    port=port)
+                result = self.create_pool(loadbalancer)
                 pool_id = result.get('id')
             changed = True
 
         return changed, result, pool_id
 
-    def ensure_loadbalancer_absent(self, name, alias, location):
-        """
-        Checks to see if a load balancer exists and deletes it if it does
-        :param name: Name of the load balancer
-        :param alias: Alias of account
-        :param location: Datacenter
-        :return: (changed, result)
-            changed: Boolean whether a change was made
-            result: The result from the CLC API Call
-        """
-        changed = False
-        result = name
-        lb_exists = self._loadbalancer_exists(name=name)
-        if lb_exists:
-            if not self.module.check_mode:
-                result = self.delete_loadbalancer(alias=alias,
-                                                  location=location,
-                                                  name=name)
-            changed = True
-        return changed, result
-
-    def ensure_loadbalancerpool_absent(self, alias, location, name, port):
+    def ensure_pool_absent(self):
         """
         Checks to see if a load balancer pool exists and deletes it if it does
-        :param alias: The account alias
-        :param location: the datacenter the load balancer resides in
-        :param name: the name of the load balancer
-        :param port: the port that the load balancer listens on
         :return: (changed, result) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
         """
+        p = self.module.params
+        name = p.get('name')
+
         changed = False
         result = None
-        lb_exists = self._loadbalancer_exists(name=name)
-        if lb_exists:
-            lb_id = self._get_loadbalancer_id(name=name)
-            pool_id = self._loadbalancerpool_exists(
-                alias=alias,
-                location=location,
-                port=port,
-                lb_id=lb_id)
-            if pool_id:
+        loadbalancer = self._find_loadbalancer(searck_key=name)
+        if loadbalancer:
+            pool = self._find_pool(loadbalancer)
+            if pool:
+                if not self.module.check_mode:
+                    result = self.delete_pool(loadbalancer, pool)
+                changed = True
+        else:
+            return self.module.fail_json(
+                msg='No load balancers matching: {search}.'.format(search=name))
+        return changed, result
+
+    def ensure_pool_nodes_present(self, loadbalancer=None):
+        """
+        Checks if list of nodes exist on pool and adds if they don't exist
+        :param loadbalancer: Loadbalancer on which to check nodes
+        :return: (changed, result) -
+            changed: Boolean whether a change was made
+            result: The result from the CLC API call
+        """
+        p = self.module.params
+        name = p.get('name')
+        nodes = p.get('nodes')
+        for node in nodes:
+            if not node.get('status'):
+                node['status'] = 'enabled'
+
+        if loadbalancer is None:
+            loadbalancer = self._find_loadbalancer(search_key=name)
+
+        changed = False
+        if loadbalancer:
+            pool = self._find_pool(loadbalancer)
+            if not pool:
+                pool = self.create_pool(loadbalancer)
+            result = pool
+            if not set(nodes).issubset(pool['nodes']):
                 changed = True
                 if not self.module.check_mode:
-                    result = self.delete_loadbalancerpool(
-                        alias=alias,
-                        location=location,
-                        lb_id=lb_id,
-                        pool_id=pool_id)
-            else:
-                result = "Pool doesn't exist"
+                    node_list = set(nodes).union(pool['nodes'])
+                    result = self._update_pool_nodes(loadbalancer, pool,
+                                                     node_list)
         else:
-            result = "LB Doesn't Exist"
+            return self.module.fail_json(
+                msg='No load balancers matching: {search}.'.format(search=name))
+
         return changed, result
 
-    def ensure_lbpool_nodes_set(self, alias, location, name, port, nodes):
+    def ensure_pool_nodes_absent(self, loadbalancer=None):
         """
-        Checks to see if the provided list of nodes exist for the pool
-         and set the nodes if any in the list those doesn't exist
-        :param alias: The account alias
-        :param location: the datacenter the load balancer resides in
-        :param name: the name of the load balancer
-        :param port: the port that the load balancer will listen on
-        :param nodes: The list of nodes to be updated to the pool
+        Checks if list of nodes not on pool and remove if they do exist
+        :param loadbalancer: Loadbalancer on which to check nodes
         :return: (changed, result) -
             changed: Boolean whether a change was made
             result: The result from the CLC API call
         """
-        result = {}
+        p = self.module.params
+        name = p.get('name')
+        nodes = p.get('nodes')
+        for node in nodes:
+            if not node.get('status'):
+                node['status'] = 'enabled'
+
+        if loadbalancer is None:
+            loadbalancer = self._find_loadbalancer(search_key=name)
+
         changed = False
-        lb_exists = self._loadbalancer_exists(name=name)
-        if lb_exists:
-            lb_id = self._get_loadbalancer_id(name=name)
-            pool_id = self._loadbalancerpool_exists(
-                alias=alias,
-                location=location,
-                port=port,
-                lb_id=lb_id)
-            if pool_id:
-                nodes_exist = self._loadbalancerpool_nodes_exists(alias=alias,
-                                                                  location=location,
-                                                                  lb_id=lb_id,
-                                                                  pool_id=pool_id,
-                                                                  nodes_to_check=nodes)
-                if not nodes_exist:
-                    changed = True
-                    result = self.set_loadbalancernodes(alias=alias,
-                                                        location=location,
-                                                        lb_id=lb_id,
-                                                        pool_id=pool_id,
-                                                        nodes=nodes)
-            else:
-                result = "Pool doesn't exist"
+        if loadbalancer:
+            pool = self._find_pool(loadbalancer)
+            result = pool
+            if not pool:
+                return self.module.fail_json(
+                    msg='Pool does no exist for port: {port} for load balancer '
+                        'with name: {name}.'.format(
+                            port=p.get('port'), name=loadbalancer.get('name')))
+            if set(nodes).intersection(pool['nodes']):
+                changed = True
+                if not self.module.check_mode:
+                    node_list = set(pool['nodes']).difference(nodes)
+                    result = self._update_pool_nodes(loadbalancer, pool,
+                                                     node_list)
         else:
-            result = "Load balancer doesn't Exist"
+            return self.module.fail_json(
+                msg='No load balancers matching: {search}.'.format(search=name))
         return changed, result
 
-    def ensure_lbpool_nodes_present(self, alias, location, name, port, nodes):
-        """
-        Checks to see if the provided list of nodes exist for the pool and add the missing nodes to the pool
-        :param alias: The account alias
-        :param location: the datacenter the load balancer resides in
-        :param name: the name of the load balancer
-        :param port: the port that the load balancer will listen on
-        :param nodes: the list of nodes to be added
-        :return: (changed, result) -
-            changed: Boolean whether a change was made
-            result: The result from the CLC API call
-        """
-        changed = False
-        lb_exists = self._loadbalancer_exists(name=name)
-        if lb_exists:
-            lb_id = self._get_loadbalancer_id(name=name)
-            pool_id = self._loadbalancerpool_exists(
-                alias=alias,
-                location=location,
-                port=port,
-                lb_id=lb_id)
-            if pool_id:
-                changed, result = self.add_lbpool_nodes(alias=alias,
-                                                        location=location,
-                                                        lb_id=lb_id,
-                                                        pool_id=pool_id,
-                                                        nodes_to_add=nodes)
-            else:
-                result = "Pool doesn't exist"
-        else:
-            result = "Load balancer doesn't Exist"
-        return changed, result
-
-    def ensure_lbpool_nodes_absent(self, alias, location, name, port, nodes):
-        """
-        Checks to see if the provided list of nodes exist for the pool and removes them if found any
-        :param alias: The account alias
-        :param location: the datacenter the load balancer resides in
-        :param name: the name of the load balancer
-        :param port: the port that the load balancer will listen on
-        :param nodes: the list of nodes to be removed
-        :return: (changed, result) -
-            changed: Boolean whether a change was made
-            result: The result from the CLC API call
-        """
-        changed = False
-        lb_exists = self._loadbalancer_exists(name=name)
-        if lb_exists:
-            lb_id = self._get_loadbalancer_id(name=name)
-            pool_id = self._loadbalancerpool_exists(
-                alias=alias,
-                location=location,
-                port=port,
-                lb_id=lb_id)
-            if pool_id:
-                changed, result = self.remove_lbpool_nodes(alias=alias,
-                                                           location=location,
-                                                           lb_id=lb_id,
-                                                           pool_id=pool_id,
-                                                           nodes_to_remove=nodes)
-            else:
-                result = "Pool doesn't exist"
-        else:
-            result = "Load balancer doesn't Exist"
-        return changed, result
-
-    def create_loadbalancer(self, name, alias, location, description, status):
+    def create_loadbalancer(self):
         """
         Create a loadbalancer w/ params
-        :param name: Name of loadbalancer
-        :param alias: Alias of account
-        :param location: Datacenter
-        :param description: Description for loadbalancer to be created
-        :param status: Enabled / Disabled
         :return: result: The result from the CLC API call
         """
+        p = self.module.params
+        alias = p.get('alias')
+        location = p.get('location')
+        name = p.get('name')
+
+        if not clc_common.server_ids_in_datacenter(self.module, self.clc_auth,
+                                                   location, alias=alias):
+            self.module.fail_json(
+                msg='Cannot create load balancer for account: {alias} '
+                    'in location: {location}. No servers are present in '
+                    'datacenter.'.format(
+                        alias=alias, location=location))
+
         result = None
         try:
-            result = self.clc.v2.API.Call('POST',
-                                          '/v2/sharedLoadBalancers/%s/%s' % (alias,
-                                                                             location),
-                                          json.dumps({"name": name,
-                                                      "description": description,
-                                                      "status": status}))
-            sleep(1)
-        except APIFailedResponse as e:
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'POST', '/sharedLoadBalancers/{alias}/{location}'.format(
+                    alias=alias, location=location),
+                data={'name': name,
+                      'description': p.get('description'),
+                      'status': p.get('status')},
+                timeout=60)
+        except ClcApiException as e:
             self.module.fail_json(
-                msg='Unable to create load balancer "{0}". {1}'.format(
-                    name, str(e.response_text)))
+                msg='Unable to create load balancer with name: {name} '
+                    'for account: {alias} in location: {location}. '
+                    '{msg}'.format(name=name, alias=alias, location=location,
+                                   msg=e.message))
         return result
 
-    def create_loadbalancerpool(
-            self, alias, location, lb_id, method, persistence, port):
-        """
-        Creates a pool on the provided load balancer
-        :param alias: the account alias
-        :param location: the datacenter the load balancer resides in
-        :param lb_id: the id string of the load balancer
-        :param method: the load balancing method
-        :param persistence: the load balancing persistence type
-        :param port: the port that the load balancer will listen on
-        :return: result: The result from the create API call
-        """
-        result = None
-        try:
-            result = self.clc.v2.API.Call(
-                'POST', '/v2/sharedLoadBalancers/%s/%s/%s/pools' %
-                (alias, location, lb_id), json.dumps(
-                    {
-                        "port": port, "method": method, "persistence": persistence
-                    }))
-        except APIFailedResponse as e:
-            self.module.fail_json(
-                msg='Unable to create pool for load balancer id "{0}". {1}'.format(
-                    lb_id, str(e.response_text)))
-        return result
-
-    def delete_loadbalancer(self, alias, location, name):
+    def delete_loadbalancer(self, loadbalancer):
         """
         Delete CLC loadbalancer
-        :param alias: Alias for account
-        :param location: Datacenter
-        :param name: Name of the loadbalancer to delete
+        :param loadbalancer: Loadbalancer object to delete
         :return: result: The result from the CLC API call
         """
-        result = None
-        lb_id = self._get_loadbalancer_id(name=name)
+        p = self.module.params
+        alias = p.get('alias')
+        location = p.get('location')
+
         try:
-            result = self.clc.v2.API.Call(
-                'DELETE', '/v2/sharedLoadBalancers/%s/%s/%s' %
-                (alias, location, lb_id))
-        except APIFailedResponse as e:
-            self.module.fail_json(
-                msg='Unable to delete load balancer "{0}". {1}'.format(
-                    name, str(e.response_text)))
+            # Returns 204 No Content
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'DELETE', '/sharedLoadBalancers/{alias}/{location}/{id}'.format(
+                    alias=alias, location=location, id=loadbalancer['id']),
+                timeout=60)
+        except ClcApiException as e:
+            return self.module.fail_json(
+                msg='Unable to delete load balancer with name: {name}. '
+                    '{msg}'.format(name=loadbalancer['name'], alias=alias,
+                                   location=location, msg=e.message))
         return result
 
-    def delete_loadbalancerpool(self, alias, location, lb_id, pool_id):
+    def update_loadbalancer(self, loadbalancer):
+        """
+        Update CLC loadbalancer
+        :param loadbalancer: Loadbalancer object to delete
+        :return: result: The result from the CLC API call
+        """
+        p = self.module.params
+        alias = p.get('alias')
+        location = p.get('location')
+        name = p.get('name')
+        description = p.get('description')
+
+        try:
+            # Returns 204 No Content
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'PUT', '/sharedLoadBalancers/{alias}/{location}/{id}'.format(
+                    alias=alias, location=location, id=loadbalancer['id']),
+                data={'name': name,
+                      'description': description},
+                timeout=60)
+        except ClcApiException as e:
+            return self.module.fail_json(
+                msg='Unable to update load balancer with name: {name}. '
+                    '{msg}'.format(name=loadbalancer['name'], alias=alias,
+                                   location=location, msg=e.message))
+        return result
+
+    def create_pool(self, loadbalancer):
+        """
+        Creates a pool on the provided load balancer
+        :param loadbalancer: Loadbalancer object to modify
+        :return: result: The result from the create API call
+        """
+        p = self.module.params
+        alias = p.get('alias')
+        location = p.get('location')
+
+        try:
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth, 'POST',
+                'POST',
+                '/sharedLoadBalancers/{alias}/{location}/{id}/pools'.format(
+                    alias=alias, location=location, id=loadbalancer['id']),
+                data={'port': p.get('port'),
+                      'method': p.get('method'),
+                      'persistence': p.get('persistence')},
+                timeout=60)
+        except ClcApiException as e:
+            return self.module.fail_json(
+                msg='Unable to create pool for load balancer with '
+                    'name: {name}. {msg}'.format(name=loadbalancer['name'],
+                                                 msg=e.message))
+        return result
+
+    def delete_pool(self, loadbalancer, pool):
         """
         Delete the pool on the provided load balancer
-        :param alias: The account alias
-        :param location: the datacenter the load balancer resides in
-        :param lb_id: the id string of the load balancer
-        :param pool_id: the id string of the load balancer pool
+        :param loadbalancer: Loadbalancer object to modify
+        :param pool: Loadbalancer pool to delete
         :return: result: The result from the delete API call
         """
-        result = None
+        p = self.module.params
+        alias = p.get('alias')
+        location = p.get('location')
+
         try:
-            result = self.clc.v2.API.Call(
-                'DELETE', '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s' %
-                (alias, location, lb_id, pool_id))
-        except APIFailedResponse as e:
-            self.module.fail_json(
-                msg='Unable to delete pool for load balancer id "{0}". {1}'.format(
-                    lb_id, str(e.response_text)))
+            # Returns 204 No Content
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth, 'DELETE',
+                '/sharedLoadBalancers/{alias}/{location}/{lb_id}'
+                '/pools/{pool_id}'.format(alias=alias, location=location,
+                                          lb_id=loadbalancer['id'],
+                                          pool_id=pool['id']),
+                timeout=60)
+        except ClcApiException as e:
+            return self.module.fail_json(
+                msg='Unable to delete pool on port: {port} for load balancer '
+                    'with name: {name}. {msg}'.format(
+                        port=pool['port'], name=loadbalancer['name'],
+                        msg=e.message))
         return result
 
-    def _get_loadbalancer_id(self, name):
+    def _update_pool_nodes(self, loadbalancer, pool, node_list):
         """
-        Retrieves unique ID of loadbalancer
-        :param name: Name of loadbalancer
-        :return: Unique ID of the loadbalancer
+        Update list of nodes in loadbalancer pool
+        :param loadbalancer: Loadbalancer on which to update nodes
+        :param pool: Pool to be updated
+        :param node_list: List/set of nodes
+        :return:
         """
-        id = None
-        for lb in self.lb_dict:
-            if lb.get('name') == name:
-                id = lb.get('id')
-        return id
+        p = self.module.params
+        alias = p.get('alias')
+        location = p.get('location')
 
-    def _get_loadbalancer_list(self, alias, location):
+        try:
+            # Returns 204 No Content
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth, 'PUT',
+                '/sharedLoadBalancers/{alias}/{location}/{lb_id}'
+                '/pools/{pool_id}/nodes'.format(
+                    alias=alias, location=location,
+                    lb_id=loadbalancer['id'], pool_id=pool['id']),
+                data=node_list,
+                timeout=60)
+        except ClcApiException as e:
+            return self.module.fail_json(
+                msg='Unable to updated nodes in  pool on port: {port} '
+                    'for load balancer with name: {name}. {msg}'.format(
+                        port=pool['port'], name=loadbalancer['name'],
+                        msg=e.message))
+        return result
+
+    def _get_loadbalancer_list(self):
         """
         Retrieve a list of loadbalancers
-        :param alias: Alias for account
-        :param location: Datacenter
         :return: JSON data for all loadbalancers at datacenter
         """
         result = None
+        alias = self.module.params.get('alias')
+        location = self.module.params.get('location')
         try:
-            result = self.clc.v2.API.Call(
-                'GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
-        except APIFailedResponse as e:
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'GET', '/sharedLoadBalancers/{alias}/{location}'.format(
+                    alias=alias, location=location))
+        except ClcApiException as e:
             self.module.fail_json(
-                msg='Unable to fetch load balancers for account: {0}. {1}'.format(
-                    alias, str(e.response_text)))
+                msg='Unable to fetch load balancers for account: {alias} '
+                    'in location: {location}. {msg}'.format(
+                        alias=alias, location=location, msg=str(e.message)))
         return result
 
-    def _loadbalancer_exists(self, name):
+    def _find_loadbalancer(self, search_key=None, refresh=False):
         """
-        Verify a loadbalancer exists
-        :param name: Name of loadbalancer
-        :return: False or the ID of the existing loadbalancer
+        Retrieves load balancer matching search key
+        :param search_key: Id or name of load balancer
+        :return: Matching load balancer dictionary
         """
-        result = False
+        lb_list = []
+        if refresh:
+            self.load_balancers = self._get_loadbalancer_list()
+        for lb in self.load_balancers:
+            if search_key.lower() in (lb['id'].lower(), lb['name'].lower()):
+                lb_list.append(lb)
+        num_lb = len(lb_list)
+        if num_lb > 1:
+            return module.fail_json(
+                msg='Multiple load balancers matching: {search}. '
+                    'Load balancer ids: {ids}'.format(
+                        search=search_key,
+                        ids=', '.join([l['id'] for l in lb_list])))
+        return lb_list[0] if num_lb > 0 else None
 
-        for lb in self.lb_dict:
-            if lb.get('name') == name:
-                result = lb.get('id')
-        return result
+    def _find_pool(self, loadbalancer):
+        p = self.module.params
+        port = int(p.get['port'])
 
-    def _loadbalancerpool_exists(self, alias, location, port, lb_id):
-        """
-        Checks to see if a pool exists on the specified port on the provided load balancer
-        :param alias: the account alias
-        :param location: the datacenter the load balancer resides in
-        :param port: the port to check and see if it exists
-        :param lb_id: the id string of the provided load balancer
-        :return: result: The id string of the pool or False
-        """
-        result = False
-        try:
-            pool_list = self.clc.v2.API.Call(
-                'GET', '/v2/sharedLoadBalancers/%s/%s/%s/pools' %
-                (alias, location, lb_id))
-        except APIFailedResponse as e:
-            return self.module.fail_json(
-                msg='Unable to fetch the load balancer pools for for load balancer id: {0}. {1}'.format(
-                    lb_id, str(e.response_text)))
-        for pool in pool_list:
-            if int(pool.get('port')) == int(port):
-                result = pool.get('id')
-        return result
-
-    def _loadbalancerpool_nodes_exists(
-            self, alias, location, lb_id, pool_id, nodes_to_check):
-        """
-        Checks to see if a set of nodes exists on the specified port on the provided load balancer
-        :param alias: the account alias
-        :param location: the datacenter the load balancer resides in
-        :param lb_id: the id string of the provided load balancer
-        :param pool_id: the id string of the load balancer pool
-        :param nodes_to_check: the list of nodes to check for
-        :return: result: True / False indicating if the given nodes exist
-        """
-        result = False
-        nodes = self._get_lbpool_nodes(alias, location, lb_id, pool_id)
-        for node in nodes_to_check:
-            if not node.get('status'):
-                node['status'] = 'enabled'
-            if node in nodes:
-                result = True
-            else:
-                result = False
-        return result
-
-    def set_loadbalancernodes(self, alias, location, lb_id, pool_id, nodes):
-        """
-        Updates nodes to the provided pool
-        :param alias: the account alias
-        :param location: the datacenter the load balancer resides in
-        :param lb_id: the id string of the load balancer
-        :param pool_id: the id string of the pool
-        :param nodes: a list of dictionaries containing the nodes to set
-        :return: result: The result from the CLC API call
-        """
         result = None
-        if not lb_id:
-            return result
-        if not self.module.check_mode:
-            try:
-                result = self.clc.v2.API.Call('PUT',
-                                              '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s/nodes'
-                                              % (alias, location, lb_id, pool_id), json.dumps(nodes))
-            except APIFailedResponse as e:
-                self.module.fail_json(
-                    msg='Unable to set nodes for the load balancer pool id "{0}". {1}'.format(
-                        pool_id, str(e.response_text)))
-        return result
-
-    def add_lbpool_nodes(self, alias, location, lb_id, pool_id, nodes_to_add):
-        """
-        Add nodes to the provided pool
-        :param alias: the account alias
-        :param location: the datacenter the load balancer resides in
-        :param lb_id: the id string of the load balancer
-        :param pool_id: the id string of the pool
-        :param nodes_to_add: a list of dictionaries containing the nodes to add
-        :return: (changed, result) -
-            changed: Boolean whether a change was made
-            result: The result from the CLC API call
-        """
-        changed = False
-        result = {}
-        nodes = self._get_lbpool_nodes(alias, location, lb_id, pool_id)
-        for node in nodes_to_add:
-            if not node.get('status'):
-                node['status'] = 'enabled'
-            if not node in nodes:
-                changed = True
-                nodes.append(node)
-        if changed == True and not self.module.check_mode:
-            result = self.set_loadbalancernodes(
-                alias,
-                location,
-                lb_id,
-                pool_id,
-                nodes)
-        return changed, result
-
-    def remove_lbpool_nodes(
-            self, alias, location, lb_id, pool_id, nodes_to_remove):
-        """
-        Removes nodes from the provided pool
-        :param alias: the account alias
-        :param location: the datacenter the load balancer resides in
-        :param lb_id: the id string of the load balancer
-        :param pool_id: the id string of the pool
-        :param nodes_to_remove: a list of dictionaries containing the nodes to remove
-        :return: (changed, result) -
-            changed: Boolean whether a change was made
-            result: The result from the CLC API call
-        """
-        changed = False
-        result = {}
-        nodes = self._get_lbpool_nodes(alias, location, lb_id, pool_id)
-        for node in nodes_to_remove:
-            if not node.get('status'):
-                node['status'] = 'enabled'
-            if node in nodes:
-                changed = True
-                nodes.remove(node)
-        if changed == True and not self.module.check_mode:
-            result = self.set_loadbalancernodes(
-                alias,
-                location,
-                lb_id,
-                pool_id,
-                nodes)
-        return changed, result
-
-    def _get_lbpool_nodes(self, alias, location, lb_id, pool_id):
-        """
-        Return the list of nodes available to the provided load balancer pool
-        :param alias: the account alias
-        :param location: the datacenter the load balancer resides in
-        :param lb_id: the id string of the load balancer
-        :param pool_id: the id string of the pool
-        :return: result: The list of nodes
-        """
-        result = None
-        try:
-            result = self.clc.v2.API.Call('GET',
-                                          '/v2/sharedLoadBalancers/%s/%s/%s/pools/%s/nodes'
-                                          % (alias, location, lb_id, pool_id))
-        except APIFailedResponse as e:
-            self.module.fail_json(
-                msg='Unable to fetch list of available nodes for load balancer pool id: {0}. {1}'.format(
-                    pool_id, str(e.response_text)))
+        for pool in loadbalancer['pools']:
+            if int(pool['port']) == port:
+                result = pool
         return result
 
     @staticmethod
@@ -878,7 +681,7 @@ class ClcLoadBalancer(object):
             name=dict(required=True),
             description=dict(default=None),
             location=dict(required=True),
-            alias=dict(required=True),
+            alias=dict(required=False),
             port=dict(choices=[80, 443]),
             method=dict(choices=['leastConnection', 'roundRobin']),
             persistence=dict(choices=['standard', 'sticky']),
@@ -894,43 +697,6 @@ class ClcLoadBalancer(object):
                     'nodes_absent'])
         )
         return argument_spec
-
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials on the sdk by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        api_url = env.get('CLC_V2_API_URL', False)
-
-        if api_url:
-            self.clc.defaults.ENDPOINT_URL_V2 = api_url
-
-        if v2_api_token and clc_alias:
-            self.clc._LOGIN_TOKEN_V2 = v2_api_token
-            self.clc._V2_ENABLED = True
-            self.clc.ALIAS = clc_alias
-        elif v2_api_username and v2_api_passwd:
-            self.clc.v2.SetCredentials(
-                api_username=v2_api_username,
-                api_passwd=v2_api_passwd)
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
-
-    @staticmethod
-    def _set_user_agent(clc):
-        if hasattr(clc, 'SetRequestsSession'):
-            agent_string = "ClcAnsibleModule/" + __version__
-            ses = requests.Session()
-            ses.headers.update({"Api-Client": agent_string})
-            ses.headers['User-Agent'] += " " + agent_string
-            clc.SetRequestsSession(ses)
 
 
 def main():
