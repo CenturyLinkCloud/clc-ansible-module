@@ -114,7 +114,8 @@ def _default_headers():
     return headers
 
 
-def call_clc_api(module, clc_auth, method, url, headers=None, data=None):
+def call_clc_api(module, clc_auth, method, url, headers=None, data=None,
+                 timeout=10):
     """
     Make a request to the CLC API v2.0
     :param module: Ansible module being called
@@ -123,6 +124,7 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None):
     :param url: URL string to be appended to root api_url
     :param headers: Headers to be added to request
     :param data: Data to be sent with request
+    :param timeout: Timeout in seconds
     :return response: JSON from HTTP response, or None if no content
     """
     if not isinstance(url, str) or not isinstance(url, basestring):
@@ -155,7 +157,8 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None):
                 path=url.lstrip('/')),
             method=method,
             headers=headers,
-            data=data)
+            data=data,
+            timeout=timeout)
     except urllib2.HTTPError as ex:
         api_ex = ClcApiException(
             message='Error calling CenturyLink Cloud API: {msg}'.format(
