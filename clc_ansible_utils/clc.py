@@ -32,6 +32,7 @@ __version__ = '${version}'
 import os
 import json
 import math
+import time
 import urllib
 import urllib2
 
@@ -160,9 +161,14 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None,
             data=data,
             timeout=timeout)
     except urllib2.HTTPError as ex:
+        try:
+            error_response = json.loads(ex.read())
+            error_message = error_response['message']
+        except (AttributeError, ValueError, KeyError):
+            error_message = ex.reason
         api_ex = ClcApiException(
             message='Error calling CenturyLink Cloud API: {msg}'.format(
-                msg=ex.reason),
+                msg=error_message),
             code=ex.code)
         raise api_ex
     except ssl.SSLError as ex:
@@ -492,6 +498,40 @@ def find_server(module, clc_auth, server_id):
         return module.fail_json(
             msg='Failed to get server information '
                 'for server id: {id}:'.format(id=server_id))
+
+
+def server_ip_addresses(module, clc_auth, server, poll_freq=2, retries=5):
+    """
+    Retrieve IP addresses for a CLC server, retrying if needed
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param server: Server object for which to retrieve IP addresses
+    :param poll_freq: Poll frequency for retries
+    :param retries:  Number of retries
+    :return: Server object with IP addresses added to data dictionary
+    """
+    while 'ipAddresses' not in server.data['details']:
+        if retries < 1:
+            module.fail_json(
+                msg='Unable to retrieve IP addresses for server: '
+                    '{name}.'.format(
+                        name=server.name))
+        time.sleep(poll_freq)
+        retries -= 1
+        server = find_server(module, clc_auth, server.id)
+
+    internal_ips = [ip['internal'] for ip
+                    in server.data['details']['ipAddresses']
+                    if 'internal' in ip]
+    public_ips = [ip['public'] for ip
+                  in server.data['details']['ipAddresses']
+                  if 'public' in ip]
+    if len(internal_ips) > 0:
+        server.data['ipaddress'] = internal_ips[0]
+    if len(public_ips) > 0:
+        server.data['publicip'] = public_ips[0]
+
+    return server
 
 
 def servers_by_id(module, clc_auth, server_ids):

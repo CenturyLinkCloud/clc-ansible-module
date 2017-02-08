@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # CenturyLink Cloud Ansible Modules.
 #
@@ -239,6 +240,9 @@ server:
 
 __version__ = '${version}'
 
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
+
 
 class ClcServerFact(object):
 
@@ -246,6 +250,7 @@ class ClcServerFact(object):
         """
         Construct module
         """
+        self.clc_auth = {}
         self.module = module
 
     def process_request(self):
@@ -253,36 +258,18 @@ class ClcServerFact(object):
         Process the request - Main Code Path
         :return: Returns with either an exit_json or fail_json
         """
-        self._set_clc_credentials_from_env()
         server_id = self.module.params.get('server_id')
 
-        try:
-            request = open_url(url=self._get_endpoint(server_id),
-                               headers={'Authorization': 'Bearer ' + self.v2_api_token},
-                               method='GET')
-        except Exception as e:
-            self.module.fail_json(
-                msg='Unable to fetch the server facts for server id : {0}. {1}'.format(server_id, e.message)
-            )
+        self.clc_auth = clc_common.authenticate(self.module)
 
-        if request.code not in [200]:
-            self.module.fail_json(
-                msg='Failed to retrieve server facts: {0}'.format(server_id))
-
-        r = json.loads(request.read())
-
-        if r['details']['memoryMB']:
-            r['details']['memory'] = int(r['details']['memoryMB'] / 1024)
-        if len(r['details']['ipAddresses']) > 0:
-            r['ipaddress'] = r['details']['ipAddresses'][0]['internal']
-            publicips = [ a for a in r['details']['ipAddresses'] if 'public' in a ]
-            if len(publicips) > 0:
-                r['publicip'] = publicips[0]
+        server = clc_common.find_server(self.module, self.clc_auth, server_id)
+        server = clc_common.server_ip_addresses(self.module, self.clc_auth,
+                                                server)
 
         if self.module.params.get('credentials'):
-            r['credentials'] = self._get_server_credentials(server_id)
+            server.data['credentials'] = self._get_server_credentials(server_id)
 
-        self.module.exit_json(changed=False, server=r)
+        self.module.exit_json(changed=False, server=server.data)
 
     @staticmethod
     def _define_module_argument_spec():
@@ -297,64 +284,21 @@ class ClcServerFact(object):
         return {"argument_spec": argument_spec}
 
     def _get_server_credentials(self, server_id):
-
+        """
+        Retrieve login credentials for server
+        :return: credentials for server with server_id
+        """
         try:
-            request = open_url(url=self._get_endpoint(server_id) + '/credentials',
-                               headers={'Authorization': 'Bearer ' + self.v2_api_token},
-                               method='GET')
-        except Exception as e:
-            self.module.fail_json(
-                msg='Unable to fetch the server credentials for server id : {0}. {1}'.format(server_id, e.message)
-            )
-
-        if request.code not in [200]:
-            self.module.fail_json(
-                msg='Failed to retrieve server credentials: %s' %
-                server_id)
-
-        return json.loads(request.read())
-
-    def _get_endpoint(self, server_id):
-        return self.api_url + '/v2/servers/' + self.clc_alias + '/' + server_id
-
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        self.api_url = env.get('CLC_V2_API_URL', 'https://api.ctl.io')
-
-        if v2_api_token and clc_alias:
-
-            self.v2_api_token = v2_api_token
-            self.clc_alias = clc_alias
-
-        elif v2_api_username and v2_api_passwd:
-
-            headers = {"Content-Type": "application/json"}
-            request = open_url(url=self.api_url + '/v2/authentication/login',
-                               method='POST',
-                               headers=headers,
-                               data=json.dumps({'username': v2_api_username,
-                                     'password': v2_api_passwd}))
-
-            if request.code not in [200]:
-                self.module.fail_json(
-                    msg='Failed to authenticate with clc V2 api.')
-
-            r = json.loads(request.read())
-            self.v2_api_token = r['bearerToken']
-            self.clc_alias = r['accountAlias']
-
-        else:
+            response = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'GET', '/servers/{alias}/{id}/credentials'.format(
+                    alias=self.clc_auth['clc_alias'], id=server_id))
+        except ClcApiException as e:
             return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
+                msg='Unable to fetch the credentials for server id: {id}. '
+                    '{msg}'.format(
+                        id=server_id, msg=e.message))
+        return response
 
 
 def main():
@@ -368,6 +312,5 @@ def main():
     clc_server_fact.process_request()
 
 from ansible.module_utils.basic import * # pylint: disable=W0614
-from ansible.module_utils.urls import * # pylint: disable=W0614
 if __name__ == '__main__':
     main()

@@ -17,26 +17,99 @@
 
 import os
 import unittest
-from uuid import UUID
-import clc as clc_sdk
-from clc import CLCException
-from clc import APIFailedResponse
 import mock
-from mock import patch, create_autospec
+from mock import patch
 
 import clc_ansible_module.clc_server_fact as clc_server_fact
 from clc_ansible_module.clc_server_fact import ClcServerFact
+
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
 
 
 class TestClcServerFactFunctions(unittest.TestCase):
 
     def setUp(self):
-        self.clc = mock.MagicMock()
         self.module = mock.MagicMock()
-        self.datacenter = mock.MagicMock()
+        self.clc_auth = {'clc_alias': 'mock_alias', 'clc_location': 'mock_dc'}
 
-    def test_process_request(self):
-        pass
+        server = mock.MagicMock()
+        server.id = 'mock_id'
+        server.data = {'id': 'mock_id'}
+        self.server = server
+
+    @patch.object(ClcServerFact, '_get_server_credentials')
+    @patch.object(clc_common, 'authenticate')
+    @patch.object(clc_common, 'server_ip_addresses')
+    @patch.object(clc_common, 'find_server')
+    def test_process_request_without_credentials(self, mock_find_server,
+                                                 mock_ip_addresses,
+                                                 mock_authenticate,
+                                                 mock_server_credentials):
+        mock_authenticate.return_value = self.clc_auth
+        mock_find_server.return_value = self.server
+        mock_ip_addresses.return_value = self.server
+
+        under_test = ClcServerFact(self.module)
+        under_test.module.params = {'server_id': 'mock_id'}
+
+        under_test.process_request()
+
+        self.assertFalse(mock_server_credentials.called)
+        self.module.exit_json.assert_called_once_with(
+            changed=False, server=self.server.data)
+
+    @patch.object(ClcServerFact, '_get_server_credentials')
+    @patch.object(clc_common, 'authenticate')
+    @patch.object(clc_common, 'server_ip_addresses')
+    @patch.object(clc_common, 'find_server')
+    def test_process_request_with_credentials(self, mock_find_server,
+                                              mock_ip_addresses,
+                                              mock_authenticate,
+                                              mock_server_credentials):
+        mock_authenticate.return_value = self.clc_auth
+        mock_find_server.return_value = self.server
+        mock_ip_addresses.return_value = self.server
+        credentials = {'userName': 'mock_user', 'password': 'mock_passwd'}
+        mock_server_credentials.return_value = credentials
+        server_data = self.server.data.copy()
+        server_data['credentials'] = credentials
+
+        under_test = ClcServerFact(self.module)
+        under_test.module.params = {'server_id': 'mock_id',
+                                    'credentials': True}
+
+        under_test.process_request()
+
+        self.assertTrue(mock_server_credentials.called)
+        self.module.exit_json.assert_called_once_with(
+            changed=False, server=server_data)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_get_server_credentials(self, mock_call_api):
+        credentials = {'userName': 'mock_user', 'password': 'mock_passwd'}
+        mock_call_api.return_value = credentials
+
+        under_test = ClcServerFact(self.module)
+        under_test.clc_auth = self.clc_auth
+
+        response = under_test._get_server_credentials('mock_id')
+
+        self.assertEqual(response, credentials)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_get_server_credentials_exception(self, mock_call_api):
+        error = ClcApiException('Fail')
+        mock_call_api.side_effect = error
+
+        under_test = ClcServerFact(self.module)
+        under_test.clc_auth = self.clc_auth
+
+        under_test._get_server_credentials('mock_id')
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Unable to fetch the credentials for server id: mock_id. Fail')
 
     def test_define_argument_spec(self):
         result = ClcServerFact._define_module_argument_spec()
@@ -47,46 +120,18 @@ class TestClcServerFactFunctions(unittest.TestCase):
             {'server_id': {'required': True},
              'credentials': {'default': False}})
 
-    def test_get_server_credentials(self):
-        under_test = ClcServerFact(self.module)
-        under_test.api_url = 'http://unittest.example.com'
-        under_test.clc_alias = 'test_alias'
-        # Mock request response from endpoint
+    @patch.object(clc_server_fact, 'AnsibleModule')
+    @patch.object(clc_server_fact, 'ClcServerFact')
+    def test_main(self, mock_ClcServerFact, mock_AnsibleModule):
+        mock_ClcServerFact_instance = mock.MagicMock()
+        mock_AnsibleModule_instance = mock.MagicMock()
+        mock_ClcServerFact.return_value = mock_ClcServerFact_instance
+        mock_AnsibleModule.return_value = mock_AnsibleModule_instance
 
-    def test_get_endpoint(self):
-        under_test = ClcServerFact(self.module)
-        under_test.api_url = 'http://unittest.example.com'
-        under_test.clc_alias = 'test_alias'
-        self.assertEqual(
-            under_test._get_endpoint('test_server'),
-            'http://unittest.example.com/v2/servers/test_alias/test_server')
+        clc_server_fact.main()
 
-    def test_set_clc_credentials_from_env(self):
-        # Required combination of credentials not passed
-        with patch.dict(
-                'os.environ', {
-                    'CLC_V2_API_URL': 'http://unittest.example.com',
-                },
-                clear=True):
-            under_test = ClcServerFact(self.module)
-            under_test._set_clc_credentials_from_env()
-        self.module.fail_json.assert_called_with(
-            msg='You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD '
-                'environment variables')
-        # Token and alias
-        with patch.dict(
-                'os.environ', {
-                    'CLC_V2_API_URL': 'http://unittest.example.com',
-                    'CLC_V2_API_TOKEN': 'dummy_token',
-                    'CLC_ACCT_ALIAS': 'dummy_alias',
-                },
-                clear=True):
-            under_test = ClcServerFact(self.module)
-            under_test._set_clc_credentials_from_env()
-        self.assertEqual(under_test.v2_api_token, 'dummy_token')
-        self.assertEqual(under_test.clc_alias, 'dummy_alias')
-        # Username and password
-        # Mock requests response from endpoint
+        mock_ClcServerFact.assert_called_once_with(mock_AnsibleModule_instance)
+        assert mock_ClcServerFact_instance.process_request.call_count == 1
 
 
 if __name__ == '__main__':
