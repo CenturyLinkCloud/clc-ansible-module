@@ -1,16 +1,19 @@
-pipeline {
-    agent any
-    stages {
-        stage('Build') {
-            steps {
-                echo 'Building..'
-                docker.build "runner/clc-ansible-module:${env.BUILD_NUMBER}"
-            }
+node {
+        stage("Main build") {
+
+            checkout scm
+
+            docker.image('alpine:latest').inside {
+
+              stage("Setup") {
+                sh "python setup.py build"
+              }
+
+           }
+
         }
-        stage('Test'){
-            steps {
-                echo 'Testing..'
-            }
-        }
-    }
+
+        // Clean up workspace
+        step([$class: 'WsCleanup'])
+
 }
