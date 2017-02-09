@@ -133,7 +133,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Assert
         self.module.exit_json.assert_called_once_with(changed=True,
-                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER" ]},
+                                                      group=None,
                                                       servers=[],
                                                       server_ids=['TEST_SERVER'],
                                                       partially_created_server_ids=[])
@@ -567,7 +567,7 @@ class TestClcServerFunctions(unittest.TestCase):
 
         # Assert
         self.module.exit_json.assert_called_once_with(server_ids=['TEST_SERVER'],
-                                                      group={ "id": "1111111", "servers": [ "EXISTING_SERVER", "TEST_SERVER" ]},
+                                                      group=None,
                                                       changed=True,
                                                       servers=[{'name': 'TEST_SERVER',
                                                                 'publicip': '5.6.7.8',
