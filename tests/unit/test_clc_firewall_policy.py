@@ -514,6 +514,38 @@ class TestClcFirewallPolicy(unittest.TestCase):
             changed=True, firewall_policy_id='mock_id', firewall_policy=None)
         self.assertFalse(self.module.fail_json.called)
 
+    @patch.object(ClcFirewallPolicy, '_firewall_policies')
+    @patch.object(ClcFirewallPolicy, '_policy_matches_request')
+    def test_find_matching_policy_match(self, mock_policy_matches,
+                                        mock_firewall_policies):
+        mock_firewall_policies.return_value = [self.policy_existing]
+        mock_policy_matches.side_effect = [True]
+
+        under_test = ClcFirewallPolicy(self.module)
+        under_test.module.params = {
+            'source_account_alias': 'mock_alias',
+            'location': 'mock_dc'}
+
+        policy = under_test._find_matching_policy()
+
+        self.assertEqual(policy, self.policy_existing)
+
+    @patch.object(ClcFirewallPolicy, '_firewall_policies')
+    @patch.object(ClcFirewallPolicy, '_policy_matches_request')
+    def test_find_matching_policy_no_match(self, mock_policy_matches,
+                                           mock_firewall_policies):
+        mock_firewall_policies.return_value = [self.policy_existing]
+        mock_policy_matches.side_effect = [False]
+
+        under_test = ClcFirewallPolicy(self.module)
+        under_test.module.params = {
+            'source_account_alias': 'mock_alias',
+            'location': 'mock_dc'}
+
+        policy = under_test._find_matching_policy()
+
+        self.assertIsNone(policy)
+
     def test_policy_matches_request_true(self):
         policy = self.policy_existing
         params = {
@@ -531,8 +563,6 @@ class TestClcFirewallPolicy(unittest.TestCase):
         res = under_test._policy_matches_request(policy)
 
         self.assertTrue(res)
-
-
 
     def test_policy_matches_request_false_source(self):
         policy = self.policy_existing
