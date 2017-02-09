@@ -18,21 +18,82 @@
 import clc_ansible_module.clc_group_fact as clc_group_fact
 from clc_ansible_module.clc_group_fact import ClcGroupFact
 
-from clc import CLCException
-import clc as clc_sdk
+import clc_ansible_utils.clc as clc_common
+
 import mock
 from mock import patch
 import unittest
 
+
 class TestClcGroupFactFunctions(unittest.TestCase):
 
     def setUp(self):
-        self.clc = mock.MagicMock()
         self.module = mock.MagicMock()
-        self.datacenter = mock.MagicMock()
+        self.clc_auth = {'clc_alias': 'mock_alias', 'clc_location': 'mock_dc'}
 
-    def test_process_request(self):
-        pass
+        group = mock.MagicMock()
+        group.id = 'mock_id'
+        group.name = 'mock_name'
+        group.data = {
+            'id': 'mock_id',
+            'name': 'mock_name',
+            'links': [
+                {'rel': 'server',
+                 'id': 'mock_server1'},
+                {'rel': 'server',
+                 'id': 'mock_server2'}
+            ]
+        }
+        self.group = group
+        self.root_group = mock.MagicMock()
+
+    @patch.object(clc_common, 'authenticate')
+    @patch.object(clc_common, 'find_group_by_id')
+    def test_process_request_by_id(self, mock_find_group_id, mock_authenticate):
+        mock_authenticate.return_value = self.clc_auth
+        mock_find_group_id.return_value = self.group
+
+        under_test = ClcGroupFact(self.module)
+        under_test.module.params = {
+            'location': 'mock_dc',
+            'group_id': 'mock_id'}
+
+        under_test.process_request()
+
+        mock_find_group_id.assert_called_once_with(self.module, self.clc_auth,
+                                                   'mock_id')
+        self.module.exit_json.assert_called_once_with(changed=False,
+                                                      group=self.group.data)
+
+    @patch.object(clc_common, 'authenticate')
+    @patch.object(clc_common, 'find_group')
+    @patch.object(clc_common, 'group_tree')
+    def test_process_request_by_name(self, mock_group_tree,
+                                     mock_find_group, mock_authenticate):
+        mock_authenticate.return_value = self.clc_auth
+        mock_group_tree.return_value = self.root_group
+        mock_find_group.return_value = self.group
+
+        under_test = ClcGroupFact(self.module)
+        under_test.module.params = {
+            'location': 'mock_dc',
+            'group_name': 'mock_name'}
+
+        under_test.process_request()
+
+        mock_find_group.assert_called_once_with(self.module, self.root_group,
+                                                'mock_name')
+        self.module.exit_json.assert_called_once_with(changed=False,
+                                                      group=self.group.data)
+
+    def test_process_request_no_search_key(self):
+        under_test = ClcGroupFact(self.module)
+        under_test.module.params = {'location': 'mock_dc'}
+
+        under_test.process_request()
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Must specify either group_id or group_name parameter.')
 
     def test_define_argument_spec(self):
         result = ClcGroupFact._define_module_argument_spec()
@@ -40,42 +101,22 @@ class TestClcGroupFactFunctions(unittest.TestCase):
         self.assertTrue('argument_spec' in result)
         self.assertEqual(
             result['argument_spec'],
-            {'group_id': {'required': True}})
+            dict(group_id=dict(default=None),
+                 group_name=dict(default=None),
+                 location=dict(default=None)))
 
-    def test_get_endpoint(self):
-        under_test = ClcGroupFact(self.module)
-        under_test.api_url = 'http://unittest.example.com'
-        under_test.clc_alias = 'test_alias'
-        self.assertEqual(
-            under_test._get_endpoint('test_group'),
-            'http://unittest.example.com/v2/groups/test_alias/test_group')
+    @patch.object(clc_group_fact, 'AnsibleModule')
+    @patch.object(clc_group_fact, 'ClcGroupFact')
+    def test_main(self, mock_ClcGroupFact, mock_AnsibleModule):
+        mock_ClcGroupFact_instance = mock.MagicMock()
+        mock_AnsibleModule_instance = mock.MagicMock()
+        mock_ClcGroupFact.return_value = mock_ClcGroupFact_instance
+        mock_AnsibleModule.return_value = mock_AnsibleModule_instance
 
-    def test_set_clc_credentials_from_env(self):
-        # Required combination of credentials not passed
-        with patch.dict(
-                'os.environ', {
-                    'CLC_V2_API_URL': 'http://unittest.example.com',
-                },
-                clear=True):
-            under_test = ClcGroupFact(self.module)
-            under_test._set_clc_credentials_from_env()
-        self.module.fail_json.assert_called_with(
-            msg='You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD '
-                'environment variables')
-        # Token and alias
-        with patch.dict(
-                'os.environ', {
-                    'CLC_V2_API_URL': 'http://unittest.example.com',
-                    'CLC_V2_API_TOKEN': 'dummy_token',
-                    'CLC_ACCT_ALIAS': 'dummy_alias',
-                },
-                clear=True):
-            under_test = ClcGroupFact(self.module)
-            under_test._set_clc_credentials_from_env()
-        self.assertEqual(under_test.v2_api_token, 'dummy_token')
-        self.assertEqual(under_test.clc_alias, 'dummy_alias')
-        # Username and password
-        # Mock requests response from endpoint
+        clc_group_fact.main()
+
+        mock_ClcGroupFact.assert_called_once_with(mock_AnsibleModule_instance)
+        assert mock_ClcGroupFact_instance.process_request.call_count == 1
 
 
 if __name__ == '__main__':

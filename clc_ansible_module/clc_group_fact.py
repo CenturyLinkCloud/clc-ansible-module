@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # CenturyLink Cloud Ansible Modules.
 #
@@ -36,7 +37,17 @@ options:
   group_id:
     description:
       - The group id to retrieve facts for.
-    required: True
+    required: False
+  group_name:
+    description:
+      - The group name to retrieve facts for.
+    required: False
+  location:
+    description:
+      - Datacenter to create the group in. If location is not provided,
+        the group gets created in the default datacenter
+        associated with the account
+    required: False
 requirements:
     - python = 2.7
 author: "CLC Runner (@clc-runner)"
@@ -190,6 +201,8 @@ server:
 
 __version__ = '${version}'
 
+import clc_ansible_utils.clc as clc_common
+
 
 class ClcGroupFact(object):
 
@@ -197,6 +210,7 @@ class ClcGroupFact(object):
         """
         Construct module
         """
+        self.clc_auth = {}
         self.module = module
 
     def process_request(self):
@@ -204,33 +218,28 @@ class ClcGroupFact(object):
         Process the request - Main Code Path
         :return: Returns with either an exit_json or fail_json
         """
-        self._set_clc_credentials_from_env()
         group_id = self.module.params.get('group_id')
-        request = None
+        group_name = self.module.params.get('group_name')
+        if not group_id and not group_name:
+            return self.module.fail_json(
+                msg='Must specify either group_id or group_name parameter.')
 
-        try:
-            request = open_url(url=self._get_endpoint(group_id),
-                               headers={'Authorization': 'Bearer ' + self.v2_api_token},
-                               method='GET')
-        except Exception as e:
-            self.module.fail_json(
-                msg='Unable to fetch the group facts for group id : {0}. {1}'.format(group_id, e.message)
-            )
+        self.clc_auth = clc_common.authenticate(self.module)
 
-        if request.code not in [200]:
-            self.module.fail_json(
-                msg='Failed to retrieve group facts: %s' %
-                group_id)
+        if group_id:
+            group = clc_common.find_group_by_id(self.module, self.clc_auth,
+                                                group_id)
+        elif group_name:
+            location = self.module.params.get('location')
+            root_group = clc_common.group_tree(self.module, self.clc_auth,
+                                               datacenter=location)
+            group = clc_common.find_group(self.module, root_group,
+                                          group_name)
 
-        r = json.loads(request.read())
-        request.close()
-        servers = r['servers'] = []
+        group.data['servers'] = [obj['id'] for obj in group.data['links'] if
+                                 obj['rel'] == 'server']
 
-        for l in r['links']:
-            if 'server' == l['rel']:
-                servers.append(l['id'])
-
-        self.module.exit_json(changed=False, group=r)
+        return self.module.exit_json(changed=False, group=group.data)
 
     @staticmethod
     def _define_module_argument_spec():
@@ -238,49 +247,17 @@ class ClcGroupFact(object):
         Define the argument spec for the ansible module
         :return: argument spec dictionary
         """
-        return {"argument_spec": dict(group_id=dict(required=True))}
 
-    def _get_endpoint(self, group_id):
-        return self.api_url + '/v2/groups/' + self.clc_alias + '/' + group_id
+        argument_spec = dict(
+            group_id=dict(default=None),
+            group_name=dict(default=None),
+            location=dict(default=None)
+        )
 
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        self.api_url = env.get('CLC_V2_API_URL', 'https://api.ctl.io')
+        mutually_exclusive = [['group_id', 'group_name']]
 
-        if v2_api_token and clc_alias:
-
-            self.v2_api_token = v2_api_token
-            self.clc_alias = clc_alias
-
-        elif v2_api_username and v2_api_passwd:
-
-            headers = {"Content-Type": "application/json"}
-            request = open_url(url=self.api_url + '/v2/authentication/login',
-                               method='POST',
-                               headers=headers,
-                               data=json.dumps({'username': v2_api_username,
-                                     'password': v2_api_passwd}))
-
-            if request.code not in [200]:
-                self.module.fail_json(
-                    msg='Failed to authenticate with clc V2 api.')
-
-            r = json.loads(request.read())
-            self.v2_api_token = r['bearerToken']
-            self.clc_alias = r['accountAlias']
-
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
+        return {"argument_spec": argument_spec,
+                "mutually_exclusive": mutually_exclusive}
 
 
 def main():
@@ -294,6 +271,5 @@ def main():
     clc_group_fact.process_request()
 
 from ansible.module_utils.basic import * # pylint: disable=W0614
-from ansible.module_utils.urls import * # pylint: disable=W0614
 if __name__ == '__main__':
     main()

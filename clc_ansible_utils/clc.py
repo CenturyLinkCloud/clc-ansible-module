@@ -404,6 +404,27 @@ def find_group(module, search_group, group_info, parent_info=None):
         return None
 
 
+def find_group_by_id(module, clc_auth, group_id):
+    """
+    Find server information based on server_id
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param group_id: ID for group for which to retrieve data
+    :return: Server object
+    """
+    try:
+        r = call_clc_api(
+            module, clc_auth,
+            'GET', 'groups/{alias}/{id}'.format(
+                alias=clc_auth['clc_alias'], id=group_id))
+        group = Group(r)
+        return group
+    except ClcApiException as ex:
+        return module.fail_json(
+            msg='Failed to get group information '
+                'for group id: {id}:'.format(id=group_id))
+
+
 def group_path(group, group_id=False, delimiter='/'):
     """
     :param group: Group object for which to show full ancestry
