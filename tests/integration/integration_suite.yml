@@ -17,3 +17,4 @@
 - include: aa_policy.yml
 - include: alert_policy.yml
 - include: firewall_policy.yml
+- include: loadbalancer.yml

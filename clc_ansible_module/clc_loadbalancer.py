@@ -252,12 +252,12 @@ class ClcLoadBalancer(object):
         if p.get('description') is None:
             p['description'] = p.get('name')
 
-        state = self.module.params.get('state')
+        state = p.get('state')
 
         self.load_balancers = self._get_loadbalancer_list()
 
         if state == 'present':
-            changed, result_lb, lb_id = self.ensure_loadbalancer_present()
+            changed, result_lb = self.ensure_loadbalancer_present()
         elif state == 'absent':
             changed, result_lb = self.ensure_loadbalancer_absent()
 
@@ -296,15 +296,13 @@ class ClcLoadBalancer(object):
             changed = True
 
         if p.get('port'):
-            changed, result_pool, pool_id = self.ensure_pool_present(
+            changed, loadbalancer = self.ensure_pool_present(
                 loadbalancer)
             if p.get('nodes'):
-                changed, result_nodes = self.ensure_pool_nodes_present(
+                changed, loadbalancer = self.ensure_pool_nodes_present(
                     loadbalancer)
-            loadbalancer = self._find_loadbalancer(search_key=name,
-                                                   refresh=True)
 
-        return changed, loadbalancer, loadbalancer['id']
+        return changed, loadbalancer
 
     def ensure_loadbalancer_absent(self):
         """
@@ -337,17 +335,16 @@ class ClcLoadBalancer(object):
         p = self.module.params
 
         changed = False
-        pool_id = None
-        result = p.get('port')
 
         pool = self._find_pool(loadbalancer)
         if not pool:
             if not self.module.check_mode:
                 result = self.create_pool(loadbalancer)
-                pool_id = result.get('id')
+                loadbalancer = self._find_loadbalancer(
+                    search_key=loadbalancer['id'], refresh=True)
             changed = True
 
-        return changed, result, pool_id
+        return changed, loadbalancer
 
     def ensure_pool_absent(self):
         """
@@ -360,18 +357,19 @@ class ClcLoadBalancer(object):
         name = p.get('name')
 
         changed = False
-        result = None
-        loadbalancer = self._find_loadbalancer(searck_key=name)
+        loadbalancer = self._find_loadbalancer(search_key=name)
         if loadbalancer:
             pool = self._find_pool(loadbalancer)
             if pool:
                 if not self.module.check_mode:
                     result = self.delete_pool(loadbalancer, pool)
+                    loadbalancer = self._find_loadbalancer(
+                        search_key=loadbalancer['id'], refresh=True)
                 changed = True
         else:
             return self.module.fail_json(
                 msg='No load balancers matching: {search}.'.format(search=name))
-        return changed, result
+        return changed, loadbalancer
 
     def ensure_pool_nodes_present(self, loadbalancer=None):
         """
@@ -397,17 +395,19 @@ class ClcLoadBalancer(object):
             if not pool:
                 pool = self.create_pool(loadbalancer)
             result = pool
-            if not set(nodes).issubset(pool['nodes']):
+            updated_nodes = self._update_node_list(pool['nodes'])
+            if updated_nodes != pool['nodes']:
                 changed = True
                 if not self.module.check_mode:
-                    node_list = set(nodes).union(pool['nodes'])
                     result = self._update_pool_nodes(loadbalancer, pool,
-                                                     node_list)
+                                                     updated_nodes)
+                    loadbalancer = self._find_loadbalancer(
+                        search_key=loadbalancer['id'], refresh=True)
         else:
             return self.module.fail_json(
                 msg='No load balancers matching: {search}.'.format(search=name))
 
-        return changed, result
+        return changed, loadbalancer
 
     def ensure_pool_nodes_absent(self, loadbalancer=None):
         """
@@ -419,10 +419,6 @@ class ClcLoadBalancer(object):
         """
         p = self.module.params
         name = p.get('name')
-        nodes = p.get('nodes')
-        for node in nodes:
-            if not node.get('status'):
-                node['status'] = 'enabled'
 
         if loadbalancer is None:
             loadbalancer = self._find_loadbalancer(search_key=name)
@@ -431,21 +427,20 @@ class ClcLoadBalancer(object):
         if loadbalancer:
             pool = self._find_pool(loadbalancer)
             result = pool
-            if not pool:
-                return self.module.fail_json(
-                    msg='Pool does no exist for port: {port} for load balancer '
-                        'with name: {name}.'.format(
-                            port=p.get('port'), name=loadbalancer.get('name')))
-            if set(nodes).intersection(pool['nodes']):
-                changed = True
-                if not self.module.check_mode:
-                    node_list = set(pool['nodes']).difference(nodes)
-                    result = self._update_pool_nodes(loadbalancer, pool,
-                                                     node_list)
+            if pool:
+                updated_nodes = self._update_node_list(pool['nodes'],
+                                                       remove_nodes=True)
+                if updated_nodes != pool['nodes']:
+                    changed = True
+                    if not self.module.check_mode:
+                        result = self._update_pool_nodes(loadbalancer, pool,
+                                                         updated_nodes)
+                        loadbalancer = self._find_loadbalancer(
+                            search_key=loadbalancer['id'], refresh=True)
         else:
             return self.module.fail_json(
                 msg='No load balancers matching: {search}.'.format(search=name))
-        return changed, result
+        return changed, loadbalancer
 
     def create_loadbalancer(self):
         """
@@ -503,8 +498,7 @@ class ClcLoadBalancer(object):
         except ClcApiException as e:
             return self.module.fail_json(
                 msg='Unable to delete load balancer with name: {name}. '
-                    '{msg}'.format(name=loadbalancer['name'], alias=alias,
-                                   location=location, msg=e.message))
+                    '{msg}'.format(name=loadbalancer['name'], msg=e.message))
         return result
 
     def update_loadbalancer(self, loadbalancer):
@@ -548,7 +542,6 @@ class ClcLoadBalancer(object):
         try:
             result = clc_common.call_clc_api(
                 self.module, self.clc_auth, 'POST',
-                'POST',
                 '/sharedLoadBalancers/{alias}/{location}/{id}/pools'.format(
                     alias=alias, location=location, id=loadbalancer['id']),
                 data={'port': p.get('port'),
@@ -614,7 +607,7 @@ class ClcLoadBalancer(object):
                 timeout=60)
         except ClcApiException as e:
             return self.module.fail_json(
-                msg='Unable to updated nodes in  pool on port: {port} '
+                msg='Unable to updated nodes in pool on port: {port} '
                     'for load balancer with name: {name}. {msg}'.format(
                         port=pool['port'], name=loadbalancer['name'],
                         msg=e.message))
@@ -654,7 +647,7 @@ class ClcLoadBalancer(object):
                 lb_list.append(lb)
         num_lb = len(lb_list)
         if num_lb > 1:
-            return module.fail_json(
+            return self.module.fail_json(
                 msg='Multiple load balancers matching: {search}. '
                     'Load balancer ids: {ids}'.format(
                         search=search_key,
@@ -663,13 +656,44 @@ class ClcLoadBalancer(object):
 
     def _find_pool(self, loadbalancer):
         p = self.module.params
-        port = int(p.get['port'])
+        port = int(p.get('port'))
 
         result = None
         for pool in loadbalancer['pools']:
             if int(pool['port']) == port:
                 result = pool
         return result
+
+    def _update_node_list(self, existing_nodes, remove_nodes=False):
+        """
+        Update list of existing nodes to nodes specified in module call
+        All nodes passed back are a shallow copy of the original node
+        :param existing_nodes: List of existing nodes
+        :param remove_nodes: bool indicating whether to remove nodes
+        :return: Updated list of dictionaries
+        """
+        p = self.module.params
+        nodes = p.get('nodes')
+
+        updated_nodes = []
+        nodes_dict = dict([(n['ipAddress'], n) for n in nodes])
+        for node in existing_nodes:
+            ip = node['ipAddress']
+            if ip in nodes_dict:
+                if remove_nodes:
+                    continue
+                else:
+                    new_node = node.copy()
+                    new_node.update(nodes_dict[ip])
+                    updated_nodes.append(new_node)
+            else:
+                updated_nodes.append(node.copy())
+        if not remove_nodes:
+            existing_ips = [n['ipAddress'] for n in updated_nodes]
+            for node in nodes:
+                if node['ipAddress'] not in existing_ips:
+                    updated_nodes.append(node.copy())
+        return updated_nodes
 
     @staticmethod
     def define_argument_spec():
@@ -682,9 +706,11 @@ class ClcLoadBalancer(object):
             description=dict(default=None),
             location=dict(required=True),
             alias=dict(required=False),
-            port=dict(choices=[80, 443]),
-            method=dict(choices=['leastConnection', 'roundRobin']),
-            persistence=dict(choices=['standard', 'sticky']),
+            port=dict(type='int', choices=[80, 443]),
+            method=dict(choices=['leastConnection', 'roundRobin'],
+                        default='roundRobin'),
+            persistence=dict(choices=['standard', 'sticky'],
+                             default='standard'),
             nodes=dict(type='list', default=[]),
             status=dict(default='enabled', choices=['enabled', 'disabled']),
             state=dict(
