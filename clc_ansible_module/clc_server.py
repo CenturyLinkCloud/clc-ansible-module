@@ -631,10 +631,11 @@ class ClcServer(object):
         wait = self.module.params.get('wait')
         if wait:
             datacenter = self._find_datacenter(self.clc, self.module)
-            group = ClcServer._find_group(module=self.module, datacenter=datacenter, lookup_group=p.get('group'))
-            servers = group.Servers().Servers()
-            group = group.data
-            group['servers'] = [s.id for s in servers]
+            if state == 'present':
+                group = ClcServer._find_group(module=self.module, datacenter=datacenter, lookup_group=p.get('group'))
+                servers = group.Servers().Servers()
+                group = group.data
+                group['servers'] = [s.id for s in servers]
 
         self.module.exit_json(
             changed=changed,
@@ -777,7 +778,8 @@ class ClcServer(object):
         params['description'] = ClcServer._find_description(module)
         params['ttl'] = ClcServer._find_ttl(clc, module)
         params['template'] = ClcServer._find_template_id(module, datacenter)
-        params['group'] = ClcServer._find_group(module, datacenter).id
+        if params['state'] == 'present':
+            params['group'] = ClcServer._find_group(module, datacenter).id
         params['network_id'] = ClcServer._find_network_id(module, datacenter)
         params['anti_affinity_policy_id'] = ClcServer._find_aa_policy_id(
             clc,
