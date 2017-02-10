@@ -656,3 +656,58 @@ def find_policy(module, clc_auth, search_key,
                     type=policy_str, search=search_key,
                     ids=', '.join([p['id'] for p in policies])))
     return policies[0] if num_policies > 0 else None
+
+
+def loadbalancer_list(module, clc_auth, alias=None, location=None):
+    """
+    Retrieve a list of loadbalancers
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param location: the datacenter to search for a network id
+    :param alias: string - CLC account alias
+    :return: List of JSON data for all loadbalancers at datacenter
+    """
+    result = None
+    if alias is None:
+        alias = clc_auth['clc_alias']
+    if location is None:
+        location = clc_auth['clc_location']
+    try:
+        result = call_clc_api(
+            module, clc_auth,
+            'GET', '/sharedLoadBalancers/{alias}/{location}'.format(
+                alias=alias, location=location))
+    except ClcApiException as e:
+        module.fail_json(
+            msg='Unable to fetch load balancers for account: {alias} '
+                'in location: {location}. {msg}'.format(
+                    alias=alias, location=location, msg=str(e.message)))
+    return result
+
+
+def find_loadbalancer(module, clc_auth, search_key, load_balancers=None,
+                      alias=None, location=None):
+    """
+    Retrieves load balancer matching search key
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param search_key: Id or name of load balancer
+    :param load_balancers: List of load balancers to search
+    :param location: the datacenter to search for a network id
+    :param alias: string - CLC account alias
+    :return: Matching load balancer dictionary
+    """
+    lb_list = []
+    if load_balancers is None:
+        load_balancers = loadbalancer_list(module, clc_auth,)
+    for lb in load_balancers:
+        if search_key.lower() in (lb['id'].lower(), lb['name'].lower()):
+            lb_list.append(lb)
+    num_lb = len(lb_list)
+    if num_lb > 1:
+        return module.fail_json(
+            msg='Multiple load balancers matching: {search}. '
+                'Load balancer ids: {ids}'.format(
+                    search=search_key,
+                    ids=', '.join([l['id'] for l in lb_list])))
+    return lb_list[0] if num_lb > 0 else None

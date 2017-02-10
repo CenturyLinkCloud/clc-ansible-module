@@ -72,7 +72,7 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         }
 
     @patch.object(clc_common, 'authenticate')
-    @patch.object(ClcLoadBalancer, '_get_loadbalancer_list')
+    @patch.object(clc_common, 'loadbalancer_list')
     @patch.object(ClcLoadBalancer, 'ensure_loadbalancer_present')
     def test_process_request_state_present(self,
                                            mock_loadbalancer_present,
@@ -105,7 +105,7 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_common, 'authenticate')
-    @patch.object(ClcLoadBalancer, '_get_loadbalancer_list')
+    @patch.object(clc_common, 'loadbalancer_list')
     @patch.object(ClcLoadBalancer, 'ensure_loadbalancer_absent')
     def test_process_request_state_absent(self,
                                            mock_loadbalancer_absent,
@@ -132,7 +132,7 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_common, 'authenticate')
-    @patch.object(ClcLoadBalancer, '_get_loadbalancer_list')
+    @patch.object(clc_common, 'loadbalancer_list')
     @patch.object(ClcLoadBalancer, 'ensure_pool_absent')
     def test_process_request_state_port_absent(self,
                                            mock_pool_absent,
@@ -163,7 +163,7 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_common, 'authenticate')
-    @patch.object(ClcLoadBalancer, '_get_loadbalancer_list')
+    @patch.object(clc_common, 'loadbalancer_list')
     @patch.object(ClcLoadBalancer, 'ensure_pool_nodes_present')
     def test_process_request_state_nodes_present(self,
                                                  mock_nodes_present,
@@ -196,7 +196,7 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
         self.assertFalse(self.module.fail_json.called)
 
     @patch.object(clc_common, 'authenticate')
-    @patch.object(ClcLoadBalancer, '_get_loadbalancer_list')
+    @patch.object(clc_common, 'loadbalancer_list')
     @patch.object(ClcLoadBalancer, 'ensure_pool_nodes_absent')
     def test_process_request_state_nodes_absent(self,
                                                 mock_nodes_absent,
@@ -828,41 +828,7 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
                     port=self.pool_existing['port'],
                     name=self.loadbalancer_existing['name']))
 
-    @patch.object(clc_common, 'call_clc_api')
-    def test_get_loadbalancer_list(self, mock_call_api):
-        params = {
-            'alias': 'mock_alias',
-            'location': 'mock_dc',
-        }
-        mock_call_api.return_value = [self.loadbalancer_existing]
-
-        under_test = ClcLoadBalancer(self.module)
-        under_test.module.params = params
-
-        result = under_test._get_loadbalancer_list()
-
-        self.assertEqual(result, [self.loadbalancer_existing])
-        self.assertFalse(self.module.fail_json.called)
-
-    @patch.object(clc_common, 'call_clc_api')
-    def test_get_loadbalancer_list_exception(self, mock_call_api):
-        params = {
-            'alias': 'mock_alias',
-            'location': 'mock_dc',
-        }
-        error = ClcApiException('Failed')
-        mock_call_api.side_effect = error
-
-        under_test = ClcLoadBalancer(self.module)
-        under_test.module.params = params
-
-        result = under_test._get_loadbalancer_list()
-
-        self.module.fail_json.assert_called_once_with(
-            msg='Unable to fetch load balancers for account: mock_alias '
-                'in location: mock_dc. Failed')
-
-    @patch.object(ClcLoadBalancer, '_get_loadbalancer_list')
+    @patch.object(clc_common, 'loadbalancer_list')
     def test_find_loadbalancer(self, mock_loadbalancer_list):
         mock_loadbalancer_list.return_value = [self.loadbalancer_existing]
         under_test = ClcLoadBalancer(self.module)
@@ -871,22 +837,6 @@ class TestClcLoadbalancerFunctions(unittest.TestCase):
             self.loadbalancer_existing['id'], refresh=True)
 
         self.assertEqual(result, self.loadbalancer_existing)
-
-    @patch.object(ClcLoadBalancer, '_get_loadbalancer_list')
-    def test_find_loadbalancer(self, mock_loadbalancer_list):
-        mock_loadbalancer_list.return_value = [self.loadbalancer_existing,
-                                               self.loadbalancer_existing]
-        under_test = ClcLoadBalancer(self.module)
-
-        result = under_test._find_loadbalancer(
-            self.loadbalancer_existing['name'], refresh=True)
-
-        self.module.fail_json.assert_called_once_with(
-            msg='Multiple load balancers matching: {search}. '
-                'Load balancer ids: {ids}'.format(
-                    search=self.loadbalancer_existing['name'],
-                    ids=', '.join([self.loadbalancer_existing['id'],
-                                   self.loadbalancer_existing['id']])))
 
     def test_find_pool(self):
         loadbalancer = self.loadbalancer_existing

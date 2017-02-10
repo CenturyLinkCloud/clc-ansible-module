@@ -376,10 +376,10 @@ class ClcGroup(object):
     def _create_group(self, group_name, parent_name, description):
         """
         Create the provided server group
-        :param group: clc_sdk.Group - the group to create
-        :param parent: clc_sdk.Parent - the parent group for {group}
-        :param description: string - a text description of the group
-        :return: clc_sdk.Group - the created group
+        :param group: The group to create
+        :param parent: The parent group for {group}
+        :param description: a text description of the group
+        :return: The created group
         """
         group = None
         parent = clc_common.find_group(self.module, self.root_group,

@@ -43,7 +43,6 @@ options:
     example: UC1
 requirements:
   - python = 2.7
-  - requests >= 2.5.0
 author: "CLC Runner (@clc-runner)"
 notes:
   - To use this module, it is required to set the below environmental variables which enable access to CLC
@@ -151,23 +150,7 @@ loadbalancer:
 
 __version__ = '{version}'
 
-from distutils.version import LooseVersion
-
-try:
-    import requests
-except ImportError:
-    REQUESTS_FOUND = False
-else:
-    REQUESTS_FOUND = True
-
-try:
-    import clc as clc_sdk
-    from clc import APIFailedResponse
-except ImportError:
-    CLC_FOUND = False
-    clc_sdk = None
-else:
-    CLC_FOUND = True
+import clc_ansible_utils.clc as clc_common
 
 
 class ClcLoadbalancerFact(object):
@@ -176,42 +159,31 @@ class ClcLoadbalancerFact(object):
         """
         Build module
         """
-        self.clc = clc_sdk
+        self.clc_auth = {}
         self.module = module
-        self.lb_dict = {}
-
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-        if not REQUESTS_FOUND:
-            self.module.fail_json(
-                msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(
-                requests.__version__) < LooseVersion('2.5.0'):
-            self.module.fail_json(
-                msg='requests library  version should be >= 2.5.0')
 
     def process_request(self):
         """
         Process the request - Main Code Path
         :return: Returns with either an exist_json or fail_json
         """
-        self._set_clc_credentials_from_env()
         name = self.module.params.get('name')
         location = self.module.params.get('location')
         alias = self.module.params.get('alias')
-        result = None
 
-        self.lb_dict = self._get_loadbalancer_list(
-            alias=alias,
-            location=location)
+        self.clc_auth = clc_common.authenticate(self.module)
 
-        try:
-            result = self._get_endpoint(alias, location, name)
-        except APIFailedResponse as e:
-            self.module.fail_json(msg=e.response_text)
+        loadbalancer = clc_common.find_loadbalancer(
+            self.module, self.clc_auth, name,
+            alias=alias, location=location)
 
-        self.module.exit_json(changed=False, loadbalancer=result)
+        if loadbalancer is None:
+            return self.module.fail_json(
+                msg='Load balancer with name: {name} does not exist '
+                    'for account: {alias} at location: {location}.'.format(
+                        name=name, alias=alias, location=location))
+
+        self.module.exit_json(changed=False, loadbalancer=loadbalancer)
 
     @staticmethod
     def _define_module_argument_spec():
@@ -222,80 +194,6 @@ class ClcLoadbalancerFact(object):
         return {"argument_spec": dict(name=dict(required=True),
                                       location=dict(required=True),
                                       alias=dict(required=True))}
-
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials on the sdk by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        api_url = env.get('CLC_V2_API_URL', False)
-
-        if api_url:
-            self.clc.defaults.ENDPOINT_URL_V2 = api_url
-
-        if v2_api_token and clc_alias:
-            self.clc._LOGIN_TOKEN_V2 = v2_api_token
-            self.clc._V2_ENABLED = True
-            self.clc.ALIAS = clc_alias
-        elif v2_api_username and v2_api_passwd:
-            self.clc.v2.SetCredentials(
-                api_username=v2_api_username,
-                api_passwd=v2_api_passwd)
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
-
-    def _get_loadbalancer_list(self, alias, location):
-        """
-        Retrieve a list of loadbalancers
-        :param alias: Alias for account
-        :param location: Datacenter
-        :return: JSON data for all loadbalancers at location
-        """
-        result = None
-        try:
-            result = self.clc.v2.API.Call(
-                'GET', '/v2/sharedLoadBalancers/%s/%s' % (alias, location))
-        except APIFailedResponse as e:
-            self.module.fail_json(
-                msg='Unable to fetch load balancers for account: {0} at location: {1}. {2}'.format(
-                    alias, location, str(e.message)))
-        return result
-
-    def _get_loadbalancer_id(self, name):
-        """
-        Retrieves unique ID of loadbalancer
-        :param name: Name of loadbalancer
-        :return: Unique ID of the loadbalancer
-        """
-        lb_id = None
-        for lb in self.lb_dict:
-            if lb.get('name') == name:
-                lb_id = lb.get('id')
-        return lb_id
-
-    def _get_endpoint(self, alias, location, name):
-        lb_id = self._get_loadbalancer_id(name=name)
-        if not lb_id:
-            self.module.fail_json(
-                msg='load balancer {0} does not exist for account: {1} at location: {2}'.format(
-                    name, alias, location
-                )
-            )
-        try:
-            return self.clc.v2.API.Call(
-                'GET', '/v2/sharedLoadBalancers/%s/%s/%s' % (alias, location, lb_id))
-        except APIFailedResponse as e:
-            self.module.fail_json(
-                msg='Unable to get information for load balancer {0} with account: {1} at location: {2}. {3}'.format(
-                    name, alias, location, str(e.message)))
-
 
 
 def main():

@@ -16,85 +16,59 @@
 # limitations under the License.
 
 import unittest
-import requests
-from uuid import UUID
-import clc as clc_sdk
-from clc import CLCException
-from clc import APIFailedResponse
 import json
 import mock
-from mock import patch, create_autospec
+from mock import patch
 
 import clc_ansible_module.clc_loadbalancer_fact as clc_loadbalancer_fact
 from clc_ansible_module.clc_loadbalancer_fact import ClcLoadbalancerFact
+
+import clc_ansible_utils.clc as clc_common
+
 
 class TestClcLoadbalancerFact(unittest.TestCase):
 
     def setUp(self):
         self.clc = mock.MagicMock()
         self.module = mock.MagicMock()
-        self.datacenter = mock.MagicMock()
 
-    def test_clc_module_not_found(self):
-        # Setup Mock Import Function
-        real_import = __import__
+    @patch.object(clc_common, 'authenticate')
+    @patch.object(clc_common, 'find_loadbalancer')
+    def test_process_request(self, mock_find_loadbalancer, mock_authenticate):
+        loadbalancer = {'name': 'mock_name', 'id': 'mock_id'}
+        mock_find_loadbalancer.return_value = loadbalancer
 
-        def mock_import(name, *args):
-            if name == 'clc':
-                raise ImportError
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_loadbalancer_fact)
-            ClcLoadbalancerFact(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(
-            msg='clc-python-sdk required for this module')
+        under_test = ClcLoadbalancerFact(self.module)
+        under_test.module.params = {
+            'name': 'mock_name',
+            'alias': 'mock_alias',
+            'location': 'mock_dc'
+        }
 
-        # Reset
-        reload(clc_loadbalancer_fact)
+        result = under_test.process_request()
 
-    def test_requests_invalid_version(self):
-        # Setup Mock Import Function
-        real_import = __import__
+        self.assertEqual(result, loadbalancer)
+        self.module.exit_json.assert_called_once_with(changed=False,
+                                                      loadbalancer=loadbalancer)
+        self.assertFalse(self.module.fail_json.called)
 
-        def mock_import(name, *args):
-            if name == 'requests':
-                args[0]['requests'].__version__ = '2.4.0'
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_loadbalancer_fact)
-            ClcLoadbalancerFact(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(
-            msg='requests library  version should be >= 2.5.0')
+    @patch.object(clc_common, 'authenticate')
+    @patch.object(clc_common, 'find_loadbalancer')
+    def test_process_request(self, mock_find_loadbalancer, mock_authenticate):
+        mock_find_loadbalancer.return_value = None
 
-        # Reset
-        reload(clc_loadbalancer_fact)
+        under_test = ClcLoadbalancerFact(self.module)
+        under_test.module.params = {
+            'name': 'mock_name',
+            'alias': 'mock_alias',
+            'location': 'mock_dc'
+        }
 
-    def test_requests_module_not_found(self):
-        # Setup Mock Import Function
-        real_import = __import__
+        result = under_test.process_request()
 
-        def mock_import(name, *args):
-            if name == 'requests':
-                args[0]['requests'].__version__ = '2.7.0'
-                raise ImportError
-            return real_import(name, *args)
-        # Under Test
-        with mock.patch('__builtin__.__import__', side_effect=mock_import):
-            reload(clc_loadbalancer_fact)
-            ClcLoadbalancerFact(self.module)
-        # Assert Expected Behavior
-        self.module.fail_json.assert_called_with(
-            msg='requests library is required for this module')
-
-        # Reset
-        reload(clc_loadbalancer_fact)
-
-    def test_process_request(self):
-        pass
+        self.module.fail_json.assert_called_once_with(
+            msg='Load balancer with name: mock_name does not exist '
+                'for account: mock_alias at location: mock_dc.')
 
     def test_define_argument_spec(self):
         result = ClcLoadbalancerFact._define_module_argument_spec()
@@ -106,53 +80,19 @@ class TestClcLoadbalancerFact(unittest.TestCase):
              'location': {'required': True},
              'alias': {'required': True}})
 
-    def test_set_clc_credentials_from_env(self):
-        # Required combination of credentials not passed
-        with patch.dict(
-                'os.environ', {
-                    'CLC_V2_API_URL': 'http://unittest.example.com',
-                },
-                clear=True):
-            under_test = ClcLoadbalancerFact(self.module)
-            under_test._set_clc_credentials_from_env()
-        self.assertEqual(under_test.clc.defaults.ENDPOINT_URL_V2,
-                         'http://unittest.example.com')
-        self.module.fail_json.assert_called_with(
-            msg='You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD '
-                'environment variables')
-        # Token and alias
-        with patch.dict(
-                'os.environ', {
-                    'CLC_V2_API_URL': 'http://unittest.example.com',
-                    'CLC_V2_API_TOKEN': 'dummy_token',
-                    'CLC_ACCT_ALIAS': 'dummy_alias',
-                },
-                clear=True):
-            under_test = ClcLoadbalancerFact(self.module)
-            under_test._set_clc_credentials_from_env()
-        self.assertEqual(under_test.clc._LOGIN_TOKEN_V2, 'dummy_token')
-        self.assertTrue(under_test.clc._V2_ENABLED)
-        self.assertEqual(under_test.clc.ALIAS, 'dummy_alias')
-        # Username and password
-        # Mock requests response from endpoint
+    @patch.object(clc_loadbalancer_fact, 'AnsibleModule')
+    @patch.object(clc_loadbalancer_fact, 'ClcLoadbalancerFact')
+    def test_main(self, mock_ClcLoadbalancerFact, mock_AnsibleModule):
+        mock_ClcLoadbalancerFact_instance  = mock.MagicMock()
+        mock_AnsibleModule_instance = mock.MagicMock()
+        mock_ClcLoadbalancerFact.return_value = mock_ClcLoadbalancerFact_instance
+        mock_AnsibleModule.return_value = mock_AnsibleModule_instance
 
-    def test_get_loadbalancer_list(self):
-        pass
+        clc_loadbalancer_fact.main()
 
-    def test_loadbalancer_id(self):
-        under_test = ClcLoadbalancerFact(self.module)
-        # Figure out correct object type
-        under_test.lb_dict = [
-            {'name': 'lb1', 'id': 'lb_id1'},
-            {'name': 'lb2', 'id': 'lb_id2'},
-            {'name': 'lb4', 'id': 'lb_id4'},
-        ]
-        self.assertEqual(under_test._get_loadbalancer_id('lb1'), 'lb_id1')
-        self.assertEqual(under_test._get_loadbalancer_id('lb2'), 'lb_id2')
-        self.assertIsNone(under_test._get_loadbalancer_id('lb3'))
-
-    def test_get_endpoint(self):
-        pass
+        mock_ClcLoadbalancerFact.assert_called_once_with(
+            mock_AnsibleModule_instance)
+        assert mock_ClcLoadbalancerFact_instance.process_request.call_count == 1
 
 
 if __name__ == '__main__':

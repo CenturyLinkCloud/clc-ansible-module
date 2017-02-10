@@ -254,7 +254,9 @@ class ClcLoadBalancer(object):
 
         state = p.get('state')
 
-        self.load_balancers = self._get_loadbalancer_list()
+        self.load_balancers = clc_common.loadbalancer_list(
+            self.module, self.clc_auth,
+            alias=p.get('alias'), location=p.get('location'))
 
         if state == 'present':
             changed, result_lb = self.ensure_loadbalancer_present()
@@ -613,46 +615,22 @@ class ClcLoadBalancer(object):
                         msg=e.message))
         return result
 
-    def _get_loadbalancer_list(self):
-        """
-        Retrieve a list of loadbalancers
-        :return: JSON data for all loadbalancers at datacenter
-        """
-        result = None
-        alias = self.module.params.get('alias')
-        location = self.module.params.get('location')
-        try:
-            result = clc_common.call_clc_api(
-                self.module, self.clc_auth,
-                'GET', '/sharedLoadBalancers/{alias}/{location}'.format(
-                    alias=alias, location=location))
-        except ClcApiException as e:
-            self.module.fail_json(
-                msg='Unable to fetch load balancers for account: {alias} '
-                    'in location: {location}. {msg}'.format(
-                        alias=alias, location=location, msg=str(e.message)))
-        return result
-
     def _find_loadbalancer(self, search_key=None, refresh=False):
         """
         Retrieves load balancer matching search key
         :param search_key: Id or name of load balancer
+        :param refresh: Boolean on whether to refresh the data
         :return: Matching load balancer dictionary
         """
-        lb_list = []
+        alias = self.module.params.get('alias')
+        location = self.module.params.get('location')
         if refresh:
-            self.load_balancers = self._get_loadbalancer_list()
-        for lb in self.load_balancers:
-            if search_key.lower() in (lb['id'].lower(), lb['name'].lower()):
-                lb_list.append(lb)
-        num_lb = len(lb_list)
-        if num_lb > 1:
-            return self.module.fail_json(
-                msg='Multiple load balancers matching: {search}. '
-                    'Load balancer ids: {ids}'.format(
-                        search=search_key,
-                        ids=', '.join([l['id'] for l in lb_list])))
-        return lb_list[0] if num_lb > 0 else None
+            self.load_balancers = clc_common.loadbalancer_list(
+                self.module, self.clc_auth, alias=alias, location=location)
+        loadbalancer = clc_common.find_loadbalancer(
+            self.module, self.clc_auth, search_key,
+            load_balancers=self.load_balancers)
+        return loadbalancer
 
     def _find_pool(self, loadbalancer):
         p = self.module.params

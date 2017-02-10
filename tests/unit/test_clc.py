@@ -374,3 +374,52 @@ class TestClcCommonFunctions(unittest.TestCase):
 
         self.assertIsNone(policy)
         self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_loadbalancer_list(self, mock_call_api):
+        loadbalancer_existing = {'id': 'mock_id', 'name': 'mock_name'}
+        mock_call_api.return_value = [loadbalancer_existing]
+
+        clc_auth = {'clc_alias': 'mock_alias', 'clc_location': 'mock_dc'}
+        result = clc_common.loadbalancer_list(self.module, clc_auth)
+
+        self.assertEqual(result, [loadbalancer_existing])
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_loadbalancer_list_exception(self, mock_call_api):
+        error = ClcApiException('Failed')
+        mock_call_api.side_effect = error
+
+        clc_auth = {'clc_alias': 'mock_alias', 'clc_location': 'mock_dc'}
+        result = clc_common.loadbalancer_list(self.module, clc_auth)
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Unable to fetch load balancers for account: mock_alias '
+                'in location: mock_dc. Failed')
+
+    @patch.object(clc_common, 'loadbalancer_list')
+    def test_find_loadbalancer(self, mock_loadbalancer_list):
+        loadbalancer_existing = {'id': 'mock_id', 'name': 'mock_name'}
+        mock_loadbalancer_list.return_value = [loadbalancer_existing]
+
+        result = clc_common.find_loadbalancer(self.module, {},
+                                              loadbalancer_existing['id'])
+
+        self.assertEqual(result, loadbalancer_existing)
+
+    @patch.object(clc_common, 'loadbalancer_list')
+    def test_find_loadbalancer_exception(self, mock_loadbalancer_list):
+        loadbalancer_existing = {'id': 'mock_id', 'name': 'mock_name'}
+        mock_loadbalancer_list.return_value = [loadbalancer_existing,
+                                               loadbalancer_existing]
+
+        result = clc_common.find_loadbalancer(
+            self.module, {}, loadbalancer_existing['name'])
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Multiple load balancers matching: {search}. '
+                'Load balancer ids: {ids}'.format(
+                    search=loadbalancer_existing['name'],
+                    ids=', '.join([loadbalancer_existing['id'],
+                                   loadbalancer_existing['id']])))
