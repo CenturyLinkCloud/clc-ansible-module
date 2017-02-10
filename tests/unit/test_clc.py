@@ -140,6 +140,42 @@ class TestClcCommonFunctions(unittest.TestCase):
             clc_common.find_group(
                 self.module, mock_rootgroup, 'MockGroup', 'MissingParent'))
 
+    @patch.object(clc_common, 'servers_by_id')
+    def test_servers_in_group(self, mock_servers):
+        group = mock.MagicMock()
+        group.data = {
+            'links': [
+                {'rel': 'server', 'id': 'mock_id1'},
+                {'rel': 'server', 'id': 'mock_id2'}
+                ]
+            }
+        server1 = clc_common.Server({'id': 'mock_id1',
+                                     'details': {'memoryMB': 2048,
+                                                 'powerState': 'started'}})
+        server2 = clc_common.Server({'id': 'mock_id2',
+                                     'details': {'memoryMB': 2048,
+                                                 'powerState': 'started'}})
+        mock_servers.return_value = [server1, server2]
+
+        res = clc_common.servers_in_group(self.module, {}, group)
+
+        self.assertEqual(res, [server1, server2])
+
+    @patch.object(clc_common, 'group_tree')
+    def test_server_ids_in_datacenter(self, mock_group_tree):
+        child_group = mock.MagicMock()
+        child_group.data = {'links': [{'rel': 'server', 'id': 'mock_id2'}]}
+        root_group = mock.MagicMock()
+        root_group.data  = {'links': [{'rel': 'server', 'id': 'mock_id1'}]}
+        root_group.children = [child_group]
+
+        mock_group_tree.return_value = root_group
+
+        servers = clc_common.server_ids_in_datacenter(self.module, {}, 'dc',
+                                                      root_group=None)
+
+        self.assertEqual(servers, ['mock_id1', 'mock_id2'])
+
     @patch.object(clc_common, 'networks_in_datacenter')
     def test_find_network_default(self, mock_networks_datacenter):
         # Setup

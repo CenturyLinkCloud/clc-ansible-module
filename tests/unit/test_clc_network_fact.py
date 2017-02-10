@@ -111,6 +111,19 @@ class TestClcNetworkFactFunctions(unittest.TestCase):
             {'id': {'required': False},
              'location': {'required': True}})
 
+    @patch.object(clc_network_fact, 'AnsibleModule')
+    @patch.object(clc_network_fact, 'ClcNetworkFact')
+    def test_main(self, mock_ClcNetworkFact, mock_AnsibleModule):
+        mock_ClcNetworkFact_instance        = mock.MagicMock()
+        mock_AnsibleModule_instance     = mock.MagicMock()
+        mock_ClcNetworkFact.return_value    = mock_ClcNetworkFact_instance
+        mock_AnsibleModule.return_value = mock_AnsibleModule_instance
+
+        clc_network_fact.main()
+
+        mock_ClcNetworkFact.assert_called_once_with(mock_AnsibleModule_instance)
+        assert mock_ClcNetworkFact_instance.process_request.call_count == 1
+
 
 if __name__ == '__main__':
     unittest.main()

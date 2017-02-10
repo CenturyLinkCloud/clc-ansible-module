@@ -549,6 +549,18 @@ class TestClcNetwork(unittest.TestCase):
             msg='Unable to release network: {id} in location: mock_loc. '
                 'FAIL'.format(id=network.id))
 
+    @patch.object(clc_common, 'wait_on_completed_operations')
+    def test_wait_for_request(self, mock_wait):
+        mock_wait.return_value = 1
+        under_test = ClcNetwork(self.module)
+        under_test.module.params = {'wait': True}
+
+        under_test._wait_for_requests([mock.MagicMock()])
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Unable to process network request')
+
+
 
 if __name__ == '__main__':
     unittest.main()
