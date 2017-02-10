@@ -74,7 +74,7 @@ class TestClcServerFunctions(unittest.TestCase):
         # Assert
         self.module.exit_json.assert_called_once_with(
             changed=True,
-            group={"id": "1111111", "servers": ["EXISTING_SERVER"]},
+            group=None,
             servers=[],
             server_ids=['TEST_SERVER'],
             partially_created_server_ids=[])
@@ -378,7 +378,7 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_start_stop.assert_called_once_with(['TEST_SERVER'])
         self.module.exit_json.assert_called_once_with(
             changed=True,
-            group={'id': '1111111', 'servers': ['TEST_SERVER']},
+            group=None,
             servers=[mock_server.data],
             server_ids=['TEST_SERVER'],
             partially_created_server_ids=[])

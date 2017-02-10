@@ -588,14 +588,15 @@ class ClcServer(object):
         wait = self.module.params.get('wait')
         if wait:
             datacenter = self._find_datacenter()
-            group = self._find_group(datacenter, lookup_group=p.get('group'))
-            try:
-                servers = clc_common.servers_in_group(
-                    self.module, self.clc_auth, group)
-                group = group.data
-                group['servers'] = [s.id for s in servers]
-            except AttributeError:
-                group = group.name
+            if state == 'present':
+                group = self._find_group(datacenter, lookup_group=p.get('group'))
+                try:
+                    servers = clc_common.servers_in_group(
+                        self.module, self.clc_auth, group)
+                    group = group.data
+                    group['servers'] = [s.id for s in servers]
+                except AttributeError:
+                    group = group.name
 
         self.module.exit_json(
             changed=changed,
@@ -707,11 +708,12 @@ class ClcServer(object):
         ClcServer._validate_counts(module)
 
         params['alias'] = alias
-        group = self._find_group(datacenter)
-        group.defaults = self._group_defaults(group)
-        params['group'] = group.id
-        params['cpu'] = self._find_cpu(group)
-        params['memory'] = self._find_memory(group)
+        if params['state'] == 'present':
+            group = self._find_group(datacenter)
+            group.defaults = self._group_defaults(group)
+            params['group'] = group.id
+            params['cpu'] = self._find_cpu(group)
+            params['memory'] = self._find_memory(group)
         params['description'] = ClcServer._find_description(module)
         params['ttl'] = ClcServer._find_ttl(module)
         params['template'] = self._find_template_id(datacenter)
