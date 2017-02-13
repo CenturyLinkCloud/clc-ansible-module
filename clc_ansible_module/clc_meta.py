@@ -1,68 +1,26 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 
-try:
-    import requests
-except ImportError:
-    REQUESTS_FOUND = False
-else:
-    REQUESTS_FOUND = True
+import urllib
+import urllib2
+
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
+
 
 class ClcMeta:
 
     def __init__(self, module):
 
-        if not REQUESTS_FOUND:
-            self.module.fail_json(
-                msg='requests library is required for this module')
-
+        self.clc_auth = {}
         self.module = module
-        self.api_url = ''
-        self.headers = {}
-        self._set_clc_credentials_from_env()
-
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        self.api_url = env.get('CLC_V2_API_URL', 'https://api.ctl.io')
-        self.meta_api_url = env.get('META_API_URL', 'https://api.runner.ctl.io')
-
-        if v2_api_token and clc_alias:
-
-            self.v2_api_token = v2_api_token
-            self.clc_alias = clc_alias
-
-        elif v2_api_username and v2_api_passwd:
-
-            r = requests.post(self.api_url + '/v2/authentication/login', json={
-                'username': v2_api_username,
-                'password': v2_api_passwd
-            })
-
-            if r.status_code not in [200]:
-                self.module.fail_json(
-                    msg='Failed to authenticate with clc V2 api.')
-
-            r = r.json()
-            self.v2_api_token = r['bearerToken']
-            self.clc_alias = r['accountAlias']
-
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
-
+        self.meta_api_url = os.environ.get('META_API_URL',
+                                           'https://api.runner.ctl.io')
 
     def create_meta(self, params):
 
         model = {
-            'accountAlias' :  self.clc_alias,
+            'accountAlias':  self.clc_auth['clc_alias'],
             'jobId' : params.get('jobId'),
             'executionId' : params.get('executionId'),
             'referenceId' : params.get('referenceId'),
@@ -71,33 +29,91 @@ class ClcMeta:
             'data' : params.get('data')
         }
 
-        state = 'created'
-        r = requests.post(self.meta_api_url + '/meta/' + self.clc_alias + '/references/' + params.get('referenceId'),
-            json=model, headers={ 'Authorization': 'Bearer ' + self.v2_api_token }, verify=False)
+        state = params.get('state')
+        changed = False
+        try:
+            response = open_url(
+                url='{meta_api}/meta/{alias}/references/{id}'.format(
+                    meta_api=self.meta_api_url,
+                    alias=self.clc_auth['clc_alias'],
+                    id=params.get('referenceId')
+                ),
+                method='POST',
+                headers={'Authorization': 'Bearer {token}'.format(
+                            token=self.clc_auth['v2_api_token']),
+                         'Content-Type': 'application/json'},
+                data=json.dumps(model)
+            )
+            changed = True
+            state = 'created'
+        except urllib2.HTTPError as ex:
+            if ex.code == 409:
+                try:
+                    response = open_url(
+                        url='{meta_api}/meta/{alias}/references/{id}'
+                            '/values/{name}'.format(
+                                meta_api=self.meta_api_url,
+                                alias=self.clc_auth['clc_alias'],
+                                id=params.get('referenceId'),
+                                name=params.get('name')
+                            ),
+                        method='PUT',
+                        headers={'Authorization': 'Bearer {token}'.format(
+                                    token=self.clc_auth['v2_api_token']),
+                                 'Content-Type': 'application/json'},
+                        data=json.dumps(model)
+                    )
+                    changed = True
+                    state = 'updated'
+                except urllib2.HTTPError as ex:
+                    return self.module.fail_json(
+                        msg='Failed to update metadata with name: {name}. '
+                            '{code}: {msg}'.format(name=params.get('name'),
+                                                   code=ex.code,
+                                                   msg=ex.reason))
+            else:
+                return self.module.fail_json(
+                    msg='Failed to create metadata with name: {name}. '
+                        '{code}: {msg}'.format(name=params.get('name'),
+                                               code=ex.code,
+                                               msg=ex.reason))
 
-        if r.status_code in [409]:
-            state = 'updated'
-            r = requests.put(self.meta_api_url + '/meta/' + self.clc_alias + '/references/' + params.get('referenceId') + '/values/' + params.get('name'),
-                json=model, headers={ 'Authorization': 'Bearer ' + self.v2_api_token }, verify=False)
-
-        if r.status_code not in [200]:
-            self.module.fail_json(msg='Failed to create or update metadata. name:[%s]' % params.get('name'))
-
-        self.module.exit_json(changed=True, content={ 'state' : state, 'payload' : model })
+        if changed:
+            model = json.loads(response.read())
+        return self.module.exit_json(
+            changed=changed,
+            content={'state': state, 'payload': model})
 
     def delete_meta(self, params):
+        state = params.get('state')
+        changed = False
+        try:
+            response = open_url(
+                url='{meta_api}/meta/{alias}/references/{id}'
+                    '/values/{name}'.format(
+                        meta_api=self.meta_api_url,
+                        alias=self.clc_auth['clc_alias'],
+                        id=params.get('referenceId'),
+                        name=params.get('name')
+                    ),
+                method='DELETE',
+                headers={'Authorization': 'Bearer {token}'.format(
+                            token=self.clc_auth['v2_api_token'])}
+            )
+            changed = True
+            state = 'deleted'
+        except urllib2.HTTPError as ex:
+            if ex.code != 404:
+                return self.module.fail_json(
+                    msg='Failed to delete metadata with name: {name}. '
+                        '{msg}'.format(name=params.get('name'),
+                                       msg=ex.reason))
 
-        state = 'deleted'
-        r = requests.delete(self.meta_api_url + '/meta/' + self.clc_alias + '/references/' + params.get('referenceId') + '/values/' + params.get('name'),
-            headers={ 'Authorization': 'Bearer ' + self.v2_api_token }, verify=False)
-
-        if r.status_code not in [200, 404]:
-            self.module.fail_json(msg='Failed to delete metadata. name:[%s]' % params.get('name'))
-
-        self.module.exit_json(changed=True, content={ 'state' : state })
-
+        return self.module.exit_json(changed=changed, content={'state': state})
 
     def process_request(self):
+        self.clc_auth = clc_common.authenticate(self.module)
+
         params = self.module.params
         state = params.get('state')
         if state == 'present':
@@ -105,24 +121,22 @@ class ClcMeta:
         elif state == 'absent':
             return self.delete_meta(params)
 
-
     @staticmethod
-    def _define_module_argument_spec():
+    def _define_argument_spec():
         """
         Define the argument spec for the ansible module
         :return: argument spec dictionary
         """
         argument_spec = dict(
-            jobId=dict(required=True),
-            executionId=dict(required=True),
-            referenceId=dict(required=True),
-            name=dict(required=True),
-            description=dict(required=True),
-            data=dict(required=True),
-            state=dict(choices=['present', 'absent']))
+            jobId=dict(type='str', required=True),
+            executionId=dict(type='str', required=True),
+            referenceId=dict(type='str', required=True),
+            name=dict(type='str', required=True),
+            description=dict(type='str', required=True),
+            data=dict(type='dict', required=True),
+            state=dict(type='str', choices=['present', 'absent']))
 
-
-        return {"argument_spec": argument_spec}
+        return argument_spec
 
 
 def main():
@@ -130,14 +144,14 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    argument_dict = ClcMeta._define_module_argument_spec()
-    module = AnsibleModule(supports_check_mode=True, **argument_dict)
-    clc_meta_fact = ClcMeta(module)
+    module = AnsibleModule(argument_spec=ClcMeta._define_argument_spec(),
+                           supports_check_mode=True)
+    clc_meta = ClcMeta(module)
 
-    changed, response = clc_meta_fact.process_request()
-    module.exit_json(changed=changed, meta=response)
+    clc_meta.process_request()
 
 from ansible.module_utils.basic import *  # pylint: disable=W0614
+from ansible.module_utils.urls import *  # pylint: disable=W0614
 
 if __name__ == '__main__':
     main()
