@@ -1,11 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import urllib
 import urllib2
 
 import clc_ansible_utils.clc as clc_common
-from clc_ansible_utils.clc import ClcApiException
 
 
 class ClcMeta:
@@ -68,15 +66,13 @@ class ClcMeta:
                 except urllib2.HTTPError as ex:
                     return self.module.fail_json(
                         msg='Failed to update metadata with name: {name}. '
-                            '{code}: {msg}'.format(name=params.get('name'),
-                                                   code=ex.code,
-                                                   msg=ex.reason))
+                            '{msg}'.format(name=params.get('name'),
+                                           msg=ex.reason))
             else:
                 return self.module.fail_json(
                     msg='Failed to create metadata with name: {name}. '
-                        '{code}: {msg}'.format(name=params.get('name'),
-                                               code=ex.code,
-                                               msg=ex.reason))
+                        '{msg}'.format(name=params.get('name'),
+                                       msg=ex.reason))
 
         if changed:
             model = json.loads(response.read())
@@ -134,9 +130,10 @@ class ClcMeta:
             name=dict(type='str', required=True),
             description=dict(type='str', required=True),
             data=dict(type='dict', required=True),
-            state=dict(type='str', choices=['present', 'absent']))
+            state=dict(type='str', required=True,
+                       choices=['present', 'absent']))
 
-        return argument_spec
+        return {'argument_spec': argument_spec}
 
 
 def main():
@@ -144,8 +141,8 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    module = AnsibleModule(argument_spec=ClcMeta._define_argument_spec(),
-                           supports_check_mode=True)
+    argument_dict = ClcMeta._define_argument_spec()
+    module = AnsibleModule(supports_check_mode=True, **argument_dict)
     clc_meta = ClcMeta(module)
 
     clc_meta.process_request()

@@ -4,7 +4,6 @@
 import urllib2
 
 import clc_ansible_utils.clc as clc_common
-from clc_ansible_utils.clc import ClcApiException
 
 
 class ClcMetaFact:
@@ -43,7 +42,7 @@ class ClcMetaFact:
                             token=self.clc_auth['v2_api_token']),
                          'Content-Type': 'text/plain'})
         except urllib2.HTTPError as ex:
-            self.module.fail_json(
+            return self.module.fail_json(
                 msg='Failed to fetch metadata facts. {msg}'.format(
                     msg=ex.reason))
 
@@ -63,7 +62,7 @@ class ClcMetaFact:
             referenceId=dict(type='str', required=False, default=None),
             name=dict(type='str', required=False, default=None))
 
-        return argument_spec
+        return {'argument_spec': argument_spec}
 
 
 def main():
@@ -71,8 +70,8 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    module = AnsibleModule(argument_spec=ClcMetaFact._define_argument_spec(),
-                           supports_check_mode=True)
+    argument_dict = ClcMetaFact._define_argument_spec()
+    module = AnsibleModule(supports_check_mode=True, **argument_dict)
     clc_meta_fact = ClcMetaFact(module)
 
     clc_meta_fact.process_request()
