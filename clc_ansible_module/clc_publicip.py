@@ -217,7 +217,7 @@ class ClcPublicIp(object):
                 msg='Must specify either server_id or server_ids.')
         if not protocol or not ports:
             return self.module.fail_json(
-                msg="Must specify protocol and ports when state is present")
+                msg='Must specify protocol and ports when state is present.')
 
         if not server_ids:
             server_ids = [server_id]
@@ -232,7 +232,7 @@ class ClcPublicIp(object):
         servers = [clc_common.server_ip_addresses(self.module, self.clc_auth, s)
                    for s in servers]
 
-        ports_to_expose = [{'protocol': protocol, 'port': port}
+        ports_to_expose = [{'protocol': protocol, 'port': int(port)}
                            for port in ports]
         ports_to_expose.append({'protocol': 'ICMP', 'port': 0})
         if source_restrictions:
@@ -246,13 +246,15 @@ class ClcPublicIp(object):
                     if internal_ip not in [i['internal'] for i in ips]:
                         return self.module.fail_json(
                             msg='Internal IP address: {ip} is not present on '
-                                'server: {id}'.format(ip=internal_ip,
-                                                      id=server.id))
+                                'server: {id}.'.format(ip=internal_ip,
+                                                       id=server.id))
                     else:
                         ip = [i for i in ips if i['internal'] == internal_ip][0]
                         if 'public' in ip:
                             public_ip = ip['public']
-
+                else:
+                    if 'publicip' in server.data:
+                        public_ip = server.data['publicip']
                 if public_ip:
                     update_required = self._update_publicip_required(
                         server, public_ip,
@@ -300,7 +302,8 @@ class ClcPublicIp(object):
                 'GET',
                 '/servers/{alias}/{id}/publicIPAddresses/{ip}'.format(
                     alias=self.clc_auth['clc_alias'], id=server.id,
-                    ip=ip_address))
+                    ip=ip_address),
+                timeout=60)
         except ClcApiException as ex:
             return self.module.fail_json(
                 msg='Failed to get public ip: {ip} on the server: {id}. '
@@ -380,8 +383,9 @@ class ClcPublicIp(object):
         ips = [ip for ip in server.data['details']['ipAddresses']
                if 'public' in ip]
         for ip in ips:
-            if internal_ip and ip['internal'] == internal_ip:
-                results.append(self._delete_publicip(server, ip['public']))
+            if internal_ip and ip['internal'] != internal_ip:
+                continue
+            results.append(self._delete_publicip(server, ip['public']))
         return results
 
     def _delete_publicip(self, server, ip_address):
