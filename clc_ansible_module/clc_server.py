@@ -1217,13 +1217,15 @@ class ClcServer(object):
                 {'protocol': public_ip_protocol, 'port': port})
         if not self.module.check_mode:
             for server in servers:
+                default_ip = server.data['details']['ipAddresses'][0]
                 try:
                     request = clc_common.call_clc_api(
                         self.module, self.clc_auth,
                         'POST',
                         '/servers/{alias}/{id}/publicIPAddresses'.format(
                             alias=self.clc_auth['clc_alias'], id=server.id),
-                        data={'ports': ports_lst})
+                        data={'ports': ports_lst,
+                              'internalIPAddress': default_ip['internal']})
                     request_list.append(request)
                 except ClcApiException:
                     failed_servers.append(server)

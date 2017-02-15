@@ -53,8 +53,8 @@
         template: "{{ server_template }}"
         count: 1
         group: "{{ server_group }}"
-        cpu: 2
-        memory: 2
+        cpu: 1
+        memory: 1
         add_public_ip: True
         public_ip_protocol: TCP
         public_ip_ports: 443

@@ -69,8 +69,6 @@ options:
     required: False
 requirements:
     - python = 2.7
-    - requests >= 2.5.0
-    - clc-sdk
 author: "CLC Runner (@clc-runner)"
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
@@ -142,74 +140,36 @@ server_ids:
 
 __version__ = '${version}'
 
-from distutils.version import LooseVersion
-
-try:
-    import requests
-except ImportError:
-    REQUESTS_FOUND = False
-else:
-    REQUESTS_FOUND = True
-
-#
-#  Requires the clc-python-sdk.
-#  sudo pip install clc-sdk
-#
-try:
-    import clc as clc_sdk
-    from clc import CLCException
-except ImportError:
-    CLC_FOUND = False
-    clc_sdk = None
-else:
-    CLC_FOUND = True
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
 
 
 class ClcPublicIp(object):
-    clc = clc_sdk
-    module = None
 
     def __init__(self, module):
         """
         Construct module
         """
+        self.clc_auth = {}
         self.module = module
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-        if not REQUESTS_FOUND:
-            self.module.fail_json(
-                msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(requests.__version__) < LooseVersion('2.5.0'):
-            self.module.fail_json(
-                msg='requests library  version should be >= 2.5.0')
-
-        self._set_user_agent(self.clc)
 
     def process_request(self):
         """
         Process the request - Main Code Path
         :return: Returns with either an exit_json or fail_json
         """
-        self._set_clc_credentials_from_env()
-        params = self.module.params
-        server_ids = params['server_ids']
-        ports = params['ports']
-        protocol = params['protocol']
-        restrictions = params.get('source_restrictions')
-        state = params['state']
+        self.clc_auth = clc_common.authenticate(self.module)
 
-        if state == 'present':
-            changed, changed_server_ids, requests = self.ensure_public_ip_present(
-                server_ids=server_ids, protocol=protocol, ports=ports, source_restrictions=restrictions)
-        elif state == 'absent':
-            changed, changed_server_ids, requests = self.ensure_public_ip_absent(
-                server_ids=server_ids)
+        state = self.module.params['state']
+
+        if state == 'absent':
+            changed, changed_ids, requests = self.ensure_public_ip_absent()
         else:
-            return self.module.fail_json(msg="Unknown State: " + state)
+            changed, changed_ids, requests = self.ensure_public_ip_present()
         self._wait_for_requests_to_complete(requests)
+
         return self.module.exit_json(changed=changed,
-                                     server_ids=changed_server_ids)
+                                     server_ids=changed_ids)
 
     @staticmethod
     def _define_module_argument_spec():
@@ -218,163 +178,241 @@ class ClcPublicIp(object):
         :return: argument spec dictionary
         """
         argument_spec = dict(
-            server_ids=dict(type='list', required=True),
-            protocol=dict(default='TCP', choices=['TCP', 'UDP', 'ICMP']),
+            server_ids=dict(type='list', required=False),
+            server_id=dict(type='str', default=None, required=False),
+            internal_ip=dict(type='str', default=None, required=False),
+            protocol=dict(type='str', default='TCP',
+                          choices=['TCP', 'UDP', 'ICMP']),
             ports=dict(type='list'),
             source_restrictions=dict(type='list'),
             wait=dict(type='bool', default=True),
-            state=dict(default='present', choices=['present', 'absent']),
+            state=dict(type='str', default='present',
+                       choices=['present', 'absent']),
         )
-        return argument_spec
+        mutually_exclusive = [
+            ['server_ids', 'server_id'],
+            ['server_ids', 'internal_ip']
+        ]
+        return {'argument_spec': argument_spec,
+                'mutually_exclusive': mutually_exclusive}
 
-    def ensure_public_ip_present(self, server_ids, protocol, ports, source_restrictions=None):
+    def ensure_public_ip_present(self):
         """
         Ensures the given server ids having the public ip available
-        :param server_ids: the list of server ids
-        :param protocol: the ip protocol
-        :param ports: the list of ports to expose
-        :param source_restrictions: The list of IP range allowed to access the public IP, specified using CIDR notation.
         :return: (changed, changed_server_ids, results)
                   changed: A flag indicating if there is any change
                   changed_server_ids : the list of server ids that are changed
                   results: The result list from clc public ip call
         """
+        p = self.module.params
+        server_ids = p.get('server_ids')
+        server_id = p.get('server_id')
+        protocol = p.get('protocol')
+        ports = p.get('ports')
+        internal_ip = p.get('internal_ip')
+        source_restrictions = p.get('source_restrictions')
 
-        if protocol is None or ports is None:
+        if not server_ids and not server_id:
             return self.module.fail_json(
-                msg="you must specify a protocol and ports whenever state is set to present")
+                msg='Must specify either server_id or server_ids.')
+        if not protocol or not ports:
+            return self.module.fail_json(
+                msg="Must specify protocol and ports when state is present")
+
+        if not server_ids:
+            server_ids = [server_id]
 
         changed = False
         results = []
         changed_server_ids = []
         restrictions_list = []
-        servers = self._get_servers_from_clc(
-            server_ids,
-            'Failed to obtain server list from the CLC API')
-        servers_to_change = [
-            server for server in servers if len(
-                server.PublicIPs().public_ips) == 0]
+
+        servers = clc_common.servers_by_id(
+            self.module, self.clc_auth, server_ids)
+        servers = [clc_common.server_ip_addresses(self.module, self.clc_auth, s)
+                   for s in servers]
+
         ports_to_expose = [{'protocol': protocol, 'port': port}
                            for port in ports]
-
-        ports_to_expose.append({'protocol': 'ICMP', 'port':0})
+        ports_to_expose.append({'protocol': 'ICMP', 'port': 0})
         if source_restrictions:
             restrictions_list = [{'cidr': cidr} for cidr in source_restrictions]
-        for server in servers_to_change:
+
+        for server in servers:
             if not self.module.check_mode:
-                result = self._add_publicip_to_server(server, ports_to_expose, source_restrictions=restrictions_list)
+                public_ip = None
+                if internal_ip:
+                    ips = [i for i in server.data['details']['ipAddresses']]
+                    if internal_ip not in [i['internal'] for i in ips]:
+                        return self.module.fail_json(
+                            msg='Internal IP address: {ip} is not present on '
+                                'server: {id}'.format(ip=internal_ip,
+                                                      id=server.id))
+                    else:
+                        ip = [i for i in ips if i['internal'] == internal_ip][0]
+                        if 'public' in ip:
+                            public_ip = ip['public']
+
+                if public_ip:
+                    update_required = self._update_publicip_required(
+                        server, public_ip,
+                        ports_to_expose, restrictions_list)
+                    if not update_required:
+                        continue
+                    result = self._update_publicip(
+                        server, public_ip,
+                        ports_to_expose, source_restrictions=restrictions_list)
+                else:
+                    result = self._add_publicip(
+                        server,
+                        ports_to_expose, source_restrictions=restrictions_list)
                 results.append(result)
             changed_server_ids.append(server.id)
             changed = True
         return changed, changed_server_ids, results
 
-    def _add_publicip_to_server(self, server, ports_to_expose, source_restrictions=None):
-        result = None
+    def _add_publicip(self, server, ports_to_expose, source_restrictions=None):
+        internal_ip = self.module.params.get('internal_ip')
+        if not internal_ip:
+            internal_ip = server.data['details']['ipAddresses'][0]['internal']
+        payload = {'ports': ports_to_expose,
+                   'internalIPAddress': internal_ip}
+        if source_restrictions:
+            payload['sourceRestrictions'] = source_restrictions
         try:
-            result = server.PublicIPs().Add(ports=ports_to_expose, source_restrictions=source_restrictions)
-        except CLCException as ex:
-            self.module.fail_json(msg='Failed to add public ip to the server : {0}. {1}'.format(
-                server.id, ex.response_text
-            ))
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'POST',
+                '/servers/{alias}/{id}/publicIPAddresses'.format(
+                    alias=self.clc_auth['clc_alias'], id=server.id),
+                data=payload)
+        except ClcApiException as ex:
+            return self.module.fail_json(
+                msg='Failed to add public ip to the server: {id}. '
+                    '{msg}'.format(id=server.id, msg=ex.message))
         return result
 
-    def ensure_public_ip_absent(self, server_ids):
+    def _update_publicip_required(self, server, ip_address,
+                                  ports_to_expose, source_restrictions):
+        try:
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'GET',
+                '/servers/{alias}/{id}/publicIPAddresses/{ip}'.format(
+                    alias=self.clc_auth['clc_alias'], id=server.id,
+                    ip=ip_address))
+        except ClcApiException as ex:
+            return self.module.fail_json(
+                msg='Failed to get public ip: {ip} on the server: {id}. '
+                    '{msg}'.format(ip=ip_address, id=server.id,
+                                   msg=ex.message))
+        if source_restrictions != result['sourceRestrictions']:
+            return True
+        if ports_to_expose != result['ports']:
+            return True
+        return False
+
+    def _update_publicip(self, server, ip_address, ports_to_expose,
+                         source_restrictions=None):
+        payload = {'ports': ports_to_expose}
+        if source_restrictions:
+            payload['sourceRestrictions'] = source_restrictions
+        try:
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'PUT',
+                '/servers/{alias}/{id}/publicIPAddresses/{ip}'.format(
+                    alias=self.clc_auth['clc_alias'], id=server.id,
+                    ip=ip_address),
+                data=payload)
+        except ClcApiException as ex:
+            return self.module.fail_json(
+                msg='Failed to update public ip: {ip} on the server: {id}. '
+                    '{msg}'.format(ip=ip_address, id=server.id,
+                                   msg=ex.message))
+        return result
+
+    def ensure_public_ip_absent(self):
         """
         Ensures the given server ids having the public ip removed if there is any
-        :param server_ids: the list of server ids
         :return: (changed, changed_server_ids, results)
                   changed: A flag indicating if there is any change
                   changed_server_ids : the list of server ids that are changed
                   results: The result list from clc public ip call
         """
+        server_ids = self.module.params.get('server_ids')
+        server_id = self.module.params.get('server_id')
+        internal_ip = self.module.params.get('internal_ip')
+        if not server_ids and not server_id:
+            return self.module.fail_json(
+                msg='Must specify either server_id or server_ids.')
+
+        if not server_ids:
+            server_ids = [server_id]
+
         changed = False
         results = []
         changed_server_ids = []
-        servers = self._get_servers_from_clc(
-            server_ids,
-            'Failed to obtain server list from the CLC API')
-        servers_to_change = [
-            server for server in servers if len(
-                server.PublicIPs().public_ips) > 0]
-        for server in servers_to_change:
-            if not self.module.check_mode:
-                result = self._remove_publicip_from_server(server)
-                results.append(result)
-            changed_server_ids.append(server.id)
-            changed = True
+        servers = clc_common.servers_by_id(self.module, self.clc_auth,
+                                           server_ids)
+
+        servers = [clc_common.server_ip_addresses(self.module, self.clc_auth, s)
+                   for s in servers]
+        for server in servers:
+            if 'publicip' in server.data:
+                if internal_ip:
+                    internal_ips = [i['internal'] for i
+                                    in server.data['details']['ipAddresses']]
+                    if internal_ip not in internal_ips:
+                        self.module.fail_json(
+                            msg='Internal IP address: {ip} is not present on '
+                                'server: {id}'.format(ip=internal_ip,
+                                                      id=server.id))
+                if not self.module.check_mode:
+                    results.extend(self._remove_publicip_addresses(server))
+                changed_server_ids.append(server.id)
+                changed = True
         return changed, changed_server_ids, results
 
-    def _remove_publicip_from_server(self, server):
-        result = None
+    def _remove_publicip_addresses(self, server):
+        internal_ip = self.module.params.get('internal_ip')
+        results = []
+        ips = [ip for ip in server.data['details']['ipAddresses']
+               if 'public' in ip]
+        for ip in ips:
+            if internal_ip and ip['internal'] == internal_ip:
+                results.append(self._delete_publicip(server, ip['public']))
+        return results
+
+    def _delete_publicip(self, server, ip_address):
         try:
-            for ip_address in server.PublicIPs().public_ips:
-                    result = ip_address.Delete()
-        except CLCException as ex:
-            self.module.fail_json(msg='Failed to remove public ip from the server : {0}. {1}'.format(
-                server.id, ex.response_text
-            ))
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'DELETE',
+                '/servers/{alias}/{id}/publicIPAddresses/{ip}'.format(
+                    alias=self.clc_auth['clc_alias'],
+                    id=server.id, ip=ip_address))
+        except ClcApiException as ex:
+            return self.module.fail_json(
+                msg='Failed to remove public ip from the server: {id}. '
+                    '{msg}'.format(id=server.id, msg=ex.message))
         return result
 
     def _wait_for_requests_to_complete(self, requests_lst):
         """
         Waits until the CLC requests are complete if the wait argument is True
-        :param requests_lst: The list of CLC request objects
+        :param requests_lst:  a list of CLC API JSON responses
         :return: none
         """
-        if not self.module.params['wait']:
-            return
-        for request in requests_lst:
-            request.WaitUntilComplete()
-            for request_details in request.requests:
-                if request_details.Status() != 'succeeded':
-                    self.module.fail_json(
-                        msg='Unable to process public ip request')
+        wait = self.module.params.get('wait')
+        if wait:
+            failed_requests_count = clc_common.wait_on_completed_operations(
+                self.module, self.clc_auth,
+                clc_common.operation_id_list(requests_lst))
 
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials on the sdk by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        api_url = env.get('CLC_V2_API_URL', False)
-
-        if api_url:
-            self.clc.defaults.ENDPOINT_URL_V2 = api_url
-
-        if v2_api_token and clc_alias:
-            self.clc._LOGIN_TOKEN_V2 = v2_api_token
-            self.clc._V2_ENABLED = True
-            self.clc.ALIAS = clc_alias
-        elif v2_api_username and v2_api_passwd:
-            self.clc.v2.SetCredentials(
-                api_username=v2_api_username,
-                api_passwd=v2_api_passwd)
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
-
-    def _get_servers_from_clc(self, server_ids, message):
-        """
-        Gets list of servers form CLC api
-        """
-        try:
-            return self.clc.v2.Servers(server_ids).servers
-        except CLCException as exception:
-            self.module.fail_json(msg=message + ': %s' % exception)
-
-    @staticmethod
-    def _set_user_agent(clc):
-        if hasattr(clc, 'SetRequestsSession'):
-            agent_string = "ClcAnsibleModule/" + __version__
-            ses = requests.Session()
-            ses.headers.update({"Api-Client": agent_string})
-            ses.headers['User-Agent'] += " " + agent_string
-            clc.SetRequestsSession(ses)
+            if failed_requests_count > 0:
+                self.module.fail_json(
+                    msg='Unable to process public ip request')
 
 
 def main():
@@ -382,10 +420,8 @@ def main():
     The main function.  Instantiates the module and calls process_request.
     :return: none
     """
-    module = AnsibleModule(
-        argument_spec=ClcPublicIp._define_module_argument_spec(),
-        supports_check_mode=True
-    )
+    argument_dict = ClcPublicIp._define_module_argument_spec()
+    module = AnsibleModule(supports_check_mode=True, **argument_dict)
     clc_public_ip = ClcPublicIp(module)
     clc_public_ip.process_request()
 
