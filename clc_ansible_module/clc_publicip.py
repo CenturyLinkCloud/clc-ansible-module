@@ -46,7 +46,18 @@ options:
   server_ids:
     description:
       - A list of servers to create public ips on.
-    required: True
+        Required if server_id is not passed as a parameter
+    required: False
+  server_id:
+    description:
+      - ID of the server on which to create public ips.
+        Required if server_ids is not passed as a parameter
+    required: False
+  internal_ip:
+    description:
+      - Internal IP to NAT the public IP address.
+        Must already exist on the server.
+    required: False
   source_restrictions:
     description:
       - The source IP address range allowed to access the new public IP address.
