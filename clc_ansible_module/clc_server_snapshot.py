@@ -148,10 +148,7 @@ class ClcSnapshot(object):
         :return: Returns with either an exit_json or fail_json
         """
         p = self.module.params
-        server_ids = p['server_ids']
-        expiration_days = p['expiration_days']
         state = p['state']
-        ignore_failures = p['ignore_failures']
         request_list = []
         changed = False
         changed_servers = []
@@ -215,7 +212,7 @@ class ClcSnapshot(object):
         """
         if len(server.data['details']['snapshots']) > 0:
             result = self._delete_server_snapshot(server, ignore_failures)
-            self._wait_for_requests_to_complete([result],)
+            self._wait_for_requests_to_complete([result])
         result = None
         try:
             result = clc_common.call_clc_api(
