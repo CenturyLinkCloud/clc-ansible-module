@@ -251,7 +251,10 @@ def _wait_until_complete(module, clc_auth, operation_id, poll_freq=2):
     """
     time_completed = None
     while not time_completed:
-        status = operation_status(module, clc_auth, operation_id)
+        try:
+            status = operation_status(module, clc_auth, operation_id)
+        except ssl.SSLError as ex:
+            continue
         if status == 'succeeded':
             time_completed = time.time()
         elif status == 'failed':
