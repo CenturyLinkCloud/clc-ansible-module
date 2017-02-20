@@ -60,8 +60,6 @@ options:
     required: False
 requirements:
     - python = 2.7
-    - requests >= 2.5.0
-    - clc-sdk
 author: "CLC Runner (@clc-runner)"
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
@@ -106,61 +104,30 @@ server_ids:
 
 __version__ = '${version}'
 
-from distutils.version import LooseVersion
-
-try:
-    import requests
-except ImportError:
-    REQUESTS_FOUND = False
-else:
-    REQUESTS_FOUND = True
-
-#
-#  Requires the clc-python-sdk.
-#  sudo pip install clc-sdk
-#
-try:
-    import clc as clc_sdk
-    from clc import CLCException
-except ImportError:
-    CLC_FOUND = False
-    clc_sdk = None
-else:
-    CLC_FOUND = True
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
 
 
 class ClcBlueprintPackage(object):
 
-    clc = clc_sdk
     module = None
 
     def __init__(self, module):
         """
         Construct module
         """
+        self.clc_auth = {}
         self.module = module
-        if not CLC_FOUND:
-            self.module.fail_json(
-                msg='clc-python-sdk required for this module')
-        if not REQUESTS_FOUND:
-            self.module.fail_json(
-                msg='requests library is required for this module')
-        if requests.__version__ and LooseVersion(
-                requests.__version__) < LooseVersion('2.5.0'):
-            self.module.fail_json(
-                msg='requests library  version should be >= 2.5.0')
-
-        self._set_user_agent(self.clc)
 
     def process_request(self):
         """
         Process the request - Main Code Path
         :return: Returns with either an exit_json or fail_json
         """
+        self.clc_auth = clc_common.authenticate(self.module)
         p = self.module.params
         changed = False
         changed_server_ids = []
-        self._set_clc_credentials_from_env()
         server_ids = p['server_ids']
         package_id = p['package_id']
         package_params = p['package_params']
@@ -180,17 +147,18 @@ class ClcBlueprintPackage(object):
         """
         argument_spec = dict(
             server_ids=dict(type='list', required=True),
-            package_id=dict(required=True),
+            package_id=dict(type='str', required=True),
             package_params=dict(type='dict', default={}),
-            wait=dict(default=True),
-            state=dict(default='present', choices=['present'])
+            wait=dict(type='bool', default=True),
+            state=dict(type='str', default='present',
+                       choices=['present'])
         )
         return argument_spec
 
     def ensure_package_installed(self, server_ids, package_id, package_params):
         """
         Ensure the package is installed in the given list of servers
-        :param server_ids: the server list where the package needs to be installed
+        :param server_ids: the server list where the package should be installed
         :param package_id: the blueprint package id
         :param package_params: the package arguments
         :return: (changed, server_ids, request_list)
@@ -200,9 +168,8 @@ class ClcBlueprintPackage(object):
         """
         changed = False
         request_list = []
-        servers = self._get_servers_from_clc(
-            server_ids,
-            'Failed to get servers from CLC')
+        servers = clc_common.servers_by_id(
+            self.module, self.clc_auth, server_ids)
         for server in servers:
             if not self.module.check_mode:
                 request = self.clc_install_package(
@@ -218,87 +185,42 @@ class ClcBlueprintPackage(object):
         Install the package to a given clc server
         :param server: The server object where the package needs to be installed
         :param package_id: The blue print package id
-        :param package_params: the required argument dict for the package installation
+        :param package_params: the required argument dict for blueprint
         :return: The result object from the CLC API call
         """
         result = None
+        payload = {'servers': [server.id],
+                   'package': {'packageId': package_id}}
+        if package_params:
+            payload['package']['parameters'] = package_params
         try:
-            result = server.ExecutePackage(
-                package_id=package_id,
-                parameters=package_params)
-        except CLCException as ex:
-            try:
-                msg = ex.response_text
-            except:
-                msg = ex.message
-            self.module.fail_json(msg='Failed to install package : {0} to server {1}. {2}'.format(
-                package_id, server.id, msg
-            ))
+            result = clc_common.call_clc_api(
+                self.module, self.clc_auth,
+                'POST', '/operations/{alias}/servers/executePackage'.format(
+                    alias=self.clc_auth['clc_alias']),
+                data=payload,
+                timeout=30)
+        except ClcApiException as ex:
+            return self.module.fail_json(
+                msg='Failed to install package: {pkg} to server {server}. '
+                    '{msg} {code}'.format(
+                        pkg=package_id, server=server.id, msg=ex.message,
+                        code=ex.code))
         return result
 
     def _wait_for_requests_to_complete(self, request_lst):
         """
-        Waits until the CLC requests are complete if the wait argument is True
-        :param request_lst: The list of CLC request objects
+        Block until server provisioning requests are completed.
+        :param request_lst: a list of CLC API JSON responses
         :return: none
         """
-        if not self.module.params['wait']:
-            return
-        for request in request_lst:
-            request.WaitUntilComplete()
-            for request_details in request.requests:
-                if request_details.Status() != 'succeeded':
-                    self.module.fail_json(
-                        msg='Unable to process package install request')
+        if self.module.params.get('wait'):
+            failed_requests_count = clc_common.wait_on_completed_operations(
+                self.module, self.clc_auth,
+                clc_common.operation_id_list(request_lst))
 
-    def _get_servers_from_clc(self, server_list, message):
-        """
-        Internal function to fetch list of CLC server objects from a list of server ids
-        :param server_list: the list of server ids
-        :param message: the error message to raise if there is any error
-        :return the list of CLC server objects
-        """
-        try:
-            return self.clc.v2.Servers(server_list).servers
-        except CLCException as ex:
-            self.module.fail_json(msg=message + ': %s' % ex)
-
-    def _set_clc_credentials_from_env(self):
-        """
-        Set the CLC Credentials on the sdk by reading environment variables
-        :return: none
-        """
-        env = os.environ
-        v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-        v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-        v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-        clc_alias = env.get('CLC_ACCT_ALIAS', False)
-        api_url = env.get('CLC_V2_API_URL', False)
-
-        if api_url:
-            self.clc.defaults.ENDPOINT_URL_V2 = api_url
-
-        if v2_api_token and clc_alias:
-            self.clc._LOGIN_TOKEN_V2 = v2_api_token
-            self.clc._V2_ENABLED = True
-            self.clc.ALIAS = clc_alias
-        elif v2_api_username and v2_api_passwd:
-            self.clc.v2.SetCredentials(
-                api_username=v2_api_username,
-                api_passwd=v2_api_passwd)
-        else:
-            return self.module.fail_json(
-                msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
-                    "environment variables")
-
-    @staticmethod
-    def _set_user_agent(clc):
-        if hasattr(clc, 'SetRequestsSession'):
-            agent_string = "ClcAnsibleModule/" + __version__
-            ses = requests.Session()
-            ses.headers.update({"Api-Client": agent_string})
-            ses.headers['User-Agent'] += " " + agent_string
-            clc.SetRequestsSession(ses)
+            if failed_requests_count > 0:
+                self.module.fail_json(msg='Unable to process blueprint request')
 
 
 def main():
@@ -313,6 +235,6 @@ def main():
     clc_blueprint_package = ClcBlueprintPackage(module)
     clc_blueprint_package.process_request()
 
-from ansible.module_utils.basic import *
+from ansible.module_utils.basic import *  # pylint: disable=W0614
 if __name__ == '__main__':
     main()
