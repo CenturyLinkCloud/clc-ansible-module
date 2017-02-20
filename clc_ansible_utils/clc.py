@@ -714,3 +714,103 @@ def find_loadbalancer(module, clc_auth, search_key, load_balancers=None,
                     search=search_key,
                     ids=', '.join([l['id'] for l in lb_list])))
     return lb_list[0] if num_lb > 0 else None
+
+
+def modify_aa_policy_on_server(module, clc_auth, server_id, aa_policy_id):
+    """
+    Add an alert policy to a clc server
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param server_id: The clc server id
+    :param aa_policy_id: Anti affinity policy id to be added to server
+    :return: none
+    """
+    try:
+        result = call_clc_api(
+            module, clc_auth,
+            'PUT', '/servers/{alias}/{server}/antiAffinityPolicy'.format(
+                alias=clc_auth['clc_alias'], server=server_id),
+            data={'id': aa_policy_id})
+    except ClcApiException as e:
+        return module.fail_json(
+            msg='Failed to add anti affinity policy: {policy} to '
+                'server: {server}. {msg}'.format(
+                    policy=aa_policy_id, server=server_id,
+                    msg=str(e.message)))
+    return result
+
+
+def remove_aa_policy_from_server(module, clc_auth, server_id, aa_policy_id):
+    """
+    Add an alert policy to a clc server
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param server_id: The clc server id
+    :param aa_policy_id: Anti affinity policy id to be removed from server
+    :return: none
+    """
+    try:
+        # Returns 200 OK, No Content
+        result = call_clc_api(
+            module, clc_auth,
+            'DELETE', '/servers/{alias}/{server}/antiAffinityPolicy'.format(
+                alias=clc_auth['clc_alias'], server=server_id),
+            data={})
+    except ClcApiException as e:
+        return module.fail_json(
+            msg='Failed to remove anti affinity policy: {policy} from '
+                'server: {server}. {msg}'.format(
+                    policy=aa_policy_id, server=server_id,
+                    msg=str(e.message)))
+    return result
+
+
+def add_alert_policy_to_server(module, clc_auth,
+                               server_id, alert_policy_id):
+    """
+    Add an alert policy to a clc server
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param server_id: The clc server id
+    :param alert_policy_id: the alert policy id to be associated to the server
+    :return: none
+    """
+    try:
+        result = call_clc_api(
+            module, clc_auth,
+            'POST', '/servers/{alias}/{server}/alertPolicies'.format(
+                alias=clc_auth['clc_alias'], server=server_id),
+            data={'id': alert_policy_id})
+    except ClcApiException as e:
+        return module.fail_json(
+            msg='Failed to add alert policy: {policy} to server: {server}.'
+                ' {msg}'.format(policy=alert_policy_id, server=server_id,
+                                msg=str(e.message)))
+    return result
+
+
+def remove_alert_policy_from_server(module, clc_auth,
+                                    server_id, alert_policy_id):
+    """
+    Add an alert policy to a clc server
+    :param module: Ansible module being called
+    :param clc_auth: dict containing the needed parameters for authentication
+    :param server_id: The clc server id
+    :param alert_policy_id: the alert policy id to be associated to the server
+    :return: none
+    """
+    try:
+        # Returns 200 OK, No Content
+        result = call_clc_api(
+            module, clc_auth,
+            'DELETE', '/servers/{alias}/{server}/alertPolicies/{policy}'.format(
+                alias=clc_auth['clc_alias'], server=server_id,
+                policy=alert_policy_id))
+    except ClcApiException as e:
+        return module.fail_json(
+            msg='Failed to remove alert policy: {policy} from server: {server}.'
+                ' {msg}'.format(policy=alert_policy_id, server=server_id,
+                                msg=str(e.message)))
+    return result
+
+

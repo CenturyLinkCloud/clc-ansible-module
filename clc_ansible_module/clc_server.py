@@ -1185,9 +1185,8 @@ class ClcServer(object):
         """
         server_ids = [s.id for s in servers]
         try:
-            refreshed_servers = clc_common.servers_by_id(self.module,
-                                                         self.clc_auth,
-                                                         server_ids)
+            refreshed_servers = clc_common.servers_by_id(
+                self.module, self.clc_auth, server_ids)
         except ClcApiException as ex:
             return self.module.fail_json(
                 msg='Unable to refresh servers. {msg}'.format(

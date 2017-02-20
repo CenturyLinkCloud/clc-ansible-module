@@ -278,8 +278,8 @@ class ClcServerFact(object):
         :return: argument spec dictionary
         """
         argument_spec = dict(
-            server_id=dict(required=True),
-            credentials=dict(default=False))
+            server_id=dict(type='str', required=True),
+            credentials=dict(type='bool', default=False))
 
         return {"argument_spec": argument_spec}
 
