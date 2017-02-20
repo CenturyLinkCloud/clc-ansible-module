@@ -203,9 +203,8 @@ class ClcBlueprintPackage(object):
         except ClcApiException as ex:
             return self.module.fail_json(
                 msg='Failed to install package: {pkg} to server {server}. '
-                    '{msg} {code}'.format(
-                        pkg=package_id, server=server.id, msg=ex.message,
-                        code=ex.code))
+                    '{msg}'.format(
+                        pkg=package_id, server=server.id, msg=ex.message))
         return result
 
     def _wait_for_requests_to_complete(self, request_lst):
