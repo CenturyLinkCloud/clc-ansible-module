@@ -423,3 +423,115 @@ class TestClcCommonFunctions(unittest.TestCase):
                     search=loadbalancer_existing['name'],
                     ids=', '.join([loadbalancer_existing['id'],
                                    loadbalancer_existing['id']])))
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_modify_aa_policy_on_server(self, mock_call_api):
+        server_id = 'mock_id'
+        policy_id = 'mock_policy_id'
+        mock_response = mock.MagicMock()
+        mock_call_api.return_value = mock_response
+
+        result = clc_common.modify_aa_policy_on_server(
+            self.module, {'clc_alias': 'mock_alias'},
+            server_id, policy_id)
+
+        self.assertEqual(result, mock_response)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_modify_aa_policy_on_server_exception(self, mock_call_api):
+        server_id = 'mock_id'
+        policy_id = 'mock_policy_id'
+        mock_call_api.side_effect = ClcApiException('Failed')
+
+        result = clc_common.modify_aa_policy_on_server(
+            self.module, {'clc_alias': 'mock_alias'},
+            server_id, policy_id)
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Failed to add anti affinity policy: mock_policy_id to '
+                'server: mock_id. Failed')
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_remove_aa_policy_from_server(self, mock_call_api):
+        server_id = 'mock_id'
+        policy_id = 'mock_policy_id'
+        mock_response = mock.MagicMock()
+        mock_call_api.return_value = mock_response
+
+        result = clc_common.remove_aa_policy_from_server(
+            self.module, {'clc_alias': 'mock_alias'},
+            server_id, policy_id)
+
+        self.assertEqual(result, mock_response)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_remove_aa_policy_from_server_exception(self, mock_call_api):
+        server_id = 'mock_id'
+        policy_id = 'mock_policy_id'
+        mock_call_api.side_effect = ClcApiException('Failed')
+
+        result = clc_common.remove_aa_policy_from_server(
+            self.module, {'clc_alias': 'mock_alias'},
+            server_id, policy_id)
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Failed to remove anti affinity policy: mock_policy_id from '
+                'server: mock_id. Failed')
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_add_alert_policy_to_server(self, mock_call_api):
+        server_id = 'mock_id'
+        policy_id = 'mock_policy_id'
+        mock_response = mock.MagicMock()
+        mock_call_api.return_value = mock_response
+
+        result = clc_common.add_alert_policy_to_server(
+            self.module, {'clc_alias': 'mock_alias'},
+            server_id, policy_id)
+
+        self.assertEqual(result, mock_response)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_add_alert_policy_to_server_exception(self, mock_call_api):
+        server_id = 'mock_id'
+        policy_id = 'mock_policy_id'
+        mock_call_api.side_effect = ClcApiException('Failed')
+
+        result = clc_common.add_alert_policy_to_server(
+            self.module, {'clc_alias': 'mock_alias'},
+            server_id, policy_id)
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Failed to add alert policy: mock_policy_id to '
+                'server: mock_id. Failed')
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_remove_alert_policy_from_server(self, mock_call_api):
+        server_id = 'mock_id'
+        policy_id = 'mock_policy_id'
+        mock_response = mock.MagicMock()
+        mock_call_api.return_value = mock_response
+
+        result = clc_common.remove_alert_policy_from_server(
+            self.module, {'clc_alias': 'mock_alias'},
+            server_id, policy_id)
+
+        self.assertEqual(result, mock_response)
+        self.assertFalse(self.module.fail_json.called)
+
+    @patch.object(clc_common, 'call_clc_api')
+    def test_remove_alert_policy_from_server_exception(self, mock_call_api):
+        server_id = 'mock_id'
+        policy_id = 'mock_policy_id'
+        mock_call_api.side_effect = ClcApiException('Failed')
+
+        result = clc_common.remove_alert_policy_from_server(
+            self.module, {'clc_alias': 'mock_alias'},
+            server_id, policy_id)
+
+        self.module.fail_json.assert_called_once_with(
+            msg='Failed to remove alert policy: mock_policy_id from '
+                'server: mock_id. Failed')

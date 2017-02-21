@@ -377,8 +377,8 @@ class ClcModifyServer(object):
         self.clc_auth = clc_common.authenticate(self.module)
 
         p = self.module.params
-        cpu = int(p.get('cpu')) if p.get('cpu') else None
-        memory = int(p.get('memory')) if p.get('memory') else None
+        cpu = p.get('cpu')
+        memory = p.get('memory')
         state = p.get('state')
         if state == 'absent' and (cpu or memory):
             return self.module.fail_json(

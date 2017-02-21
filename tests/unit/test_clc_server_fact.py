@@ -117,8 +117,8 @@ class TestClcServerFactFunctions(unittest.TestCase):
         self.assertTrue('argument_spec' in result)
         self.assertEqual(
             result['argument_spec'],
-            {'server_id': {'required': True},
-             'credentials': {'default': False}})
+            {'server_id': {'type': 'str', 'required': True},
+             'credentials': {'type': 'bool', 'default': False}})
 
     @patch.object(clc_server_fact, 'AnsibleModule')
     @patch.object(clc_server_fact, 'ClcServerFact')
