@@ -300,14 +300,22 @@ def authenticate(module):
             'clc_location': r['locationAlias']
         })
     elif v2_api_token:
-        return module.fail_json(
-            msg='In addition to the CLC_V2_API_TOKEN environment variable, '
-                'you must also set the CLC_ACCT_ALIAS and CLC_LOCATION '
-                'variables')
+        message = ('In addition to the CLC_V2_API_TOKEN environment variable, '
+                   'you must also set the CLC_ACCT_ALIAS and CLC_LOCATION '
+                   'variables')
+        if module is not None:
+            return module.fail_json(msg=message)
+        else:
+            sys.stderr.write(message + '\n')
+            sys.exit(1)
     else:
-        return module.fail_json(
-            msg='You set the CLC_V2_API_USERNAME and '
-                'CLC_V2_API_PASSWD environment variables')
+        message = ('You must set the CLC_V2_API_USERNAME and '
+                   'CLC_V2_API_PASSWD environment variables')
+        if module is not None:
+            return module.fail_json(msg=message)
+        else:
+            sys.stderr.write(message + '\n')
+            sys.exit(1)
     return clc_auth
 
 
@@ -519,9 +527,12 @@ def find_server(module, clc_auth, server_id):
         server = Server(r)
         return server
     except ClcApiException as ex:
-        return module.fail_json(
-            msg='Failed to get server information '
-                'for server id: {id}:'.format(id=server_id))
+        if module is None:
+            raise ex
+        else:
+            return module.fail_json(
+                msg='Failed to get server information '
+                    'for server id: {id}:'.format(id=server_id))
 
 
 def server_ip_addresses(module, clc_auth, server, poll_freq=2, retries=5):

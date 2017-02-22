@@ -14,31 +14,31 @@
 # limitations under the License.
 
 import clc_inv
-from clc import CLCException
-import clc as clc_sdk
 import mock
 from mock import patch
 from mock import create_autospec
 import unittest
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
+
 
 class TestClcInvFunctions(unittest.TestCase):
 
     def setUp(self):
-        self.clc = mock.MagicMock()
         self.module = mock.MagicMock()
-        self.datacenter=mock.MagicMock()
 
-    @patch('clc_inv.clc')
-    def test_find_hostvars_single_server_none(self, mock_clc_sdk):
+    @patch.object(clc_common, 'find_server')
+    def test_find_hostvars_single_server_none(self, mock_find_server):
         server = mock.MagicMock()
         server.name = 'testServerWithNoDetails'
         server.data = {}
-        mock_clc_sdk.v2.Server.return_value = server
-        result = clc_inv._find_hostvars_single_server('testServerWithNoDetails')
+        mock_find_server.return_value = server
+        result = clc_inv._find_hostvars_single_server(
+            [{}, 'testServerWithNoDetails'])
         self.assertIsNone(result)
 
-    @patch('clc_inv.clc')
-    def test_find_hostvars_single_server(self, mock_clc_sdk):
+    @patch.object(clc_common, 'find_server')
+    def test_find_hostvars_single_server(self, mock_find_server):
         server = mock.MagicMock()
         server.name = 'testServerWithNoDetails'
         server.data = {'details':
@@ -48,21 +48,10 @@ class TestClcInvFunctions(unittest.TestCase):
                                 ]
                            }
                         }
-        mock_clc_sdk.v2.Server.return_value = server
-        result = clc_inv._find_hostvars_single_server('testServerWithNoDetails')
+        mock_find_server.return_value = server
+        result = clc_inv._find_hostvars_single_server(
+            [{}, 'testServerWithNoDetails'])
         self.assertIsNone(result)
-
-    def test_find_hostvars_single_server_uses_unique_session(self):
-        pass
-
-    @patch.object(clc_inv, 'clc')
-    def test_set_clc_credentials_from_env(self, mock_clc_sdk):
-        with patch.dict('os.environ', {'CLC_V2_API_TOKEN': 'dummyToken',
-                                       'CLC_ACCT_ALIAS': 'TEST'}):
-            clc_inv._set_clc_credentials_from_env()
-        self.assertEqual(clc_inv.clc._LOGIN_TOKEN_V2, 'dummyToken')
-        self.assertFalse(mock_clc_sdk.v2.SetCredentials.called)
-        self.assertEqual(self.module.fail_json.called, False)
 
     def test_is_list_flat(self):
         list = [1,2,3]
@@ -83,8 +72,8 @@ class TestClcInvFunctions(unittest.TestCase):
     @patch('clc_inv._get_servers_from_groups')
     @patch('clc_inv._find_all_hostvars_for_servers')
     @patch('clc_inv._build_hostvars_dynamic_groups')
-    @patch('clc_inv._set_clc_credentials_from_env')
-    def test_print_inventory_json(self, mock_creds, mock_hostvars_d, mock_hostvars, mock_servers, mock_groups):
+    @patch.object(clc_common, 'authenticate')
+    def test_print_inventory_json(self, mock_authenticate, mock_hostvars_d, mock_hostvars, mock_servers, mock_groups):
         try:
             mock_groups.return_value = {'groups':['group1', 'group2']}
             mock_servers.return_value = ['server1', 'server2']
@@ -128,8 +117,7 @@ class TestClcInvFunctions(unittest.TestCase):
             self.assertEqual(res, {'status': 'OK'})
 
     @patch('clc_inv._add_windows_hostvars')
-    @patch('clc_inv.clc')
-    def test_add_windows_hostvars(self, mock_clc_sdk, mock_add_windows_hostvars):
+    def test_add_windows_hostvars(self, mock_add_windows_hostvars):
         server = mock.MagicMock()
         server.name = 'testWindowsServer'
         server.data = {'clc_data': {
@@ -140,14 +128,12 @@ class TestClcInvFunctions(unittest.TestCase):
         }}}
         mock_add_windows_hostvars.return_value = { 'testWindowsServer': {'ansible_ssh_port': 5986, 'clc_data': {'os': 'windows_os_image'}, 'ansible_connection': 'winrm'} }
 
-        mock_clc_sdk.v2.Server.return_value = server
         result = clc_inv._add_windows_hostvars(hostvars, server)
         self.assertEqual(result[server.name]['ansible_ssh_port'], 5986)
         self.assertEqual(result[server.name]['ansible_connection'], 'winrm')
 
     @patch('clc_inv._add_windows_hostvars')
-    @patch('clc_inv.clc')
-    def test_add_windows_hostvars_to_linux(self, mock_clc_sdk, mock_add_windows_hostvars):
+    def test_add_windows_hostvars_to_linux(self, mock_add_windows_hostvars):
         server = mock.MagicMock()
         server.name = 'testLinuxServer'
         server.data = {'clc_data': {
@@ -158,7 +144,6 @@ class TestClcInvFunctions(unittest.TestCase):
         }}}
         mock_add_windows_hostvars.return_value = { 'testLinuxServer': {'clc_data': {'os': 'linux_os_image'}} }
 
-        mock_clc_sdk.v2.Server.return_value = server
         result = clc_inv._add_windows_hostvars(hostvars, server)
         self.assertNotIn('ansible_ssh_port', result[server.name])
         self.assertNotIn('ansible_connection', result[server.name])

@@ -47,8 +47,8 @@ from multiprocessing import Pool
 import itertools
 import json
 from builtins import str
-import clc
-from clc import CLCException, APIFailedResponse
+import clc_ansible_utils.clc as clc_common
+from clc_ansible_utils.clc import ClcApiException
 
 HOSTVAR_POOL_CNT = 25
 
@@ -67,11 +67,11 @@ def print_inventory_json():
     Print the inventory in json.  This is the main execution path for the script
     :return: None
     '''
-    _set_clc_credentials_from_env()
+    clc_auth = clc_common.authenticate(None)
 
-    groups = _find_all_groups()
+    groups = _find_all_groups(clc_auth)
     servers = _get_servers_from_groups(groups)
-    hostvars = _find_all_hostvars_for_servers(servers)
+    hostvars = _find_all_hostvars_for_servers(clc_auth, servers)
     dynamic_groups = _build_hostvars_dynamic_groups(hostvars)
     groups.update(dynamic_groups)
 
@@ -81,17 +81,32 @@ def print_inventory_json():
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
-def _find_all_groups():
+def _find_all_groups(clc_auth):
     '''
     Obtain a list of all datacenters for the account, and then return a list of their Server Groups
+    :param clc_auth: dict containing the needed parameters for authentication
     :return: group dictionary
     '''
-    datacenters = _filter_datacenters(clc.v2.Datacenter.Datacenters())
-    results = [_find_groups_for_datacenter(datacenter) for datacenter in datacenters]
+    datacenters = _filter_datacenters(_find_datacenters(clc_auth))
+    results = [_find_groups_for_datacenter(clc_auth, datacenter)
+               for datacenter in datacenters]
 
     # Filter out results with no values
     results = [result for result in results if result]
     return _parse_groups_result_to_dict(results)
+
+
+def _find_datacenters(clc_auth):
+    '''
+    Get list of all datacenters for an account
+    :param clc_auth: dict containing the needed parameters for authentication
+    :return:
+    '''
+    result = clc_common.call_clc_api(
+        None, clc_auth,
+        'GET', '/datacenters/{alias}'.format(alias=clc_auth['clc_alias']))
+    datacenters = [d['id'] for d in result]
+    return datacenters
 
 
 def _filter_datacenters(datacenters):
@@ -108,19 +123,21 @@ def _filter_datacenters(datacenters):
         return datacenters
 
 
-def _find_groups_for_datacenter(datacenter):
+def _find_groups_for_datacenter(clc_auth, datacenter):
     '''
     Return a dictionary of groups and hosts for the given datacenter
     :param datacenter: The datacenter to use for finding groups
     :return: dictionary of { '<GROUP NAME>': 'hosts': [SERVERS]}
     '''
     result = {}
-    groups = datacenter.Groups().groups
-    result = _find_all_servers_for_group( datacenter, groups )
+    root_group = clc_common.group_tree(None, clc_auth, datacenter=datacenter)
+    result = _find_all_servers_for_group(clc_auth, datacenter,
+                                         root_group.children)
     if result:
         return result
 
-def _find_all_servers_for_group( datacenter, groups):
+
+def _find_all_servers_for_group(clc_auth, datacenter, groups):
     '''
     recursively walk down all groups retrieving server information.
     :param datacenter: The datacenter being search.
@@ -129,10 +146,11 @@ def _find_all_servers_for_group( datacenter, groups):
     '''
     result = {}
     for group in groups:
-        sub_groups = group.Subgroups().groups
+        sub_groups = group.children
         if ( len(sub_groups) > 0 ):
             sub_result = {}
-            sub_result = _find_all_servers_for_group( datacenter, sub_groups )
+            sub_result = _find_all_servers_for_group(clc_auth, datacenter,
+                                                     sub_groups)
             if sub_result is not None:
                 result.update( sub_result )
 
@@ -140,8 +158,9 @@ def _find_all_servers_for_group( datacenter, groups):
             continue
 
         try:
-            servers = group.Servers().servers_lst
-        except CLCException:
+            servers = [obj['id'] for obj in group.data['links'] if
+                       obj['rel'] == 'server']
+        except ClcApiException:
             continue  # Skip any groups we can't read.
 
         if servers:
@@ -156,7 +175,7 @@ def _find_all_servers_for_group( datacenter, groups):
         return result
 
 
-def _find_all_hostvars_for_servers(servers):
+def _find_all_hostvars_for_servers(clc_auth, servers):
     '''
     Return a hostvars dictionary for the provided list of servers.
     Multithreaded to optimize network calls.
@@ -165,7 +184,8 @@ def _find_all_hostvars_for_servers(servers):
     :return: dictionary of servers(k) and hostvars(v)
     '''
     p = Pool(HOSTVAR_POOL_CNT)
-    results = p.map(_find_hostvars_single_server, servers)
+    arg_list = [(clc_auth, s) for s in servers]
+    results = p.map(_find_hostvars_single_server, arg_list)
     p.close()
     p.join()
 
@@ -177,22 +197,16 @@ def _find_all_hostvars_for_servers(servers):
     return {'hostvars': hostvars}
 
 
-def _find_hostvars_single_server(server_id):
+def _find_hostvars_single_server(arg_list):
     '''
     Return dictionary of hostvars for a single server
     :param server_id: the id of the server to query
     :return:
     '''
     result = {}
+    clc_auth, server_id = arg_list
     try:
-        session = clc.requests.Session()
-
-        server_obj = clc.v2.API.Call(method='GET',
-                                     url='servers/{0}/{1}'.format(clc.ALIAS, server_id),
-                                     payload={},
-                                     session=session)
-
-        server = clc.v2.Server(id=server_id, server_obj=server_obj)
+        server = clc_common.find_server(None, clc_auth, server_id)
 
         if len(server.data['details']['ipAddresses']) == 0:
             return
@@ -203,7 +217,7 @@ def _find_hostvars_single_server(server_id):
             'clc_custom_fields': server.data['details']['customFields']
         }
         result = _add_windows_hostvars(result, server)
-    except (CLCException, APIFailedResponse, KeyError):
+    except (ClcApiException, KeyError):
         return  # Skip any servers that return bad data or an api exception
 
     return result
@@ -304,35 +318,6 @@ def _is_list_flat(lst):
         i += 1
     return result
 
-
-def _set_clc_credentials_from_env():
-    '''
-    Set the v2 API Credentials on the clc-sdk from environment variables.  Uses an API Token if set
-    otherwise, uses USERNAME and PASSWORD.
-    :return: None
-    '''
-    env = os.environ
-    v2_api_token = env.get('CLC_V2_API_TOKEN', False)
-    v2_api_username = env.get('CLC_V2_API_USERNAME', False)
-    v2_api_passwd = env.get('CLC_V2_API_PASSWD', False)
-    clc_alias = env.get('CLC_ACCT_ALIAS', False)
-    api_url = env.get('CLC_V2_API_URL', False)
-
-    if api_url:
-        clc.defaults.ENDPOINT_URL_V2 = api_url
-
-    if v2_api_token and clc_alias:
-        clc._LOGIN_TOKEN_V2 = v2_api_token
-        clc._V2_ENABLED = True
-        clc.ALIAS = clc_alias
-    elif v2_api_username and v2_api_passwd:
-        clc.v2.SetCredentials(
-            api_username=v2_api_username,
-            api_passwd=v2_api_passwd)
-    else:
-        sys.stderr.write(
-            "\n\nYou must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD environment variables to use the CenturyLink Cloud dynamic inventory script.\n")
-        sys.exit(1)
 
 if __name__ == '__main__':
     main()
