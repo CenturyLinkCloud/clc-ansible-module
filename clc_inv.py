@@ -46,7 +46,6 @@ import os
 from multiprocessing import Pool
 import itertools
 import json
-from builtins import str
 import clc_ansible_utils.clc as clc_common
 from clc_ansible_utils.clc import ClcApiException
 

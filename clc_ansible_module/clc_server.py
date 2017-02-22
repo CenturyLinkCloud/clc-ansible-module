@@ -246,7 +246,6 @@ options:
     choices: [True, False]
 requirements:
     - python = 2.7
-    - clc-sdk
 author: "CLC Runner (@clc-runner)"
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
@@ -691,8 +690,6 @@ class ClcServer(object):
     def _validate_module_params(self):
         """
         Validate the module params, and lookup default values.
-        :param clc: clc-sdk instance to use
-        :param module: module to validate
         :return: dictionary of validated params
         """
         module = self.module
@@ -1374,10 +1371,9 @@ class ClcServer(object):
     def _change_server_power_state(self, server, state):
         """
         Change the server powerState
-        :param module: the module to check for intended state
         :param server: the server to start or stop
         :param state: the intended powerState for the server
-        :return: the request object from clc-sdk call
+        :return: Request response for the server operation
         """
         result = None
         try:
@@ -1420,7 +1416,7 @@ class ClcServer(object):
         Find a server group in a datacenter by calling the CLC API
         :param datacenter: Datacenter identifier to search for the group
         :param lookup_group: string name of the group to search for
-        :return: clc-sdk.Group instance
+        :return: Group instance
         """
         group = None
         if not lookup_group:
@@ -1445,7 +1441,7 @@ class ClcServer(object):
         """
         Call the CLC Rest API to Create a Server
         :param server_params: a dictionary of params to use to create the servers
-        :return: clc-sdk.Request object linked to the queued server request
+        :return: Request linked to the queued server
         """
 
         try:

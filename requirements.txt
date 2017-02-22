@@ -1,9 +1,6 @@
 ansible
-clc-sdk>=2.44
 coverage
-future
 mock
 nose
-requests>=2.7
 setuptools
 wheel

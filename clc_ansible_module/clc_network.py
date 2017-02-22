@@ -64,7 +64,6 @@ options:
     choices: [True, False]
 requirements:
     - python = 2.7
-    - clc-sdk
 notes:
     - To use this module, it is required to set the below environment variables which enables access to the
       Centurylink Cloud

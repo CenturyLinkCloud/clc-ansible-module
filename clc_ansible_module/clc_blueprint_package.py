@@ -164,7 +164,7 @@ class ClcBlueprintPackage(object):
         :return: (changed, server_ids, request_list)
                     changed: A flag indicating if a change was made
                     server_ids: The list of servers modified
-                    request_list: The list of request objects from clc-sdk
+                    request_list: The list of request objects
         """
         changed = False
         request_list = []
