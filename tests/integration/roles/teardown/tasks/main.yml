@@ -1,0 +1,15 @@
+---
+- include: firewall_policy.yml
+
+- include: network.yml
+  when: run_network_test
+
+- include: alert_policy.yml
+
+- include: aa_policy.yml
+
+- include: loadbalancer.yml
+
+- include: group.yml
+
+- include: meta.yml

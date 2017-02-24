@@ -1,0 +1,7 @@
+---
+- name: group setup
+  clc_group:
+    name: "{{ group_name }}"
+    location: "{{ location }}"
+    state: absent
+    wait: True

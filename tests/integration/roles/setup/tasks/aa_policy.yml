@@ -1,0 +1,7 @@
+---
+- name: aa_policy setup
+  clc_aa_policy:
+    name: "{{ aa_policy_name }}"
+    location: "{{ location }}"
+    state: absent
+    wait: True

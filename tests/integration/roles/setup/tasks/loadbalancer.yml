@@ -1,0 +1,6 @@
+---
+- name: loadbalancer setup
+  clc_loadbalancer:
+    name: "{{ loadbalancer_name }}"
+    location: "{{ location }}"
+    state: absent

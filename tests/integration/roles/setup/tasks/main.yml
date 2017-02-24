@@ -1,0 +1,14 @@
+---
+- include: network.yml
+
+- include: firewall_policy.yml
+
+- include: alert_policy.yml
+
+- include: aa_policy.yml
+
+- include: group.yml
+
+- include: loadbalancer.yml
+
+- include: meta.yml

@@ -1,0 +1,26 @@
+---
+location: 'CA3'
+account_alias: 'WFTC'
+
+group_name: 'Ansible Module Test'
+
+server_name: 'AnsTst'
+server_template: 'CENTOS-7-64-TEMPLATE'
+
+alert_policy_name: 'Ansible Test Alert Policy'
+
+aa_policy_name: 'Ansible Test Anti-Affinity Policy'
+
+network_name: 'Ansible Test Network'
+network_description: 'Ansible Test Network'
+network_description_update: 'Ansible Updated Test Network'
+
+meta_name: 'Ansible Module Test'
+meta_description: 'Test metadata for ansible module'
+meta_ref_id: 'abcd1234-abcd-1234-5678-abcd12345678'
+meta_job_id: '12345678-1234-5678-abcd-12345678abcd'
+meta_exec_id: '5678abcd-5678-abcd-1234-5678abcd1234'
+meta_instance_create: "CA3WFTCANSTST00"
+meta_instance_update: "CA3WFTCANSTST99"
+
+loadbalancer_name: 'Ansible Test Loadbalancer'

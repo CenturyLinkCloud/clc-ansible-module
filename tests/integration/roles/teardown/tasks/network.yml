@@ -1,0 +1,7 @@
+---
+- name: network teardown
+  clc_network:
+    name: "{{ network_name }}"
+    location: "{{ location }}"
+    state: absent
+    wait: True

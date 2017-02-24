@@ -1,0 +1,12 @@
+---
+- name: meta setup
+  clc_meta:
+    state: absent
+    name: "{{ meta_name }}"
+    description: "{{ meta_description }}"
+    jobId: "{{ meta_job_id }}"
+    executionId: "{{ meta_exec_id }}"
+    referenceId: "{{ meta_ref_id }}"
+    data:
+      type: INSTANCE
+      value: "{{ meta_instance_create }}"

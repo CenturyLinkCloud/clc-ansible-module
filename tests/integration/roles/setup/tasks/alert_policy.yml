@@ -1,0 +1,5 @@
+---
+- name: alert_policy setup
+  clc_alert_policy:
+    name: "{{ alert_policy_name }}"
+    state: absent

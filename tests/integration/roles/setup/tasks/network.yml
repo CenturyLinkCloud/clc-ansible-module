@@ -1,0 +1,27 @@
+---
+- name: network setup
+  clc_network:
+    name: "{{ network_name }}"
+    location: "{{ location }}"
+    state: absent
+    wait: True
+  when: run_network_test
+
+# Subsequent tests require network to be present
+# First network in a datacenter does not incur any charges
+- name: network default create
+  clc_network:
+    location: "{{ location }}"
+    wait: True
+  when: network_list|length == 0
+  register: default_create
+
+- name: refresh network list
+  clc_network_fact:
+    location: "{{ location }}"
+  when: network_list|length == 0
+  register: network_refresh
+
+- name: reset network list
+  set_fact:
+    network_list: "{{ network_refresh if network_list|length == 0 else network_list }}"

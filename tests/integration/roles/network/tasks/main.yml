@@ -1,0 +1,52 @@
+---
+- name: network create
+  clc_network:
+    name: "{{ network_name }}"
+    description: "{{ network_description }}"
+    location: "{{ location }}"
+    state: present
+    wait: True
+  register: network_create
+- name: assert network create
+  assert:
+    that:
+      - network_create.changed == True
+
+- name: network present
+  clc_network:
+    name: "{{ network_name }}"
+    location: "{{ location }}"
+    state: present
+    wait: True
+  register: network_present
+- name: assert network present
+  assert:
+    that:
+      - network_present.changed == False
+
+- name: network update
+  clc_network:
+    name: "{{ network_name }}"
+    description: "{{ network_description_update }}"
+    location: "{{ location }}"
+    state: present
+    wait: True
+  register: network_update
+- name: assert network update
+  assert:
+    that:
+      - network_update.changed == True
+      - network_update.network.description == "{{ network_description_update }}"
+
+- name: network update unchanged
+  clc_network:
+    name: "{{ network_name }}"
+    description: "{{ network_description_update }}"
+    location: "{{ location }}"
+    state: present
+    wait: True
+  register: network_update_unchanged
+- name: assert network update unchanged
+  assert:
+    that:
+      - network_update_unchanged.changed == False
