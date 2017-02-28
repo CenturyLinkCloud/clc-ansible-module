@@ -1,14 +1,8 @@
 ---
-- include: network.yml
-
-- include: firewall_policy.yml
-
-- include: alert_policy.yml
-
-- include: aa_policy.yml
-
-- include: group.yml
-
-- include: loadbalancer.yml
-
-- include: meta.yml
+- include: network_setup.yml
+- include: firewall_policy_setup.yml
+- include: alert_policy_setup.yml
+- include: aa_policy_setup.yml
+- include: group_setup.yml
+- include: loadbalancer_setup.yml
+- include: meta_setup.yml

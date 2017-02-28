@@ -1,0 +1,14 @@
+---
+- name: server_snapshot restore
+  clc_server_snapshot:
+    server_ids:
+      - "{{ item.server.id }}"
+    state: restore
+    wait: True
+  when: item.server.type == 'standard'
+  with_items: "{{ servers_fact }}"
+  register: server_snapshot_restore
+- name: assert server_snapshot restore
+  assert:
+    that:
+      - server_snapshot_restore.changed == True

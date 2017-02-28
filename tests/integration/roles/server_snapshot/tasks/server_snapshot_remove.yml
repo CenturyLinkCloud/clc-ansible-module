@@ -1,0 +1,14 @@
+---
+- name: server_snapshot delete
+  clc_server_snapshot:
+    server_ids:
+      - "{{ item.server.id }}"
+    state: absent
+    wait: True
+  when: item.server.type == 'standard'
+  with_items: "{{ servers_fact }}"
+  register: server_snapshot_delete
+- name: assert server_snapshot delete
+  assert:
+    that:
+      - server_snapshot_delete.changed == True

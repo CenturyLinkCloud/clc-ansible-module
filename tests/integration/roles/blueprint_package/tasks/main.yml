@@ -1,27 +1,8 @@
 ---
-- name: blueprint_package Install Ansible on CentOS
-  clc_blueprint_package:
-    server_ids:
-      - "{{ servers_fact.servers[-1].id }}"
-    package_id: a103ec29-b590-4374-8b89-378965837abd
-    state: present
-    wait: True
-  register: blueprint_package_ansible
-- name: assert blueprint_package
-  assert:
-    that:
-      - blueprint_package_ansible.status == 'succeeded'
+- include: ../../group/tasks/group_create.yml
+  when: group_fact is undefined
+- include: ../../server/tasks/server_count_changes.yml
+  when: servers_fact is undefined
 
-- name: blueprint_package Install (Fake) SSH Public Key on Linux
-  clc_blueprint_package:
-    server_ids:
-        - "{{ servers_fact.servers[-1].id }}"
-    package_id: 77abb844-579d-478d-3955-c69ab4a7ba1a
-    package_params: {'User': 'root', 'SshKey': 'ssh-rsa AAAABO_fake_key_L0x bb@machine.local'}
-    wait: True
-    state: present
-  register: blueprint_package_ssh
-- name: assert blueprint_package install ssh key
-  assert:
-    that:
-      - blueprint_package_ssh.status == 'succeeded'
+- include: blueprint_package_ansible.yml
+- include: blueprint_package_ssh.yml

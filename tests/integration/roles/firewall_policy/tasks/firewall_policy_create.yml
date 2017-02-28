@@ -1,0 +1,52 @@
+---
+- name: firewall_policy create
+  clc_firewall_policy:
+    source_account_alias: "{{ account_alias }}"
+    location: "{{ location }}"
+    state: present
+    source:
+      - "{{ network_list.networks[0].cidr }}"
+    destination:
+      - "{{ network_list.networks[0].cidr }}"
+    ports:
+      - any
+    destination_account_alias: "{{ account_alias }}"
+    wait: True
+  register: firewall_policy_create
+
+- name: set firewall_policy_id
+  set_fact:
+    firewall_policy_id: "{{ firewall_policy_create.firewall_policy.id }}"
+
+- name: firewall_policy present
+  clc_firewall_policy:
+    source_account_alias: "{{ account_alias }}"
+    location: "{{ location }}"
+    firewall_policy_id: "{{ firewall_policy_id }}"
+    state: present
+    wait: True
+  register: firewall_policy_present
+- name: assert firewall_policy present
+  assert:
+    that:
+      - firewall_policy_present.changed == False
+
+- name: firewall_policy idempotent
+  clc_firewall_policy:
+    source_account_alias: "{{ account_alias }}"
+    location: "{{ location }}"
+    state: present
+    enabled: True
+    source:
+      - "{{ network_list.networks[0].cidr }}"
+    destination:
+      - "{{ network_list.networks[0].cidr }}"
+    ports:
+      - any
+    destination_account_alias: "{{ account_alias }}"
+    wait: True
+  register: firewall_policy_idempotent
+- name: assert firewall_policy idempotent
+  assert:
+    that:
+      - firewall_policy_idempotent.changed == False

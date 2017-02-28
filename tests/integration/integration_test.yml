@@ -30,58 +30,60 @@
 
     - block:
 
-      - name: integration test group
-        include_role:
-          name: group
+        - name: integration test group
+          include_role:
+            name: group
 
-      - name: integration test aa_policy
-        include_role:
-          name: aa_policy
+        - name: integration test aa_policy
+          include_role:
+            name: aa_policy
 
-      - name: integration test alert_policy
-        include_role:
-          name: alert_policy
+        - name: integration test alert_policy
+          include_role:
+            name: alert_policy
 
-      - name: integration test server
-        include_role:
-          name: server
+        - name: integration test server
+          include_role:
+            name: server
 
-      - name: integration test modify_server
-        include_role:
-          name: modify_server
+        - name: integration test modify_server
+          include_role:
+            name: modify_server
 
-      - name: integration test blueprint_package
-        include_role:
-          name: blueprint_package
+        - name: integration test blueprint_package
+          include_role:
+            name: blueprint_package
 
-      - name: integration test loadbalancer
-        include_role:
-          name: loadbalancer
+        - name: integration test loadbalancer
+          include_role:
+            name: loadbalancer
 
-      - name: integration test server_snapshot
-        include_role:
-          name: server_snapshot
+        - name: integration test server_snapshot
+          include_role:
+            name: server_snapshot
 
-      - name: integration test network
-        include_role:
-          name: network
-        when: run_network_test
+        - name: integration test network
+          include_role:
+            name: network
+          when: run_network_test
 
-      - name: integration test publicip
-        include_role:
-          name: publicip
+        - name: integration test publicip
+          include_role:
+            name: publicip
 
-      - name: integration test firewall_policy
-        include_role:
-          name: firewall_policy
+        - name: integration test firewall_policy
+          include_role:
+            name: firewall_policy
 
-      - name: integration test meta
-        include_role:
-          name: meta
+        - name: integration test meta
+          include_role:
+            name: meta
+
 
       # Always run teardown, even if previous tests fail
       always:
 
-      - name: integration test teardown
-        include_role:
-          name: teardown
+        - name: integration test teardown
+          include_role:
+            name: teardown
+

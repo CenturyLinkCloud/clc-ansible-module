@@ -1,0 +1,83 @@
+---
+- name: modify_server alert_policy
+  clc_modify_server:
+    server_ids:
+      - "{{ item.server.id }}"
+    location: "{{ location }}"
+    alert_policy_name: "{{ alert_policy_name }}"
+    state: present
+    wait: True
+  when: item.server.type == 'hyperscale'
+  with_items: "{{ servers_fact }}"
+  register: modify_server_alert_policy
+- name: assert modify_server alert_policy
+  assert:
+    that:
+      - modify_server_alert_policy.changed == True
+
+- name: modify_server aa_policy
+  clc_modify_server:
+    server_ids:
+      - "{{ item.server.id }}"
+    location: "{{ location }}"
+    anti_affinity_policy_name: "{{ aa_policy_name }}"
+    state: present
+    wait: True
+  when: item.server.type == 'hyperscale'
+  with_items: "{{ servers_fact }}"
+  register: modify_server_aa_policy
+- name: assert modify_server aa_policy
+  assert:
+    that:
+      - modify_server_aa_policy.changed == True
+
+- name: modify_server policies unchanged
+  clc_modify_server:
+    server_ids:
+      - "{{ item.server.id }}"
+    location: "{{ location }}"
+    alert_policy_name: "{{ alert_policy_name }}"
+    anti_affinity_policy_name: "{{ aa_policy_name }}"
+    state: present
+    wait: True
+  when: item.server.type == 'hyperscale'
+  with_items: "{{ servers_fact }}"
+  register: modify_server_policies_unchanged
+- name: assert modify_server policies unchanged
+  assert:
+    that:
+      - modify_server_policies_unchanged.changed == False
+
+- name: modify_server remove policies
+  clc_modify_server:
+    server_ids:
+      - "{{ item.server.id }}"
+    location: "{{ location }}"
+    alert_policy_name: "{{ alert_policy_name }}"
+    anti_affinity_policy_name: "{{ aa_policy_name }}"
+    state: absent
+    wait: True
+  when: item.server.type == 'hyperscale'
+  with_items: "{{ servers_fact }}"
+  register: modify_server_remove_policies
+- name: assert modify_server remove policies
+  assert:
+    that:
+      - modify_server_remove_policies.changed == True
+
+- name: modify_server remove policies unchanged
+  clc_modify_server:
+    server_ids:
+      - "{{ item.server.id }}"
+    location: "{{ location }}"
+    alert_policy_name: "{{ alert_policy_name }}"
+    anti_affinity_policy_name: "{{ aa_policy_name }}"
+    state: absent
+    wait: True
+  when: item.server.type == 'hyperscale'
+  with_items: "{{ servers_fact }}"
+  register: modify_server_remove_policies_unchanged
+- name: assert modify_server remove policies unchanged
+  assert:
+    that:
+      - modify_server_remove_policies_unchanged.changed == False

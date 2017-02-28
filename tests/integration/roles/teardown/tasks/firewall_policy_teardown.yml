@@ -1,0 +1,9 @@
+---
+- name: firewall_policy teardown
+  clc_firewall_policy:
+    source_account_alias: "{{ account_alias }}"
+    location: "{{ location }}"
+    firewall_policy_id: "{{ firewall_policy_id }}"
+    state: absent
+    wait: True
+  when: firewall_policy_id is defined

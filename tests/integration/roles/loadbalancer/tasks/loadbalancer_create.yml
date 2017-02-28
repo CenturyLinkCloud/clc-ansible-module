@@ -1,0 +1,12 @@
+---
+- name: loadbalancer create
+  clc_loadbalancer:
+    name: "{{ loadbalancer_name }}"
+    location: "{{ location }}"
+    state: present
+  register: loadbalancer_create
+- name: assert loadbalancer create
+  assert:
+    that:
+      - loadbalancer_create.changed == True
+      - loadbalancer_create.loadbalancer.pools|length == 0

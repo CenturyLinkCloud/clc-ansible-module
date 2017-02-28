@@ -1,0 +1,13 @@
+---
+- name: blueprint_package Install Ansible on CentOS
+  clc_blueprint_package:
+    server_ids:
+      - "{{ servers_fact[-1].server.id }}"
+    package_id: a103ec29-b590-4374-8b89-378965837abd
+    state: present
+    wait: True
+  register: blueprint_package_ansible
+- name: assert blueprint_package
+  assert:
+    that:
+      - blueprint_package_ansible.changed == True

@@ -1,0 +1,52 @@
+---
+- name: server start unchanged
+  clc_server:
+    location: "{{ location }}"
+    server_ids: "{{ server_ids }}"
+    state: started
+    wait: True
+  register: server_start_unchanged
+- name: assert server start unchanged
+  assert:
+    that:
+      - server_start_unchanged.servers[0].details.powerState == 'started'
+      - server_start_unchanged.changed == False
+
+- name: server stop
+  clc_server:
+    location: "{{ location }}"
+    server_ids: "{{ server_ids }}"
+    state: stopped
+    wait: True
+  register: server_stop
+- name: assert server stop
+  assert:
+    that:
+      - server_stop.servers[0].details.powerState == 'stopped'
+      - server_stop.changed == True
+
+- name: server stop unchanged
+  clc_server:
+    location: "{{ location }}"
+    server_ids: "{{ server_ids }}"
+    state: stopped
+    wait: True
+  register: server_stop_unchanged
+- name: assert server stop unchanged
+  assert:
+    that:
+      - server_stop_unchanged.servers[0].details.powerState == 'stopped'
+      - server_stop_unchanged.changed == False
+
+- name: server start restart
+  clc_server:
+    location: "{{ location }}"
+    server_ids: "{{ server_ids }}"
+    state: started
+    wait: True
+  register: server_start_restart
+- name: assert server start restart
+  assert:
+    that:
+      - server_start_restart.servers[0].details.powerState == 'started'
+      - server_start_restart.changed == True

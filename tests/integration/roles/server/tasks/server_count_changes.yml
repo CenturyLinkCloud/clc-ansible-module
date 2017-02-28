@@ -1,0 +1,77 @@
+---
+- name: server exact count
+  clc_server:
+    location: "{{ location }}"
+    name: "{{ server_name }}"
+    template: "{{ server_template }}"
+    exact_count: 3
+    group: "{{ group_name }}"
+    count_group: "{{ group_name }}"
+    cpu: 1
+    memory: 1
+    type: 'standard'
+    storage_type: 'standard'
+    ttl: 7200
+    wait: True
+  register: server_exact_count
+- name: assert server exact count
+  assert:
+    that:
+      - server_exact_count.changed == True
+      - server_exact_count.group.serversCount == 3
+
+- name: server minimum count
+  clc_server:
+    location: "{{ location }}"
+    name: "{{ server_name }}"
+    template: "{{ server_template }}"
+    min_count: 4
+    group: "{{ group_name }}"
+    count_group: "{{ group_name }}"
+    cpu: 1
+    memory: 1
+    type: 'hyperscale'
+    storage_type: 'hyperscale'
+    ttl: 7200
+    wait: True
+  register: server_minimum_count
+- name: assert server minimum count
+  assert:
+    that:
+      - server_minimum_count.changed == True
+      - server_minimum_count.group.serversCount == 4
+
+- name: server maximum count
+  clc_server:
+    location: "{{ location }}"
+    name: "{{ server_name }}"
+    template: "{{ server_template }}"
+    max_count: 2
+    group: "{{ group_name }}"
+    count_group: "{{ group_name }}"
+    cpu: 1
+    memory: 1
+    ttl: 7200
+    wait: True
+  register: server_maximum_count
+- name: assert server maximum count
+  assert:
+    that:
+      - server_maximum_count.changed == True
+      - server_maximum_count.group.serversCount == 2
+
+- name: group_info
+  clc_group_fact:
+    location: "{{ location }}"
+    group_name: "{{ group_name }}"
+  register: group_info
+
+- name: servers_info
+  clc_server_fact:
+    server_id: "{{ item }}"
+  with_items: "{{ group_info.group.servers }}"
+  register: servers_info
+
+- name: set servers_fact
+  set_fact:
+    servers_fact: "{{ servers_info.results }}"

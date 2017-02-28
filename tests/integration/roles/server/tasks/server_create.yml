@@ -1,0 +1,30 @@
+---
+- name: server create
+  clc_server:
+    location: "{{ location }}"
+    name: "{{ server_name }}"
+    template: "{{ server_template }}"
+    count: 1
+    group: "{{ group_name }}"
+    count_group: "{{ group_name }}"
+    cpu: 1
+    memory: 1
+    type: 'hyperscale'
+    storage_type: 'hyperscale'
+    ttl: 7200
+    add_public_ip: True
+    public_ip_protocol: TCP
+    public_ip_ports: 443
+    anti_affinity_policy_name: "{{ aa_policy_name }}"
+    alert_policy_name: "{{ alert_policy_name }}"
+    wait: True
+  register: server_create
+- name: assert server create
+  assert:
+    that:
+      - server_create.changed == True
+      - server_create.group.serversCount == 1
+
+- name: set server_ids
+  set_fact:
+    server_ids: "{{ server_create.group.servers }}"

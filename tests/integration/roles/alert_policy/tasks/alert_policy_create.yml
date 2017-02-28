@@ -1,0 +1,31 @@
+---
+- name: alert_policy create
+  clc_alert_policy:
+    name: "{{ alert_policy_name }}"
+    alert_recipients:
+      - test1@centurylink.com
+    metric: 'cpu'
+    duration: '00:10:00'
+    threshold: 95
+    state: present
+  register: alert_policy_create
+- name: assert alert_policy create
+  assert:
+    that:
+      - alert_policy_create.changed == True
+
+- pause: seconds=3
+
+- name: alert_policy present
+  clc_alert_policy:
+    name: "{{ alert_policy_name }}"
+    state: present
+  register: alert_policy_present
+- name: assert alert_policy present
+  assert:
+    that:
+      - alert_policy_present.changed == False
+
+- name: set alert_policy_fact
+  set_fact:
+    alert_policy_fact: "{{ alert_policy_present.policy }}"

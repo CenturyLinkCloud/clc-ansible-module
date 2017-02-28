@@ -1,0 +1,40 @@
+---
+- name: publicip update ports
+  clc_publicip:
+    server_id: "{{ servers_fact[-1].server.id }}"
+    ports: [443, 80]
+    protocol: 'TCP'
+    state: present
+    wait: True
+  register: publicip_update_ports
+- name: assert publicip update ports
+  assert:
+    that:
+      - publicip_update_ports.changed == True
+
+- name: publicip update ports unchanged
+  clc_publicip:
+    server_id: "{{ servers_fact[-1].server.id }}"
+    ports: [443, 80]
+    protocol: 'TCP'
+    state: present
+    wait: True
+  register: publicip_update_ports_unchanged
+- name: assert publicip update ports unchanged
+  assert:
+    that:
+      - publicip_update_ports_unchanged.changed == False
+
+- name: publicip update restrictions
+  clc_publicip:
+    server_id: "{{ servers_fact[-1].server.id }}"
+    ports: [443, 80]
+    protocol: 'TCP'
+    source_restrictions: '1.2.3.4/32'
+    state: present
+    wait: True
+  register: publicip_update_restrictions
+- name: assert publicip update restrictions
+  assert:
+    that:
+      - publicip_update_restrictions.changed == True

@@ -1,0 +1,43 @@
+---
+- name: modify_server cpu
+  clc_modify_server:
+    server_ids:
+      - "{{ servers_fact[-1].server.id }}"
+    location: "{{ location }}"
+    cpu: 2
+    state: present
+    wait: True
+  register: modify_server_cpu
+- name: assert modify_server cpu
+  assert:
+    that:
+      - modify_server_cpu.changed == True
+
+- name: modify_server memory
+  clc_modify_server:
+    server_ids:
+      - "{{ servers_fact[-1].server.id }}"
+    location: "{{ location }}"
+    memory: 2
+    state: present
+    wait: True
+  register: modify_server_memory
+- name: assert modify_server memory
+  assert:
+    that:
+      - modify_server_memory.changed == True
+
+- name: modify_server resources unchanged
+  clc_modify_server:
+    server_ids:
+      - "{{ servers_fact[-1].server.id }}"
+    location: "{{ location }}"
+    cpu: 2
+    memory: 2
+    state: present
+    wait: True
+  register: modify_server_resources_unchanged
+- name: assert modify_server resources unchanged
+  assert:
+    that:
+      - modify_server_resources_unchanged.changed == False

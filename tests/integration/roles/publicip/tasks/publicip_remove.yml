@@ -1,0 +1,23 @@
+---
+- name: publicip remove
+  clc_publicip:
+    server_ids:
+      - "{{ servers_fact[-1].server.id }}"
+    state: absent
+    wait: True
+  register: publicip_remove
+- name: assert publicip remove
+  assert:
+    that:
+      - publicip_remove.changed == True
+
+- name: publicip absent unchanged
+  clc_publicip:
+    server_id: "{{ servers_fact[-1].server.id }}"
+    state: absent
+    wait: True
+  register: publicip_absent_unchanged
+- name: assert publicip absent unchanged
+  assert:
+    that:
+      - publicip_absent_unchanged.changed == False

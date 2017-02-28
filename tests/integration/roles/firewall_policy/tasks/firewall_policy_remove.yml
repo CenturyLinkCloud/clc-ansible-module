@@ -1,0 +1,13 @@
+---
+- name: firewall_policy remove
+  clc_firewall_policy:
+    source_account_alias: "{{ account_alias }}"
+    location: "{{ location }}"
+    firewall_policy_id: "{{ firewall_policy_id }}"
+    state: absent
+    wait: True
+  register: firewall_policy_remove
+- name: assert firewall_policy remove
+  assert:
+    that:
+      - firewall_policy_remove.changed == True

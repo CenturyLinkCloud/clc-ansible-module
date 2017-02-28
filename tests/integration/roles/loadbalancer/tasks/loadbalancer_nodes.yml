@@ -1,0 +1,75 @@
+---
+- name: loadbalancer nodes create
+  clc_loadbalancer:
+    name: "{{ loadbalancer_name }}"
+    location: "{{ location }}"
+    port: 443
+    nodes:
+      - {ipAddress: "{{ servers_fact[0].server.ipaddress }}", privatePort: 443}
+    state: present
+  register: loadbalancer_nodes_create
+- name: assert loadbalancer nodes create
+  assert:
+    that:
+      - loadbalancer_nodes_create.changed == True
+      - loadbalancer_nodes_create.loadbalancer.pools[0].nodes|length == 1
+
+- name: loadbalancer nodes present unchanged
+  clc_loadbalancer:
+    name: "{{ loadbalancer_name }}"
+    location: "{{ location }}"
+    port: 443
+    nodes:
+      - {ipAddress: "{{ servers_fact[0].server.ipaddress }}", privatePort: 443}
+    state: present
+  register: loadbalancer_nodes_present_unchanged
+- name: assert loadbalancer nodes present unchanged
+  assert:
+    that:
+      - loadbalancer_nodes_present_unchanged.changed == False
+      - loadbalancer_nodes_present_unchanged.loadbalancer.pools[0].nodes|length == 1
+
+- name: loadbalancer nodes add
+  clc_loadbalancer:
+    name: "{{ loadbalancer_name }}"
+    location: "{{ location }}"
+    port: 443
+    nodes:
+      - {ipAddress: "{{ servers_fact[1].server.ipaddress }}", privatePort: 443}
+    state: nodes_present
+  register: loadbalancer_nodes_add
+- name: assert loadbalancer nodes add
+  assert:
+    that:
+      - loadbalancer_nodes_add.changed == True
+      - loadbalancer_nodes_add.loadbalancer.pools[0].nodes|length == 2
+
+- name: loadbalancer nodes remove
+  clc_loadbalancer:
+    name: "{{ loadbalancer_name }}"
+    location: "{{ location }}"
+    port: 443
+    nodes:
+      - {ipAddress: "{{ servers_fact[0].server.ipaddress }}", privatePort: 443}
+    state: nodes_absent
+  register: loadbalancer_nodes_remove
+- name: assert loadbalancer nodes remove
+  assert:
+    that:
+      - loadbalancer_nodes_remove.changed == True
+      - loadbalancer_nodes_remove.loadbalancer.pools[0].nodes|length == 1
+
+- name: loadbalancer nodes updated unchanged
+  clc_loadbalancer:
+    name: "{{ loadbalancer_name }}"
+    location: "{{ location }}"
+    port: 443
+    nodes:
+      - {ipAddress: "{{ servers_fact[1].server.ipaddress }}", privatePort: 443}
+    state: nodes_present
+  register: loadbalancer_nodes_updated_unchanged
+- name: assert loadbalancer nodes updated unchanged
+  assert:
+    that:
+      - loadbalancer_nodes_updated_unchanged.changed == False
+      - loadbalancer_nodes_updated_unchanged.loadbalancer.pools[0].nodes|length == 1

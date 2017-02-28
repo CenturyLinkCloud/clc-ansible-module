@@ -1,68 +1,9 @@
 ---
-- name: publicip add
-  clc_publicip:
-    server_ids:
-      - "{{ servers_fact.servers[-1].id }}"
-    protocol: TCP
-    ports: 443
-    state: present
-    wait: True
-  register: publicip_add
-- name: assert publicip add
-  assert:
-    that:
-      - publicip_add.changed == True
+- include: ../../group/tasks/group_create.yml
+  when: group_fact is undefined
+- include: ../../server/tasks/server_count_changes.yml
+  when: servers_fact is undefined
 
-- name: publicip present unchanged
-  clc_publicip:
-    server_id: "{{ servers_fact.servers[-1].id }}"
-    internal_ip: "{{ servers_fact.servers[-1].ipAddresses[0].internal }}"
-    ports: 443
-    protocol: TCP
-    state: present
-    wait: True
-  register: publicip_present_unchanged
-- name: assert publicip present unchanged
-  assert:
-    that:
-      - publicip_present_unchanged.changed == False
-
-- name: publicip update ports
-  clc_publicip:
-    server_id: "{{ servers_fact.servers[-1].id }}"
-    ports: [443, 80]
-    protocol: 'TCP'
-    state: present
-    wait: True
-  register: publicip_update_ports
-- name: assert publicip update ports
-  assert:
-    that:
-      - publicip_update_ports.changed == True
-
-- name: publicip update ports unchanged
-  clc_publicip:
-    server_id: "{{ servers_fact.servers[-1].id }}"
-    ports: [443, 80]
-    protocol: 'TCP'
-    state: present
-    wait: True
-  register: publicip_update_ports_unchanged
-- name: assert publicip update ports unchanged
-  assert:
-    that:
-      - publicip_update_ports_unchanged.changed == False
-
-- name: publicip update restrictions
-  clc_publicip:
-    server_id: "{{ servers_fact.servers[-1].id }}"
-    ports: [443, 80]
-    protocol: 'TCP'
-    source_restrictions: '1.2.3.4/32'
-    state: present
-    wait: True
-  register: publicip_update_restrictions
-- name: assert publicip update restrictions
-  assert:
-    that:
-      - publicip_update_restrictions.changed == True
+- include: publicip_create.yml
+- include: publicip_update.yml
+- include: publicip_remove.yml

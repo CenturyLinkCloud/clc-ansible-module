@@ -1,0 +1,11 @@
+---
+- name: loadbalancer remove
+  clc_loadbalancer:
+    name: "{{ loadbalancer_name }}"
+    location: "{{ location }}"
+    state: absent
+  register: loadbalancer_remove
+- name: assert loadbalancer remove
+  assert:
+    that:
+      - loadbalancer_remove.changed == True

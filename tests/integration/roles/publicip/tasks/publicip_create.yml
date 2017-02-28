@@ -1,0 +1,28 @@
+---
+- name: publicip add
+  clc_publicip:
+    server_ids:
+      - "{{ servers_fact[-1].server.id }}"
+    protocol: TCP
+    ports: 443
+    state: present
+    wait: True
+  register: publicip_add
+- name: assert publicip add
+  assert:
+    that:
+      - publicip_add.changed == True
+
+- name: publicip present unchanged
+  clc_publicip:
+    server_id: "{{ servers_fact[-1].server.id }}"
+    internal_ip: "{{ servers_fact[-1].server.details.ipAddresses[0].internal }}"
+    ports: 443
+    protocol: TCP
+    state: present
+    wait: True
+  register: publicip_present_unchanged
+- name: assert publicip present unchanged
+  assert:
+    that:
+      - publicip_present_unchanged.changed == False

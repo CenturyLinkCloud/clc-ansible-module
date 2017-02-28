@@ -1,0 +1,30 @@
+---
+- name: server_snapshot create
+  clc_server_snapshot:
+    server_ids:
+      - "{{ item.server.id }}"
+    state: present
+    expiration_days: 1
+    wait: True
+  when: item.server.type == 'standard'
+  with_items: "{{ servers_fact }}"
+  register: server_snapshot_create
+- name: assert server_snapshot create
+  assert:
+    that:
+      - server_snapshot_create.changed == True
+
+- name: server_snapshot present unchanged
+  clc_server_snapshot:
+    server_ids:
+      - "{{ item.server.id }}"
+    state: present
+    expiration_days: 1
+    wait: True
+  when: item.server.type == 'standard'
+  with_items: "{{ servers_fact }}"
+  register: server_snapshot_present_unchanged
+- name: assert server_snapshot present unchanged
+  assert:
+    that:
+      - server_snapshot_present_unchanged.changed == False

@@ -1,0 +1,34 @@
+---
+- name: group create
+  clc_group:
+    name: "{{ group_name }}"
+    location: "{{ location }}"
+    state: present
+    wait: True
+  register: group_create
+- name: assert group create
+  assert:
+    that:
+      - group_create.changed == True
+
+- name: group present
+  clc_group:
+    name: "{{ group_name }}"
+    location: "{{ location }}"
+    state: present
+    wait: True
+  register: group_present
+- name: assert group present
+  assert:
+    that:
+      - group_present.changed == False
+
+- name: group_info
+  clc_group_fact:
+    group_name: "{{ group_name }}"
+    location: "{{ location }}"
+  register: group_info
+
+- name: set group_fact
+  set_fact:
+    group_fact: "{{ group_info.group }}"

@@ -1,0 +1,47 @@
+---
+- name: firewall_policy update ports
+  clc_firewall_policy:
+    source_account_alias: "{{ account_alias }}"
+    location: "{{ location }}"
+    firewall_policy_id: "{{ firewall_policy_id }}"
+    ports:
+      - 'tcp/22'
+    state: present
+    wait: True
+  register: firewall_policy_update_ports
+- name: assert firewall_policy update ports
+  assert:
+    that:
+      - firewall_policy_update_ports.changed == True
+
+- name: firewall_policy disable
+  clc_firewall_policy:
+    source_account_alias: "{{ account_alias }}"
+    location: "{{ location }}"
+    firewall_policy_id: "{{ firewall_policy_id }}"
+    enabled: False
+    state: present
+    wait: True
+  register: firewall_policy_disable
+- name: assert firewall_policy disable
+  assert:
+    that:
+      - firewall_policy_disable.changed == True
+
+- name: firewall_policy reset
+  clc_firewall_policy:
+    source_account_alias: "{{ account_alias }}"
+    location: "{{ location }}"
+    firewall_policy_id: "{{ firewall_policy_id }}"
+    ports:
+      - 'any'
+    enabled: True
+    state: present
+    wait: True
+  register: firewall_policy_reset
+- name: assert firewall_policy reset
+  assert:
+    that:
+      - firewall_policy_reset.changed == True
+
+

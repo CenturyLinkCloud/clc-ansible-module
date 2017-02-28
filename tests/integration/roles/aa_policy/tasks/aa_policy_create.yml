@@ -1,0 +1,28 @@
+---
+- name: aa_policy create
+  clc_aa_policy:
+    name: "{{ aa_policy_name }}"
+    location: "{{ location }}"
+    state: present
+  register: aa_policy_create
+- name: assert aa_policy create
+  assert:
+    that:
+      - aa_policy_create.changed == True
+
+- pause: seconds=3
+
+- name: aa_policy present
+  clc_aa_policy:
+    name: "{{ aa_policy_name }}"
+    location: "{{ location }}"
+    state: present
+  register: aa_policy_present
+- name: assert aa_policy present
+  assert:
+    that:
+      - aa_policy_present.changed == False
+
+- name: set aa_policy_fact
+  set_fact:
+    aa_policy_fact: "{{ aa_policy_present.policy }}"

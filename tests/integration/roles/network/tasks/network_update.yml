@@ -1,0 +1,27 @@
+---
+- name: network update
+  clc_network:
+    name: "{{ network_name }}"
+    description: "{{ network_description_update }}"
+    location: "{{ location }}"
+    state: present
+    wait: True
+  register: network_update
+- name: assert network update
+  assert:
+    that:
+      - network_update.changed == True
+      - network_update.network.description == "{{ network_description_update }}"
+
+- name: network update unchanged
+  clc_network:
+    name: "{{ network_name }}"
+    description: "{{ network_description_update }}"
+    location: "{{ location }}"
+    state: present
+    wait: True
+  register: network_update_unchanged
+- name: assert network update unchanged
+  assert:
+    that:
+      - network_update_unchanged.changed == False

@@ -1,0 +1,29 @@
+---
+- name: network create
+  clc_network:
+    name: "{{ network_name }}"
+    description: "{{ network_description }}"
+    location: "{{ location }}"
+    state: present
+    wait: True
+  register: network_create
+- name: assert network create
+  assert:
+    that:
+      - network_create.changed == True
+
+- name: network present
+  clc_network:
+    name: "{{ network_name }}"
+    location: "{{ location }}"
+    state: present
+    wait: True
+  register: network_present
+- name: assert network present
+  assert:
+    that:
+      - network_present.changed == False
+
+- name: set network_fact
+  set_fact:
+    network_fact: "{{ network_present.network }}"

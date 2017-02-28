@@ -1,0 +1,18 @@
+---
+- name: meta create
+  clc_meta:
+    state: present
+    name: "{{ meta_name }}"
+    description: "{{ meta_description }}"
+    jobId: "{{ meta_job_id }}"
+    executionId: "{{ meta_exec_id }}"
+    referenceId: "{{ meta_ref_id }}"
+    data:
+      type: INSTANCE
+      value: "{{ meta_instance_create }}"
+  register: meta_create
+- name: assert meta create
+  assert:
+    that:
+      - meta_create.changed == True
+      - meta_create.content.state == "created"

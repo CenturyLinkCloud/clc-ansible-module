@@ -1,51 +1,9 @@
 ---
-- name: server_snapshot create
-  clc_server_snapshot:
-    server_ids:
-      - "{{ servers_fact.servers[-1].id }}"
-    state: present
-    expiration_days: 1
-    wait: True
-  register: server_snapshot_create
-- name: assert server_snapshot create
-  assert:
-    that:
-      - server_snapshot_create.changed == True
+- include: ../../group/tasks/group_create.yml
+  when: group_fact is undefined
+- include: ../../server/tasks/server_count_changes.yml
+  when: servers_fact is undefined
 
-- name: server_snapshot present unchanged
-  clc_server_snapshot:
-    server_ids:
-      - "{{ servers_fact.servers[-1].id }}"
-    state: present
-    expiration_days: 1
-    wait: True
-  register: server_snapshot_present_unchanged
-- name: assert server_snapshot present unchanged
-  assert:
-    that:
-      - server_snapshot_present_unchanged.changed == False
-
-- name: server_snapshot restore
-  clc_server_snapshot:
-    server_ids:
-      - "{{ servers_fact.servers[-1].id }}"
-    state: restore
-    wait: True
-  register: server_snapshot_restore
-- name: assert server_snapshot restore
-  assert:
-    that:
-      - server_snapshot_restore.changed == True
-
-
-- name: server_snapshot delete
-  clc_server_snapshot:
-    server_ids:
-      - "{{ servers_fact.servers[-1].id }}"
-    state: absent
-    wait: True
-  register: server_snapshot_delete
-- name: assert server_snapshot delete
-  assert:
-    that:
-      - server_snapshot_delete.changed == True
+- include: server_snapshot_create.yml
+- include: server_snapshot_restore.yml
+- include: server_snapshot_remove.yml

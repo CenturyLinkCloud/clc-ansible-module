@@ -1,15 +1,9 @@
 ---
-- include: firewall_policy.yml
-
-- include: network.yml
+- include: firewall_policy_teardown.yml
+- include: alert_policy_teardown.yml
+- include: aa_policy_teardown.yml
+- include: loadbalancer_teardown.yml
+- include: group_teardown.yml
+- include: network_teardown.yml
   when: run_network_test
-
-- include: alert_policy.yml
-
-- include: aa_policy.yml
-
-- include: loadbalancer.yml
-
-- include: group.yml
-
-- include: meta.yml
+- include: meta_teardown.yml

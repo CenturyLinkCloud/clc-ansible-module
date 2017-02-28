@@ -1,0 +1,14 @@
+---
+- name: modify_server network primary unchanged
+  clc_modify_server:
+    server_ids:
+      - "{{ servers_fact[-1].server.id }}"
+    location: "{{ location }}"
+    additional_network: "{{ network_list.networks[0].id }}"
+    state: present
+    wait: True
+  register: modify_server_network_unchanged
+- name: assert modify_server network primary
+  assert:
+    that:
+      - modify_server_network_unchanged.changed == False

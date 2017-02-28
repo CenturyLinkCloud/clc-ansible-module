@@ -1,0 +1,14 @@
+---
+- name: blueprint_package Install (Fake) SSH Public Key on Linux
+  clc_blueprint_package:
+    server_ids:
+        - "{{ servers_fact[-1].server.id }}"
+    package_id: 77abb844-579d-478d-3955-c69ab4a7ba1a
+    package_params: {'User': 'root', 'SshKey': 'ssh-rsa AAAABO_fake_key_L0x bb@machine.local'}
+    wait: True
+    state: present
+  register: blueprint_package_ssh
+- name: assert blueprint_package install ssh key
+  assert:
+    that:
+      - blueprint_package_ssh.changed == True
