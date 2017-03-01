@@ -116,7 +116,7 @@ def _default_headers():
 
 
 def call_clc_api(module, clc_auth, method, url, headers=None, data=None,
-                 timeout=10):
+                 timeout=10, max_tries=3):
     """
     Make a request to the CLC API v2.0
     :param module: Ansible module being called
@@ -126,6 +126,7 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None,
     :param headers: Headers to be added to request
     :param data: Data to be sent with request
     :param timeout: Timeout in seconds
+    :param max_tries: Maximum number of tries attempted if call times out
     :return response: JSON from HTTP response, or None if no content
     """
     if not isinstance(url, str) or not isinstance(url, basestring):
@@ -151,35 +152,44 @@ def call_clc_api(module, clc_auth, method, url, headers=None, data=None,
         else:
             data = json.dumps(data)
             headers['Content-Type'] = 'application/json'
-    try:
-        response = open_url(
-            url='{endpoint}/{path}'.format(
-                endpoint=clc_auth['v2_api_url'].rstrip('/'),
-                path=url.lstrip('/')),
-            method=method,
-            headers=headers,
-            data=data,
-            timeout=timeout)
-    except urllib2.HTTPError as ex:
+    tries = 0
+    while tries < max_tries:
+        tries += 1
         try:
-            error_response = json.loads(ex.read())
-            error_message = error_response['message']
-        except (AttributeError, ValueError, KeyError):
-            error_message = ex.reason
-        api_ex = ClcApiException(
-            message='Error calling CenturyLink Cloud API: {msg}'.format(
-                msg=error_message),
-            code=ex.code)
-        raise api_ex
-    except ssl.SSLError as ex:
-        raise ex
-    if response.getcode() == 204:
-        return None
-    try:
-        return json.loads(response.read())
-    except:
-        raise ClcApiException(
-            'Error converting CenturyLink Cloud API response to JSON')
+            response = open_url(
+                url='{endpoint}/{path}'.format(
+                    endpoint=clc_auth['v2_api_url'].rstrip('/'),
+                    path=url.lstrip('/')),
+                method=method,
+                headers=headers,
+                data=data,
+                timeout=timeout)
+        except urllib2.HTTPError as ex:
+            try:
+                error_response = json.loads(ex.read())
+                error_message = error_response['message']
+            except (AttributeError, ValueError, KeyError):
+                error_message = ex.reason
+            api_ex = ClcApiException(
+                message='Error calling CenturyLink Cloud API: {msg}'.format(
+                    msg=error_message),
+                code=ex.code)
+            raise api_ex
+        except ssl.SSLError as ex:
+            if tries >= max_tries:
+                error_message = 'After {num} tries, {msg}'.format(
+                    num=tries, msg=ex.message)
+                raise ssl.SSLError(error_message)
+            else:
+                timeout *= 2
+                continue
+        if response.getcode() == 204:
+            return None
+        try:
+            return json.loads(response.read())
+        except:
+            raise ClcApiException(
+                'Error converting CenturyLink Cloud API response to JSON')
 
 
 def operation_status(module, clc_auth, operation_id):
