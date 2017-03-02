@@ -1,9 +1,33 @@
 ---
 - include: firewall_policy_teardown.yml
+  tags:
+    - firewall_policy
 - include: alert_policy_teardown.yml
+  tags:
+    - alert_policy
+    - server
+    - modify_server
 - include: aa_policy_teardown.yml
+  tags:
+    - aa_policy
+    - server
+    - modify_server
 - include: loadbalancer_teardown.yml
+  tags:
+    - loadbalancer
 - include: group_teardown.yml
+  tags:
+    - group
+    - server
+    - modify_server
+    - server_snapshot
+    - loadbalancer
+    - publicip
+    - blueprint_package
 - include: network_teardown.yml
+  tags:
+    - network
   when: run_network_test
 - include: meta_teardown.yml
+  tags:
+    - meta

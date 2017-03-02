@@ -1,8 +1,32 @@
 ---
 - include: network_setup.yml
+  tags:
+    - network
 - include: firewall_policy_setup.yml
+  tags:
+    - firewall_policy
 - include: alert_policy_setup.yml
+  tags:
+    - alert_policy
+    - server
+    - modify_server
 - include: aa_policy_setup.yml
+  tags:
+    - aa_policy
+    - server
+    - modify_server
 - include: group_setup.yml
+  tags:
+    - group
+    - server
+    - modify_server
+    - server_snapshot
+    - loadbalancer
+    - publicip
+    - blueprint_package
 - include: loadbalancer_setup.yml
+  tags:
+    - loadbalancer
 - include: meta_setup.yml
+  tags:
+    - meta

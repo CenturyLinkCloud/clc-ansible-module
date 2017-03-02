@@ -1,4 +1,12 @@
 ---
+# Integration test for clc-ansible-modules
+#
+# This integration test will run through all the ansible modules, running tasks
+# required to fully test that module's functionality.
+#
+# Specific tests can be run by specifying the tags at the command line
+# Tags are listed in this playbook, as well as in the main task for the
+# setup and teardown roles.
 - name: clc-ansible-module integration test suite
   hosts: localhost
   gather_facts: False
@@ -8,6 +16,9 @@
     # in a datacenter.
     # See https://www.ctl.io/pricing for network cost information.
     # By default skip the network tests.
+    #
+    # To over-ride, run with the -e or --extra-vars flag
+    #   ansible-playbook -e run_network_test=True
     run_network_test: False
 
 
@@ -15,16 +26,26 @@
 
     - name: include vars
       include_vars: vars.yml
+      tags:
+        - always
 
     - name: network list
       clc_network_fact:
         location: "{{ location }}"
+      tags:
+        - setup
+        - teardown
+        - network
+        - firewall_policy
+        - modify_server
       register: network_list
 
     # Ensure tests start from a clean state
     - name: integration test setup
       include_role:
         name: setup
+      tags:
+        - setup
 
   tasks:
 
@@ -33,51 +54,75 @@
         - name: integration test group
           include_role:
             name: group
+          tags:
+            - group
 
         - name: integration test aa_policy
           include_role:
             name: aa_policy
+          tags:
+            - aa_policy
 
         - name: integration test alert_policy
           include_role:
             name: alert_policy
+          tags:
+            - alert_policy
 
         - name: integration test server
           include_role:
             name: server
+          tags:
+            - server
 
         - name: integration test modify_server
           include_role:
             name: modify_server
+          tags:
+            - modify_server
 
         - name: integration test blueprint_package
           include_role:
             name: blueprint_package
+          tags:
+            - blueprint_package
 
         - name: integration test loadbalancer
           include_role:
             name: loadbalancer
+          tags:
+            - loadbalancer
 
         - name: integration test server_snapshot
           include_role:
             name: server_snapshot
+          tags:
+            - server_snapshot
 
         - name: integration test network
           include_role:
             name: network
+          tags:
+            - network
           when: run_network_test
 
         - name: integration test publicip
           include_role:
             name: publicip
+          tags:
+            - publicip
 
         - name: integration test firewall_policy
           include_role:
             name: firewall_policy
+          tags:
+            - firewall_policy
 
         - name: integration test meta
           include_role:
             name: meta
+          tags:
+            - meta
 
 
       # Always run teardown, even if previous tests fail
@@ -86,4 +131,6 @@
         - name: integration test teardown
           include_role:
             name: teardown
+          tags:
+            - teardown
 
