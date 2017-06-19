@@ -1,4 +1,4 @@
-ansible==2.0.2.0
+ansible
 clc-sdk==2.44
 coverage
 future
