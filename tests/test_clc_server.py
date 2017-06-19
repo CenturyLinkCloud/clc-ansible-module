@@ -405,6 +405,8 @@ class TestClcServerFunctions(unittest.TestCase):
             'os_type': 'ubuntu14_64Bit'
         }
 
+
+
         # Define Mock Objects
         mock_server = mock.MagicMock()
         mock_requests = mock.MagicMock()
@@ -438,12 +440,18 @@ class TestClcServerFunctions(unittest.TestCase):
         mock_result_group.data = { "id":"1111111" }
         mock_result_group.Servers().Servers.return_value = [ mock_existing_server, mock_server ]
 
+        # Set Mock bareMetalCapabilities REturn Values
+        mock_baremetal = mock.MagicMock()
+
         # Setup Mock API Responses
         def _api_call_return_values(*args, **kwargs):
+            if kwargs.get('method') == 'GET' and 'bareMetalCapabilities' in kwargs.get('url'):
+                return {"operatingSystems": [{'type': 'ubuntu14_64Bit'}]}
             if kwargs.get('method') == 'GET':
                 return {'id': '12345','name': 'test'}
             if kwargs.get('method') == 'POST':
                 return {'links': [{'rel': 'self', 'id': '12345'}]}
+
 
         mock_clc_sdk.v2.Datacenter().Groups().Get.side_effect = [ mock_group, mock_result_group ]
         mock_clc_sdk.v2.Group.return_value = mock_group

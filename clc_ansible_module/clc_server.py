@@ -233,10 +233,9 @@ options:
   os_type:
     description:
       - Only required for bare metal servers.
-        Specifies the OS to provision with the bare metal server.
+        Specifies the OS to provision with the bare metal server. Will search for a os_type if a partial string is provided.
     default: None
     required: False
-    choices: ['redHat6_64Bit', 'centOS6_64Bit', 'windows2012R2Standard_64Bit', 'ubuntu14_64Bit']
   wait:
     description:
       - Whether to wait for the provisioning tasks to finish before returning.
@@ -703,13 +702,7 @@ class ClcServer(object):
                     'ICMP']),
             public_ip_ports=dict(type='list', default=[]),
             configuration_id=dict(default=None),
-            os_type=dict(default=None,
-                         choices=[
-                             'redHat6_64Bit',
-                             'centOS6_64Bit',
-                             'windows2012R2Standard_64Bit',
-                             'ubuntu14_64Bit'
-                         ]),
+            os_type=dict(),
             wait=dict(type='bool', default=True))
 
         mutually_exclusive = [
@@ -778,6 +771,7 @@ class ClcServer(object):
         params['description'] = ClcServer._find_description(module)
         params['ttl'] = ClcServer._find_ttl(clc, module)
         params['template'] = ClcServer._find_template_id(module, datacenter)
+        params['os_type'] = ClcServer._find_os_type_id(clc, module, alias, datacenter)
         if params['state'] == 'present':
             params['group'] = ClcServer._find_group(module, datacenter).id
         params['network_id'] = ClcServer._find_network_id(module, datacenter)
@@ -983,6 +977,40 @@ class ClcServer(object):
                         " in location: " +
                         datacenter.id))
         return result
+
+
+    @staticmethod
+    def _find_os_type_id(clc, module, alias, datacenter):
+        """
+        Find the template id by calling the CLC API.
+        :param module: the module to validate
+        :param datacenter: the datacenter to search for the template
+        :return: a valid clc template id
+        """
+        lookup_os = module.params.get('os_type')
+        state = module.params.get('state')
+        type = module.params.get('type')
+        os_types = []
+
+        if state == 'present' and type == 'bareMetal':
+            try:
+                baremetal = clc.v2.API.Call(method='GET', url='datacenters/%s/%s/bareMetalCapabilities' % (alias, datacenter.id))
+                for os in baremetal["operatingSystems"]:
+                    os_types.append(os["type"])
+                    if os["type"].lower().find(lookup_os.lower()) != -1:
+                        return os["type"]
+                raise CLCException()
+            except CLCException:
+                module.fail_json(
+                    msg=str(
+                        "Unable to find a os_type: " +
+                        lookup_os +
+                        " in location: " +
+                        datacenter.id))
+
+
+
+
 
     @staticmethod
     def _find_network_id(module, datacenter):
