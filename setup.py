@@ -22,7 +22,7 @@ except ImportError:
 
 setup(
     name='clc-ansible-module',
-    version='1.1.22',
+    version='1.1.23',
     description='Centurylink Cloud Ansible Modules',
     author='CenturyLink Cloud',
     author_email='WFAAS-LLFT@centurylink.com',
