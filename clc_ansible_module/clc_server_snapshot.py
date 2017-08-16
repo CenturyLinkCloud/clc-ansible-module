@@ -125,6 +125,7 @@ server_ids:
 
 __version__ = '${version}'
 
+import time
 from distutils.version import LooseVersion
 
 try:
@@ -312,6 +313,15 @@ class ClcSnapshot(object):
                 self.module.fail_json(msg='Failed to delete snapshot for server : {0}. {1}'.format(
                     server.id, ex.message
                 ))
+
+        t_end = time.time() + 300
+        while time.time() < t_end:
+            if len(self.clc.v2.Server(server).GetSnapshots()) == 0:
+                break
+        if len(self.clc.v2.Server(server).GetSnapshots()) != 0:
+            self.module.fail_json(msg='Failed to delete snapshot for server : {0}. {1}'.format(
+                    server.id, ex.message))
+        
         return result
 
     def ensure_server_snapshot_restore(self, server_ids, ignore_failures):
