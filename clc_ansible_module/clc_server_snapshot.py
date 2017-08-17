@@ -203,7 +203,7 @@ class ClcSnapshot(object):
                 server_ids=server_ids,
                 ignore_failures=ignore_failures)
 
-        self._wait_for_requests_to_complete(request_list)
+        self._wait_for_requests_to_complete(request_list, changed_servers)
         return self.module.exit_json(
             changed=changed,
             server_ids=changed_servers,
@@ -314,16 +314,6 @@ class ClcSnapshot(object):
                     server.id, ex.message
                 ))
 
-        t_end = time.time() + 600
-        while time.time() < t_end:
-            if len(self.clc.v2.Server(server).GetSnapshots()) == 0:
-                break
-        if len(self.clc.v2.Server(server).GetSnapshots()) != 0:
-            if ignore_failures:
-                return None
-            else:
-                self.module.fail_json(msg='Failed to delete snapshot for server : {0}.'.format(
-                    server.id))
         return result
 
     def ensure_server_snapshot_restore(self, server_ids, ignore_failures):
@@ -376,10 +366,11 @@ class ClcSnapshot(object):
                 ))
         return result
 
-    def _wait_for_requests_to_complete(self, requests_lst):
+    def _wait_for_requests_to_complete(self, requests_lst, changed_servers):
         """
         Waits until the CLC requests are complete if the wait argument is True
         :param requests_lst: The list of CLC request objects
+        :param changed_servers: The list of servers that were changed
         :return: none
         """
         if not self.module.params['wait']:
@@ -390,6 +381,16 @@ class ClcSnapshot(object):
                 if request_details.Status() != 'succeeded':
                     self.module.fail_json(
                         msg='Unable to process server snapshot request')
+
+        if self.module.params['state'] == 'absent':
+            for server in changed_servers:
+                t_end = time.time() + 600
+                while time.time() < t_end:
+                    if len(self.clc.v2.Server(server).GetSnapshots()) == 0:
+                        break
+                if len(self.clc.v2.Server(server).GetSnapshots()) != 0:
+                    self.module.fail_json(msg='Failed to delete snapshot for server : {0}.'.format(server))
+
 
     @staticmethod
     def define_argument_spec():
