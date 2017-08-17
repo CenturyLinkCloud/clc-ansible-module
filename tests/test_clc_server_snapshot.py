@@ -283,10 +283,11 @@ class TestClcServerSnapshotFunctions(unittest.TestCase):
         mock_r2 = mock.MagicMock()
         mock_r2.WaitUntilComplete.return_value = True
         requests = [mock_r1, mock_r2]
+
         self.module.wait = True
 
         under_test = ClcSnapshot(self.module)
-        under_test._wait_for_requests_to_complete(requests)
+        under_test._wait_for_requests_to_complete(requests, mock.MagicMock())
         self.assertFalse(self.module.fail_json.called)
 
     def test_wait_for_requests_w_mock_request_fail(self):
@@ -299,7 +300,7 @@ class TestClcServerSnapshotFunctions(unittest.TestCase):
         self.module.wait = True
 
         under_test = ClcSnapshot(self.module)
-        under_test._wait_for_requests_to_complete(requests)
+        under_test._wait_for_requests_to_complete(requests, mock.MagicMock())
         self.assertTrue(self.module.fail_json.called)
 
     @patch.object(ClcSnapshot, '_get_servers_from_clc')
@@ -326,7 +327,7 @@ class TestClcServerSnapshotFunctions(unittest.TestCase):
         server_ids = ['INVALID']
         mock_get_servers.return_value=[mock.MagicMock()]
         under_test = ClcSnapshot(self.module)
-        under_test._wait_for_requests_to_complete (mock.MagicMock())
+        under_test._wait_for_requests_to_complete (mock.MagicMock(), mock.MagicMock())
         self.assertFalse(self.module.fail_json.called)
 
     def test_wait_for_requests_no_wait(self):
@@ -336,7 +337,7 @@ class TestClcServerSnapshotFunctions(unittest.TestCase):
             'wait': False
         }
         under_test = ClcSnapshot(self.module)
-        under_test._wait_for_requests_to_complete([mock_request])
+        under_test._wait_for_requests_to_complete([mock_request], mock.MagicMock())
         self.assertFalse(self.module.fail_json.called)
 
     def test_create_server_snapshot_exception(self):
