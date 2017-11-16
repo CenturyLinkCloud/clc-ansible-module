@@ -19,7 +19,7 @@ The installation will install a dynamic inventory script to /usr/local/bin.  In 
 ln -s /usr/local/bin/clc_inv.py /etc/ansible/hosts
 ```
 
-####Validation
+#### Validation
 Validate that the clc-ansible-module package has been installed and is functioning:
 ```bash
 ansible all -i /usr/local/bin/clc_inv.py --list-hosts
@@ -30,7 +30,7 @@ Validate that all packages are install and configured:
 ansible-playbook -i /usr/local/bin/clc_inv.py my-playbook.yml
 ```
 
-####Dependencies
+#### Dependencies
 This module has one dependency  The [clc-python-sdk](https://github.com/CenturyLinkCloud/clc-python-sdk).  You can install it with pip
 
 ```bash
@@ -53,7 +53,7 @@ Create, delete, start, or stop a server at CLC.  This module can be run in two m
 
 If you just specify *count* instead of *exact_count*, the module runs in non-idempotent mode.  It will create *count* number of VMs every time it's run.
 
-###Example Playbooks
+### Example Playbooks
 ```yaml
 ---
 - name: deploy ubuntu hosts at CLC (Yay!)
@@ -134,7 +134,7 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
     - debug: var=clc_svr
 ```
 
-###Available Parameters
+### Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
@@ -170,7 +170,7 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 | `ttl:` | N | | Any valid int > 3600 | The time to live for the server.  The server will be deleted when this expires. |
 | `type:` | N | `standard` | `standard`, `hyperscale`, `bareMetal`| The type of server to create.
 | `configuration_id:` | N | |  | The identifier for the specific configuration type of bare metal server to deploy. |
-| `os_type:` | N |  | `redHat6_64Bit`, `centOS6_64Bit`, `windows2012R2Standard_64Bit`, `ubuntu14_64Bit`| The OS to provision with the bare metal server.
+| `os_type:` | N |  | `redHat6_64Bit`, `redHat7_64Bit`, `centOS6_64Bit`, `centOS7_64Bit`, `windows2012R2Standard_64Bit`, `ubuntu14_64Bit`, `Ubuntu16_64Bit`| The OS to provision with the bare metal server.
 | `v2_api_username:` | N | | | The control portal user to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `v2_api_passwd:` | N | | | The control portal password to use for the task.  ```This should be provided by setting environment variables instead of including it in the playbook.```
 | `wait:` | N | True | Boolean| Whether to wait for the provisioning tasks to finish before returning.
@@ -179,7 +179,7 @@ If you just specify *count* instead of *exact_count*, the module runs in non-ide
 
 This module can be used to modify server configuration in CLC.
 
-###Example Playbook
+### Example Playbook
 ```yaml
 ---
 - name: modify clc server example
@@ -268,7 +268,7 @@ This module can be used to modify server configuration in CLC.
         additional_network: '613a25aff2124d10a71b16cd6fb28975'
 ```
 
-###Available Parameters
+### Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
@@ -288,7 +288,7 @@ This module can be used to modify server configuration in CLC.
 ## clc_server_fact Module
 Retrieve facts about servers in Centurylink Cloud.
 
-###Example Playbook
+### Example Playbook
 ```yaml
 - name: Retrieve Server Facts
   clc_server_fact:
@@ -301,7 +301,7 @@ Retrieve facts about servers in Centurylink Cloud.
     server_id: UC1ACCTSRVR10
     credentials: true
 ```
-###Available Parameters
+### Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
@@ -312,7 +312,7 @@ Retrieve facts about servers in Centurylink Cloud.
 
 Create or deletes Server Groups at CenturyLink Cloud.
 
-###Example Playbook
+### Example Playbook
 ```yaml
 ---
 - name: Create Server Group
@@ -349,7 +349,7 @@ Create or deletes Server Groups at CenturyLink Cloud.
       debug: var=clc
 ```
 
-###Available Parameters
+### Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
@@ -362,7 +362,7 @@ Create or deletes Server Groups at CenturyLink Cloud.
 ## clc_group_fact Module
 Retrieve facts about groups in Centurylink Cloud.
 
-###Example Playbook
+### Example Playbook
 ```yaml
 ---
 - name: Retrieve Group Facts
@@ -370,7 +370,7 @@ Retrieve facts about groups in Centurylink Cloud.
     group_id: 31d13f501459411ba59304f3d47486eb
 ```
 
-###Available Parameters
+### Available Parameters
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
 | `group_id` | Y | | | The group id to retrieve facts for.
@@ -379,7 +379,7 @@ Retrieve facts about groups in Centurylink Cloud.
 
 Create or deletes Anti Affinity Policies at CenturyLink Cloud.
 
-###Example Playbook
+### Example Playbook
 ```yaml
 ---
 - name: Create AA Policy
@@ -416,7 +416,7 @@ Create or deletes Anti Affinity Policies at CenturyLink Cloud.
       debug: var=policy
 ```
 
-###Available Parameters
+### Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
@@ -471,7 +471,7 @@ Creates a public ip on an existing server or servers.
     - name: debug
       debug: var=clc
 ```
-###Available Parameters
+### Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
@@ -535,7 +535,7 @@ Create/Delete/Restore a snapshot on an existing server or servers.
         state: absent
 ```
 
-###Available Parameters
+### Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
@@ -564,7 +564,7 @@ Executes a blue print package on existing set of servers.
         package_params: {}
 ```
 
-###Available Parameters
+### Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
@@ -791,7 +791,7 @@ Create/Delete a Firewall Policy
 
 Create or delete Network at CenturyLink Cloud.
 
-###Example Playbook
+### Example Playbook
 ```yaml
 ---
 - name: Create Network
@@ -828,7 +828,7 @@ Create or delete Network at CenturyLink Cloud.
 
 ```
 
-###Available Parameters
+### Available Parameters
 
 | Parameter | Required | Default | Choices | Description |
 |-----------|:--------:|:-------:|:-------:|-------------|
@@ -881,7 +881,7 @@ Our recommended approach to working with the clc-ansible-module code base is to 
 `
 - Make the virutual environment active:`
 `. ./clc-ansible-module/bin/activate`
-
+`
 
 ### Install necessary dependencies
 - `pip install -r requirements.txt`
@@ -908,7 +908,7 @@ python ./setup.py install
 - This step isn't required to build the module set.  It's primarily used to help the Runner team manage changes and releases.
 
 ### Submitting Changes
-#####PR's are welcome!
+##### PR's are welcome!
 
 Please create an Issue in Github against the project prior to doing any custom work or submitting a PR.
 
