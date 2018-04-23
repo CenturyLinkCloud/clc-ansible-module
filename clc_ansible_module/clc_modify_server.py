@@ -413,6 +413,7 @@ class ClcModifyServer(object):
         self._set_clc_credentials_from_env()
 
         p = self.module.params
+        p['alias'] = self._find_alias(self.clc, self.module)
         cpu = int(p.get('cpu')) if p.get('cpu') else None
         memory = int(p.get('memory')) if p.get('memory') else None
         state = p.get('state')
@@ -487,6 +488,24 @@ class ClcModifyServer(object):
             return self.module.fail_json(
                 msg="You must set the CLC_V2_API_USERNAME and CLC_V2_API_PASSWD "
                     "environment variables")
+
+    @staticmethod
+    def _find_alias(clc, module):
+        """
+        Find or Validate the Account Alias by calling the CLC API
+        :param clc: clc-sdk instance to use
+        :param module: module to validate
+        :return: clc-sdk.Account instance
+        """
+        alias = module.params.get('alias')
+        if not alias:
+            try:
+                alias = clc.v2.Account.GetAlias()
+            except CLCException as ex:
+                module.fail_json(msg='Unable to find account alias. {0}'.format(
+                    ex.message
+                ))
+        return alias
 
     def _get_servers_from_clc(self, server_list, message):
         """
@@ -614,7 +633,7 @@ class ClcModifyServer(object):
         :return: the result of CLC API call
         """
         result = None
-        acct_alias = clc.v2.Account.GetAlias()
+        acct_alias = module.params['alias']
         try:
             # Update the server configuration
             job_obj = clc.v2.API.Call('PATCH',
@@ -643,7 +662,7 @@ class ClcModifyServer(object):
         :return:
         """
         result = None
-        acct_alias = clc.v2.Account.GetAlias()
+        acct_alias = module.params['alias']
         datacenter = ClcModifyServer._find_datacenter(clc, module)
         additional_network = ClcModifyServer._find_network_id(module, datacenter)
         wait = module.params.get('wait', False)
@@ -668,29 +687,26 @@ class ClcModifyServer(object):
 
     @staticmethod
     def _modify_remove_nic(clc, module, server_id):
-      result = None
+        result = None
+        acct_alias = module.params['alias']
+        dc = ClcModifyServer._find_datacenter(clc, module)
+        network = ClcModifyServer._find_network_id(module, dc)
+        wait = module.params.get('wait', False)
 
-      acct_alias = clc.v2.Account.GetAlias()
-      dc = ClcModifyServer._find_datacenter(clc, module)
-      network = ClcModifyServer._find_network_id(module, dc)
-      wait = module.params.get('wait', False)
+        if not module.check_mode:
+            try:
+                if wait:
+                    clc.v2.Server(alias=acct_alias, id=server_id).RemoveNIC(network_id=network).WaitUntilComplete()
+                    result = True
+                else:
+                    clc.v2.Server(alias=acct_alias, id=server_id).RemoveNIC(network_id=network)
+                    result = True
+            except CLCException as ex:
+                result = False
+                module.fail_json(msg='Unable to remove NIC from server : "{0}". {1}'.format(
+                    server_id, str(ex.message)))
 
-      if not module.check_mode:
-        try:
-          if wait:
-            clc.v2.Server(alias=acct_alias, id=server_id).RemoveNIC(network_id=network).WaitUntilComplete()
-            result = True
-          else:
-            clc.v2.Server(alias=acct_alias, id=server_id).RemoveNIC(network_id=network)
-            result = True
-        except CLCException as ex:
-          result = False
-          module.fail_json(
-            msg='Unable to remove NIC from server : "{0}". {1}'.format(
-                    server_id, str(ex.message))
-          )
-
-      return result
+        return result
 
     @staticmethod
     def _find_datacenter(clc, module):
@@ -835,7 +851,7 @@ class ClcModifyServer(object):
             result: The result from the CLC API call
         """
         changed = False
-        acct_alias = self.clc.v2.Account.GetAlias()
+        acct_alias = self.module.params['alias']
 
         aa_policy_id = server_params.get('anti_affinity_policy_id')
         aa_policy_name = server_params.get('anti_affinity_policy_name')
@@ -872,7 +888,7 @@ class ClcModifyServer(object):
             result: The result from the CLC API call
         """
         changed = False
-        acct_alias = self.clc.v2.Account.GetAlias()
+        acct_alias = self.module.params['alias']
         aa_policy_id = server_params.get('anti_affinity_policy_id')
         aa_policy_name = server_params.get('anti_affinity_policy_name')
         if not aa_policy_id and aa_policy_name:
@@ -1008,7 +1024,7 @@ class ClcModifyServer(object):
             result: The result from the CLC API call
         """
         changed = False
-        acct_alias = self.clc.v2.Account.GetAlias()
+        acct_alias = self.module.params['alias']
         alert_policy_id = server_params.get('alert_policy_id')
         alert_policy_name = server_params.get('alert_policy_name')
         if not alert_policy_id and alert_policy_name:
@@ -1040,7 +1056,7 @@ class ClcModifyServer(object):
         """
         changed = False
 
-        acct_alias = self.clc.v2.Account.GetAlias()
+        acct_alias = self.module.params['alias']
         alert_policy_id = server_params.get('alert_policy_id')
         alert_policy_name = server_params.get('alert_policy_name')
         if not alert_policy_id and alert_policy_name:
